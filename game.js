@@ -1,4 +1,5 @@
 // ===== GAME DATA =====
+console.log('🎮 game.js is loading...');
 
 const CHARACTERS = {
     powerhouse: {
@@ -164,67 +165,88 @@ const TRAINING_AREAS = [
 // gearModifiers: array of gear names that provide benefits on this route
 const ROUTES = {
     bouldering: [
-        { name: "Beginner's Fortune", grade: "V0", strength: 15, technique: 20, focus: 15, flexibility: 10, time: 2, endurance: 12, xpSuccess: 25, xpFail: 8, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Climbing Shoes"] },
-        { name: "Warm-Up Wonder", grade: "V1", strength: 22, technique: 25, focus: 18, flexibility: 20, time: 2, endurance: 16, xpSuccess: 32, xpFail: 12, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [] },
-        { name: "Crimson Ladder", grade: "V2", strength: 30, technique: 28, focus: 25, flexibility: 22, time: 2, endurance: 22, xpSuccess: 42, xpFail: 16, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: ["Finger Tape"] },
-        { name: "Toe Hook Traverse", grade: "V3", strength: 32, technique: 35, focus: 30, flexibility: 28, time: 3, endurance: 28, xpSuccess: 52, xpFail: 22, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'flexibility', modifier: -1 }], gearModifiers: ["Climbing Shoes"] },
-        { name: "Crimper's Delight", grade: "V4", strength: 45, technique: 40, focus: 35, flexibility: 28, time: 4, endurance: 36, xpSuccess: 65, xpFail: 30, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: -1 }], gearModifiers: ["Finger Tape"] },
-        { name: "Dyno Dilemma", grade: "V5", strength: 52, technique: 38, focus: 36, flexibility: 30, time: 4, endurance: 46, xpSuccess: 78, xpFail: 38, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [] },
-        { name: "Heel Hook Heaven", grade: "V6", strength: 48, technique: 50, focus: 44, flexibility: 42, time: 4, endurance: 56, xpSuccess: 90, xpFail: 46, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'flexibility', modifier: -1 }], gearModifiers: ["Climbing Shoes"] },
-        { name: "The Roof of Doom", grade: "V7", strength: 58, technique: 48, focus: 42, flexibility: 40, time: 5, endurance: 64, xpSuccess: 100, xpFail: 54, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Chalk Bag"] },
-        { name: "Shoulder Shredder", grade: "V8", strength: 65, technique: 48, focus: 44, flexibility: 40, time: 5, endurance: 72, xpSuccess: 100, xpFail: 62, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: ["Chalk Bag"] },
-        { name: "Dyno Chain", grade: "V9", strength: 70, technique: 52, focus: 50, flexibility: 44, time: 5, endurance: 80, xpSuccess: 100, xpFail: 70, rollEffect: [{ stat: 'strength', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Chalk Bag"] },
-        { name: "Precision Impossible", grade: "V10", strength: 58, technique: 70, focus: 68, flexibility: 58, time: 5, endurance: 88, xpSuccess: 100, xpFail: 78, rollEffect: [{ stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [] },
-        { name: "The Impossible Pinch", grade: "V11", strength: 80, technique: 64, focus: 60, flexibility: 52, time: 5, endurance: 96, xpSuccess: 100, xpFail: 86, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [] },
-        { name: "Project Zero", grade: "V12", strength: 82, technique: 72, focus: 70, flexibility: 58, time: 6, endurance: 100, xpSuccess: 100, xpFail: 90, rollEffect: [{ stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [] }
+        { name: "Beginner's Fortune", grade: "V0", strength: 15, technique: 20, focus: 15, flexibility: 10, time: 2, endurance: 12, xpSuccess: 25, xpFail: 8, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Slab", holdFeatures: ["Jugs"], moveFeatures: [] },
+        { name: "Warm-Up Wonder", grade: "V1", strength: 22, technique: 25, focus: 18, flexibility: 20, time: 2, endurance: 16, xpSuccess: 32, xpFail: 12, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: ["Jugs"], moveFeatures: [] },
+        { name: "Crimson Ladder", grade: "V2", strength: 30, technique: 28, focus: 25, flexibility: 22, time: 2, endurance: 22, xpSuccess: 42, xpFail: 16, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
+        { name: "Toe Hook Traverse", grade: "V3", strength: 32, technique: 35, focus: 30, flexibility: 28, time: 3, endurance: 28, xpSuccess: 52, xpFail: 22, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'flexibility', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Traverse", holdFeatures: [], moveFeatures: ["Toe Hook", "Heel Hook"] },
+        { name: "Crimper's Delight", grade: "V4", strength: 45, technique: 40, focus: 35, flexibility: 28, time: 4, endurance: 36, xpSuccess: 65, xpFail: 30, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: -1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
+        { name: "Dyno Dilemma", grade: "V5", strength: 52, technique: 38, focus: 36, flexibility: 30, time: 4, endurance: 46, xpSuccess: 78, xpFail: 38, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic", "Dyno"] },
+        { name: "Heel Hook Heaven", grade: "V6", strength: 48, technique: 50, focus: 44, flexibility: 42, time: 4, endurance: 56, xpSuccess: 90, xpFail: 46, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'flexibility', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Heel Hook"] },
+        { name: "The Roof of Doom", grade: "V7", strength: 58, technique: 48, focus: 42, flexibility: 40, time: 5, endurance: 64, xpSuccess: 100, xpFail: 54, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: ["Jugs"], moveFeatures: ["Roof"] },
+        { name: "Shoulder Shredder", grade: "V8", strength: 65, technique: 48, focus: 44, flexibility: 40, time: 5, endurance: 72, xpSuccess: 100, xpFail: 62, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Dyno Chain", grade: "V9", strength: 70, technique: 52, focus: 50, flexibility: 44, time: 5, endurance: 80, xpSuccess: 100, xpFail: 70, rollEffect: [{ stat: 'strength', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic", "Dyno"] },
+        { name: "Precision Impossible", grade: "V10", strength: 58, technique: 70, focus: 68, flexibility: 58, time: 5, endurance: 88, xpSuccess: 100, xpFail: 78, rollEffect: [{ stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        { name: "The Impossible Pinch", grade: "V11", strength: 80, technique: 64, focus: 60, flexibility: 52, time: 5, endurance: 96, xpSuccess: 100, xpFail: 86, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: ["Pinch"], moveFeatures: [] },
+        { name: "Project Zero", grade: "V12", strength: 82, technique: 72, focus: 70, flexibility: 58, time: 6, endurance: 100, xpSuccess: 100, xpFail: 90, rollEffect: [{ stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] }
     ],
     topRope: [
-        { name: "First Timer's Friend", grade: "5.6", strength: 20, technique: 18, focus: 15, flexibility: 12, time: 3, endurance: 15, xpSuccess: 30, xpFail: 10, rollEffect: [{ stat: 'technique', modifier: -1 }], gearModifiers: ["Harness"] },
-        { name: "Learning Curve", grade: "5.8", strength: 30, technique: 28, focus: 26, flexibility: 22, time: 4, endurance: 25, xpSuccess: 42, xpFail: 18, rollEffect: [{ stat: 'technique', modifier: -1 }], gearModifiers: ["Climbing Shoes"] },
-        { name: "The Standard", grade: "5.9", strength: 38, technique: 34, focus: 30, flexibility: 26, time: 4, endurance: 35, xpSuccess: 55, xpFail: 26, rollEffect: [{ stat: 'strength', modifier: -1 }], gearModifiers: [] },
-        { name: "Crimson Wall", grade: "5.10a", strength: 40, technique: 38, focus: 35, flexibility: 30, time: 5, endurance: 40, xpSuccess: 62, xpFail: 30, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Finger Tape"] },
-        { name: "Overhang Initiation", grade: "5.10b", strength: 45, technique: 38, focus: 34, flexibility: 30, time: 5, endurance: 48, xpSuccess: 70, xpFail: 36, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"] },
-        { name: "Crimp Central", grade: "5.10d", strength: 50, technique: 46, focus: 42, flexibility: 36, time: 5, endurance: 56, xpSuccess: 80, xpFail: 44, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Finger Tape"] },
-        { name: "Power Climb", grade: "5.11b", strength: 56, technique: 48, focus: 44, flexibility: 38, time: 6, endurance: 66, xpSuccess: 92, xpFail: 54, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [] },
-        { name: "Sustained Difficulty", grade: "5.11c", strength: 58, technique: 52, focus: 50, flexibility: 44, time: 6, endurance: 70, xpSuccess: 98, xpFail: 58, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"] },
-        { name: "Dynamic Moves", grade: "5.12a", strength: 62, technique: 56, focus: 54, flexibility: 48, time: 6, endurance: 78, xpSuccess: 100, xpFail: 66, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [] },
-        { name: "The Power Endurance", grade: "5.12b", strength: 68, technique: 60, focus: 58, flexibility: 54, time: 7, endurance: 84, xpSuccess: 100, xpFail: 72, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"] },
-        { name: "Micro Hold Heaven", grade: "5.12d", strength: 66, technique: 66, focus: 64, flexibility: 58, time: 6, endurance: 90, xpSuccess: 100, xpFail: 78, rollEffect: [{ stat: 'technique', modifier: 1 }], gearModifiers: ["Finger Tape"] },
-        { name: "The Upper Echelon", grade: "5.13a", strength: 72, technique: 68, focus: 66, flexibility: 60, time: 7, endurance: 92, xpSuccess: 100, xpFail: 80, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [] },
-        { name: "Professional Grade", grade: "5.13c", strength: 80, technique: 74, focus: 72, flexibility: 66, time: 7, endurance: 100, xpSuccess: 100, xpFail: 88, rollEffect: [{ stat: 'technique', modifier: 1 }], gearModifiers: [] }
+        { name: "First Timer's Friend", grade: "5.6", strength: 20, technique: 18, focus: 15, flexibility: 12, time: 3, endurance: 15, xpSuccess: 30, xpFail: 10, rollEffect: [{ stat: 'technique', modifier: -1 }], gearModifiers: ["Harness"], routeType: "Slab", holdFeatures: ["Jugs"], moveFeatures: [] },
+        { name: "Learning Curve", grade: "5.8", strength: 30, technique: 28, focus: 26, flexibility: 22, time: 4, endurance: 25, xpSuccess: 42, xpFail: 18, rollEffect: [{ stat: 'technique', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "The Standard", grade: "5.9", strength: 38, technique: 34, focus: 30, flexibility: 26, time: 4, endurance: 35, xpSuccess: 55, xpFail: 26, rollEffect: [{ stat: 'strength', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "Crimson Wall", grade: "5.10a", strength: 40, technique: 38, focus: 35, flexibility: 30, time: 5, endurance: 40, xpSuccess: 62, xpFail: 30, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
+        { name: "Overhang Initiation", grade: "5.10b", strength: 45, technique: 38, focus: 34, flexibility: 30, time: 5, endurance: 48, xpSuccess: 70, xpFail: 36, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Crimp Central", grade: "5.10d", strength: 50, technique: 46, focus: 42, flexibility: 36, time: 5, endurance: 56, xpSuccess: 80, xpFail: 44, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
+        { name: "Power Climb", grade: "5.11b", strength: 56, technique: 48, focus: 44, flexibility: 38, time: 6, endurance: 66, xpSuccess: 92, xpFail: 54, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Sustained Difficulty", grade: "5.11c", strength: 58, technique: 52, focus: 50, flexibility: 44, time: 6, endurance: 70, xpSuccess: 98, xpFail: 58, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: ["Sloper"], moveFeatures: [] },
+        { name: "Dynamic Moves", grade: "5.12a", strength: 62, technique: 56, focus: 54, flexibility: 48, time: 6, endurance: 78, xpSuccess: 100, xpFail: 66, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic"] },
+        { name: "The Power Endurance", grade: "5.12b", strength: 68, technique: 60, focus: 58, flexibility: 54, time: 7, endurance: 84, xpSuccess: 100, xpFail: 72, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Micro Hold Heaven", grade: "5.12d", strength: 66, technique: 66, focus: 64, flexibility: 58, time: 6, endurance: 90, xpSuccess: 100, xpFail: 78, rollEffect: [{ stat: 'technique', modifier: 1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
+        { name: "The Upper Echelon", grade: "5.13a", strength: 72, technique: 68, focus: 66, flexibility: 60, time: 7, endurance: 92, xpSuccess: 100, xpFail: 80, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Professional Grade", grade: "5.13c", strength: 80, technique: 74, focus: 72, flexibility: 66, time: 7, endurance: 100, xpSuccess: 100, xpFail: 88, rollEffect: [{ stat: 'technique', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] }
     ],
     leadClimbing: [
-        { name: "Lead Introduction", grade: "5.8", strength: 30, technique: 28, focus: 30, flexibility: 22, time: 4, endurance: 25, xpSuccess: 40, xpFail: 15, rollEffect: [{ stat: 'focus', modifier: -1 }], gearModifiers: ["Harness", "Lead Rope"] },
-        { name: "Clip and Climb", grade: "5.9", strength: 38, technique: 34, focus: 36, flexibility: 28, time: 4, endurance: 32, xpSuccess: 48, xpFail: 22, rollEffect: [{ stat: 'focus', modifier: -1 }], gearModifiers: ["Harness", "Belay Device"] },
-        { name: "First Overhang Lead", grade: "5.10a", strength: 42, technique: 38, focus: 40, flexibility: 30, time: 5, endurance: 35, xpSuccess: 52, xpFail: 24, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [] },
-        { name: "Pump Management", grade: "5.10b", strength: 45, technique: 44, focus: 46, flexibility: 34, time: 6, endurance: 40, xpSuccess: 58, xpFail: 28, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"] },
-        { name: "Power Lead", grade: "5.10d", strength: 52, technique: 48, focus: 50, flexibility: 38, time: 6, endurance: 50, xpSuccess: 70, xpFail: 36, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"] },
-        { name: "The Steep Lead", grade: "5.11a", strength: 54, technique: 50, focus: 52, flexibility: 44, time: 6, endurance: 55, xpSuccess: 75, xpFail: 40, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"] },
-        { name: "Runout Section", grade: "5.11b", strength: 56, technique: 52, focus: 58, flexibility: 48, time: 6, endurance: 60, xpSuccess: 80, xpFail: 44, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [] },
-        { name: "Overhang Lead Challenge", grade: "5.11c", strength: 60, technique: 56, focus: 60, flexibility: 52, time: 7, endurance: 65, xpSuccess: 85, xpFail: 48, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness", "Chalk Bag"] },
-        { name: "Advanced Clipping", grade: "5.12a", strength: 66, technique: 64, focus: 66, flexibility: 58, time: 7, endurance: 75, xpSuccess: 95, xpFail: 56, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [] },
-        { name: "The Compression Lead", grade: "5.12b", strength: 72, technique: 66, focus: 66, flexibility: 60, time: 7, endurance: 82, xpSuccess: 100, xpFail: 62, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"] },
-        { name: "Endurance Lead", grade: "5.12d", strength: 72, technique: 72, focus: 72, flexibility: 66, time: 8, endurance: 88, xpSuccess: 100, xpFail: 68, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [] },
-        { name: "The Elite Lead", grade: "5.13a", strength: 76, technique: 74, focus: 74, flexibility: 70, time: 8, endurance: 92, xpSuccess: 100, xpFail: 72, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [] },
-        { name: "World Class Leading", grade: "5.14a", strength: 88, technique: 84, focus: 84, flexibility: 80, time: 8, endurance: 100, xpSuccess: 100, xpFail: 88, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [] }
+        { name: "Lead Introduction", grade: "5.8", strength: 30, technique: 28, focus: 30, flexibility: 22, time: 4, endurance: 25, xpSuccess: 40, xpFail: 15, rollEffect: [{ stat: 'focus', modifier: -1 }], gearModifiers: ["Harness", "Lead Rope"], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "Clip and Climb", grade: "5.9", strength: 38, technique: 34, focus: 36, flexibility: 28, time: 4, endurance: 32, xpSuccess: 48, xpFail: 22, rollEffect: [{ stat: 'focus', modifier: -1 }], gearModifiers: ["Harness", "Belay Device"], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "First Overhang Lead", grade: "5.10a", strength: 42, technique: 38, focus: 40, flexibility: 30, time: 5, endurance: 35, xpSuccess: 52, xpFail: 24, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Pump Management", grade: "5.10b", strength: 45, technique: 44, focus: 46, flexibility: 34, time: 6, endurance: 40, xpSuccess: 58, xpFail: 28, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Power Lead", grade: "5.10d", strength: 52, technique: 48, focus: 50, flexibility: 38, time: 6, endurance: 50, xpSuccess: 70, xpFail: 36, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "The Steep Lead", grade: "5.11a", strength: 54, technique: 50, focus: 52, flexibility: 44, time: 6, endurance: 55, xpSuccess: 75, xpFail: 40, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Runout Section", grade: "5.11b", strength: 56, technique: 52, focus: 58, flexibility: 48, time: 6, endurance: 60, xpSuccess: 80, xpFail: 44, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "Overhang Lead Challenge", grade: "5.11c", strength: 60, technique: 56, focus: 60, flexibility: 52, time: 7, endurance: 65, xpSuccess: 85, xpFail: 48, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness", "Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Advanced Clipping", grade: "5.12a", strength: 66, technique: 64, focus: 66, flexibility: 58, time: 7, endurance: 75, xpSuccess: 95, xpFail: 56, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "The Compression Lead", grade: "5.12b", strength: 72, technique: 66, focus: 66, flexibility: 60, time: 7, endurance: 82, xpSuccess: 100, xpFail: 62, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"], routeType: "Overhang", holdFeatures: ["Pinch"], moveFeatures: [] },
+        { name: "Endurance Lead", grade: "5.12d", strength: 72, technique: 72, focus: 72, flexibility: 66, time: 8, endurance: 88, xpSuccess: 100, xpFail: 68, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "The Elite Lead", grade: "5.13a", strength: 76, technique: 74, focus: 74, flexibility: 70, time: 8, endurance: 92, xpSuccess: 100, xpFail: 72, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "World Class Leading", grade: "5.14a", strength: 88, technique: 84, focus: 84, flexibility: 80, time: 8, endurance: 100, xpSuccess: 100, xpFail: 88, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] }
     ]
 };
 
 const GEAR_SHOP = [
-    { name: "Climbing Shoes", cost: 75, statEffect: "technique", value: -3, description: "Improves foothold precision", effectDisplay: "🎯 -3 Technique on routes" },
-    { name: "Chalk", cost: 50, statEffect: "strength", value: -2, description: "Maintains friction on sweaty hands", effectDisplay: "💪 -2 Strength on routes" },
-    { name: "Chalk Bag", cost: 60, statEffect: "strength", value: -2, description: "Allows chalk access without leaving wall", effectDisplay: "💪 -2 Strength on routes" },
-    { name: "Harness", cost: 95, statEffect: "all", value: -3, description: "Required for rope climbing", effectDisplay: "✨ -3 All Stats on routes" },
-    { name: "Belay Device", cost: 80, statEffect: "focus", value: -2, description: "Safer belaying and catching", effectDisplay: "🧠 -2 Focus on routes" },
-    { name: "Lead Rope", cost: 120, statEffect: "strength", value: -3, description: "Required for lead climbing", effectDisplay: "💪 -3 Strength on routes" },
-    { name: "Helmet", cost: 65, statEffect: "endurance", value: 5, description: "Protects head from impacts", effectDisplay: "💨 +5 Max Endurance" },
-    { name: "Finger Tape", cost: 85, statEffect: "strength", value: -4, description: "Prevents finger injuries on crimps", effectDisplay: "💪 -4 Strength on routes" },
-    { name: "Liquid Chalk", cost: 95, statEffect: "strength", value: -3, description: "Long-lasting friction", effectDisplay: "💪 -3 Strength on routes" },
-    { name: "Water Bottle", cost: 40, statEffect: "endurance", value: 3, description: "Recover extra endurance when resting", effectDisplay: "💨 +3 Max Endurance" },
-    { name: "Energy Snacks", cost: 45, statEffect: "endurance", value: 10, description: "Once per round, recover 2d6 Endurance without resting", effectDisplay: "💨 +10 Max Endurance" },
-    { name: "Grip Strength Trainer", cost: 180, statEffect: "strength", value: 2, description: "+2 permanent Strength", effectDisplay: "💪 +2 Permanent Strength" },
-    { name: "Portable Hangboard", cost: 280, statEffect: "strengthTech", value: 3, description: "+3 permanent Strength, +2 permanent Technique", effectDisplay: "💪 +3 Str, 🎯 +2 Tech" },
-    { name: "Resistance Bands", cost: 150, statEffect: "flexibility", value: 2, description: "+2 permanent Flexibility", effectDisplay: "🤸 +2 Permanent Flexibility" }
+    { name: "Climbing Shoes", cost: 75, category: "Essential Safety Gear", statEffect: "technique", value: -3, routeFilter: ["Slab"], holdFeatureFilter: ["Heel Hook", "Toe Hook"], description: "Sticky rubber provides superior footwork precision", effectDisplay: "🎯 -3 Technique on Slab, -2 on Heel/Toe Hook routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Chalk", cost: 50, category: "Performance Gear", statEffect: "strength", value: -2, routeFilter: [], holdFeatureFilter: ["Crimp", "Sloper"], description: "Maintains friction on challenging holds", effectDisplay: "💪 -2 Strength on Crimp/Sloper holds", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Chalk Bag", cost: 60, category: "Performance Gear", statEffect: "strength", value: -2, routeFilter: ["All"], holdFeatureFilter: [], description: "Convenient chalk access during climbs", effectDisplay: "💪 -2 Strength on all routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Harness", cost: 80, category: "Essential Safety Gear", statEffect: "all", value: -2, routeFilter: ["Top Rope", "Lead"], holdFeatureFilter: [], description: "Essential safety equipment for roped climbing", effectDisplay: "✨ -2 All Stats on rope routes | 🔓 Unlocks Top Rope", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: "Top Rope", restBonus: 0 },
+    { name: "Belay Device", cost: 70, category: "Essential Safety Gear", statEffect: "focus", value: -2, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Controls rope friction for safe belaying", effectDisplay: "🧠 -2 Focus on Lead routes | 🔓 Unlocks Top Rope", prerequisiteItems: ["Harness"], prerequisiteLevel: 1, accessRequirement: "Top Rope", restBonus: 0 },
+    { name: "Locking Carabiner", cost: 60, category: "Essential Safety Gear", statEffect: "focus", value: -1, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Secures belay device to harness", effectDisplay: "🧠 -1 Focus on Lead routes | 🔓 Part of Lead system", prerequisiteItems: ["Harness", "Belay Device"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
+    { name: "Lead Rope", cost: 120, category: "Essential Safety Gear", statEffect: "strength", value: -3, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Dynamic rope absorbs fall energy", effectDisplay: "💪 -3 Strength on Lead routes | 🔓 Unlocks Lead", prerequisiteItems: ["Harness", "Belay Device", "Locking Carabiner"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
+    { name: "Quickdraws Set", cost: 140, category: "Performance Gear", statEffect: "focus", value: -4, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Enables efficient clipping during lead climbs", effectDisplay: "🧠 -4 Focus on Lead routes", prerequisiteItems: ["Lead Rope"], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Finger Tape", cost: 85, category: "Performance Gear", statEffect: "strength", value: -4, routeFilter: [], holdFeatureFilter: ["Crimp"], description: "Protects fingers and supports tendons on sharp holds", effectDisplay: "💪 -4 Strength on Crimp holds", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Liquid Chalk", cost: 95, category: "Performance Gear", statEffect: "strength", value: -3, routeFilter: ["All"], holdFeatureFilter: [], description: "Long-lasting alcohol-based chalk layer", effectDisplay: "💪 -3 Strength on all routes (stacks)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Knee Pads", cost: 110, category: "Specialized Gear", statEffect: "all", value: -5, routeFilter: [], holdFeatureFilter: ["Roof"], description: "Enables knee bar rest positions on overhangs", effectDisplay: "✨ -5 All Stats on Roof features", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Athletic Tape", cost: 50, category: "Performance Gear", statEffect: "flexibility", value: -2, routeFilter: ["All"], holdFeatureFilter: [], description: "Joint support and stability", effectDisplay: "🤸 -2 Flexibility on all routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Crash Pad", cost: 130, category: "Safety Gear", statEffect: "all", value: -3, routeFilter: ["Bouldering"], holdFeatureFilter: [], description: "Cushioned landing provides confidence", effectDisplay: "✨ -3 All Stats on Bouldering", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Belay Gloves", cost: 95, category: "Safety Gear", statEffect: "focus", value: -2, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Prevents rope burn during belaying", effectDisplay: "🧠 -2 Focus on Lead routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Helmet", cost: 65, category: "Safety Gear", statEffect: "endurance", value: 5, routeFilter: ["All"], holdFeatureFilter: [], description: "Head protection reduces injury risk", effectDisplay: "💨 +5 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Comfortable Climbing Apparel", cost: 90, category: "Comfort Gear", statEffect: "all", value: -1, routeFilter: ["All"], holdFeatureFilter: [], description: "Full range of motion and breathability", effectDisplay: "✨ -1 All Stats, 💨 +10 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0, enduranceBonus: 10 },
+    { name: "Water Bottle", cost: 40, category: "Comfort Gear", statEffect: "endurance", value: 5, routeFilter: ["All"], holdFeatureFilter: [], description: "Proper hydration during sessions", effectDisplay: "💨 +5 Max Endurance, +3 Rest Bonus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 3 },
+    { name: "Foam Roller", cost: 120, category: "Recovery Gear", statEffect: "endurance", value: 8, routeFilter: ["All"], holdFeatureFilter: [], description: "Muscle recovery and tension release", effectDisplay: "💨 +8 Max Endurance, +5 Rest Bonus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 5 },
+    { name: "Approach Shoes", cost: 55, category: "Comfort Gear", statEffect: "time", value: -1, routeFilter: ["All"], holdFeatureFilter: [], description: "Comfortable for walking around gym", effectDisplay: "⏱️ -1 time when moving areas", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Yoga Mat", cost: 95, category: "Training Equipment", statEffect: "endurance", value: 10, routeFilter: ["All"], holdFeatureFilter: [], description: "Used for stretching and mobility work", effectDisplay: "💨 +10 Max Endurance, +4 Rest Bonus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 4 },
+    { name: "Grip Strength Trainer", cost: 180, category: "Training Equipment", statEffect: "strength", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Builds finger and forearm strength", effectDisplay: "💪 +2 Permanent Strength", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Portable Hangboard", cost: 240, category: "Training Equipment", statEffect: "strengthTech", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Advanced finger strength training", effectDisplay: "💪 +2 Str, 🎯 +2 Tech (Permanent)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Resistance Bands", cost: 150, category: "Training Equipment", statEffect: "flexibility", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Mobility and warm-up tool", effectDisplay: "🤸 +2 Permanent Flexibility", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Campus Board Training Program", cost: 200, category: "Training Equipment", statEffect: "strengthTechMixed", value: 3, routeFilter: ["All"], holdFeatureFilter: [], description: "Explosive power training with drawbacks", effectDisplay: "💪 +3 Str, 🎯 -1 Tech (Permanent)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Technique Training System", cost: 180, category: "Training Equipment", statEffect: "technique", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Deliberate practice for movement precision", effectDisplay: "🎯 +2 Permanent Technique", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Meditation App", cost: 160, category: "Training Equipment", statEffect: "focus", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Mental training for composure", effectDisplay: "🧠 +2 Permanent Focus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Gear Bag", cost: 70, category: "Convenience Gear", statEffect: "time", value: -1, routeFilter: ["All"], holdFeatureFilter: [], description: "Organized gear storage", effectDisplay: "⏱️ Gear shop costs 0 time", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Non-Locking Carabiner", cost: 35, category: "Convenience Gear", statEffect: "special", value: 0, routeFilter: ["All"], holdFeatureFilter: [], description: "Quick clipping of accessories", effectDisplay: "🔗 Utility item", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Climbing Brush", cost: 55, category: "Convenience Gear", statEffect: "endurance", value: 3, routeFilter: ["All"], holdFeatureFilter: [], description: "Cleans holds of chalk buildup", effectDisplay: "💨 +3 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Route Notebook", cost: 100, category: "Strategy Gear", statEffect: "technique", value: -2, routeFilter: ["Repeated"], holdFeatureFilter: [], description: "Record beta and learn from attempts", effectDisplay: "🎯 -2 Technique on repeated routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Power Grips", cost: 130, category: "Performance Gear", statEffect: "strength", value: -3, routeFilter: [], holdFeatureFilter: ["Sloper", "Pinch"], description: "Enhanced grip for difficult holds", effectDisplay: "💪 -3 Strength on Sloper/Pinch holds", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Compression Sleeves", cost: 75, category: "Recovery Gear", statEffect: "strength", value: -1, routeFilter: ["All"], holdFeatureFilter: [], description: "Reduces muscle fatigue and pump", effectDisplay: "💪 -1 Strength, 💨 +8 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0, enduranceBonus: 8 },
+    { name: "Dynamic Shoes", cost: 110, category: "Specialized Gear", statEffect: "flexibility", value: -3, routeFilter: [], holdFeatureFilter: ["Dynamic", "Dyno"], description: "Specialized shoes for explosive movements", effectDisplay: "🤸 -3 Flexibility on Dynamic/Dyno routes", prerequisiteItems: ["Climbing Shoes"], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Mental Training Card Set", cost: 140, category: "Strategy Gear", statEffect: "focus", value: -3, routeFilter: ["Repeated"], holdFeatureFilter: [], description: "Visualization and mental rehearsal techniques", effectDisplay: "🧠 -3 Focus on repeated routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Recovery Supplements", cost: 90, category: "Recovery Gear", statEffect: "endurance", value: 12, routeFilter: ["All"], holdFeatureFilter: [], description: "Optimized nutrition for sustained performance", effectDisplay: "💨 +12 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 }
 ];
 
 // ===== GAME STATE =====
@@ -350,11 +372,150 @@ function movePlayerToSection(playerNum, section) {
     return { success: false, message: 'Player not found' };
 }
 
+// ===== AREA ACCESS CHECKING =====
+
+function checkAreaAccess(area) {
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    const char = currentPlayer.character;
+    
+    // Bouldering is always accessible
+    if (area === 'bouldering') {
+        return { hasAccess: true, missingItems: [] };
+    }
+    
+    // Top Rope requires Harness + Belay Device
+    if (area === 'topRope') {
+        const hasHarness = char.equipment.includes('Harness');
+        const hasBelayDevice = char.equipment.includes('Belay Device');
+        
+        if (!hasHarness || !hasBelayDevice) {
+            const missing = [];
+            if (!hasHarness) missing.push('Harness');
+            if (!hasBelayDevice) missing.push('Belay Device');
+            return { hasAccess: false, missingItems: missing };
+        }
+        return { hasAccess: true, missingItems: [] };
+    }
+    
+    // Lead Climbing requires Harness + Belay Device + Locking Carabiner + Lead Rope
+    if (area === 'leadClimbing') {
+        const hasHarness = char.equipment.includes('Harness');
+        const hasBelayDevice = char.equipment.includes('Belay Device');
+        const hasCarabiner = char.equipment.includes('Locking Carabiner');
+        const hasLeadRope = char.equipment.includes('Lead Rope');
+        
+        if (!hasHarness || !hasBelayDevice || !hasCarabiner || !hasLeadRope) {
+            const missing = [];
+            if (!hasHarness) missing.push('Harness');
+            if (!hasBelayDevice) missing.push('Belay Device');
+            if (!hasCarabiner) missing.push('Locking Carabiner');
+            if (!hasLeadRope) missing.push('Lead Rope');
+            return { hasAccess: false, missingItems: missing };
+        }
+        return { hasAccess: true, missingItems: [] };
+    }
+    
+    return { hasAccess: true, missingItems: [] };
+}
+
+// ===== GEAR BONUS CALCULATION =====
+
+function calculateGearBonuses(route, area) {
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    const char = currentPlayer.character;
+    
+    const bonuses = {
+        strength: 0,
+        technique: 0,
+        focus: 0,
+        flexibility: 0
+    };
+    
+    // Check if this route has been attempted before (for Repeated filter)
+    const routeKey = `${area}:${route.name}`;
+    const isRepeated = gameState.attemptedRoutes[currentPlayer.playerNum] && 
+                       gameState.attemptedRoutes[currentPlayer.playerNum].has(routeKey);
+    
+    // Iterate through owned equipment
+    char.equipment.forEach(gearName => {
+        const gear = GEAR_SHOP.find(g => g.name === gearName);
+        if (!gear) return;
+        
+        // Skip gear that doesn't apply to routes (time/endurance only)
+        if (gear.statEffect === 'endurance' || gear.statEffect === 'time' || gear.statEffect === 'special') {
+            return;
+        }
+        
+        // Check for "Repeated" route filter
+        if (gear.routeFilter && gear.routeFilter.includes("Repeated")) {
+            if (!isRepeated) return; // Only applies to repeated routes
+        }
+        
+        // Skip if gear doesn't apply to this route type
+        if (gear.routeFilter && gear.routeFilter.length > 0 && !gear.routeFilter.includes("All") && !gear.routeFilter.includes("Repeated")) {
+            let applies = false;
+            
+            // Check area match (Bouldering, Top Rope, Lead)
+            if (area === 'bouldering' && gear.routeFilter.includes('Bouldering')) applies = true;
+            if (area === 'topRope' && gear.routeFilter.includes('Top Rope')) applies = true;
+            if (area === 'leadClimbing' && gear.routeFilter.includes('Lead')) applies = true;
+            
+            // Check route type match (Slab, Overhang, Vertical, Traverse)
+            if (route.routeType && gear.routeFilter.includes(route.routeType)) applies = true;
+            
+            if (!applies) return;  // Skip this gear
+        }
+        
+        // Check hold/move feature filter
+        if (gear.holdFeatureFilter && gear.holdFeatureFilter.length > 0) {
+            let featureMatches = false;
+            if (route.holdFeatures) {
+                route.holdFeatures.forEach(feature => {
+                    if (gear.holdFeatureFilter.includes(feature)) featureMatches = true;
+                });
+            }
+            if (route.moveFeatures) {
+                route.moveFeatures.forEach(feature => {
+                    if (gear.holdFeatureFilter.includes(feature)) featureMatches = true;
+                });
+            }
+            
+            if (!featureMatches) return;  // Skip this gear
+        }
+        
+        // Apply gear effect (negative values reduce requirements, which is a bonus)
+        if (gear.statEffect === 'all') {
+            bonuses.strength += Math.abs(gear.value);
+            bonuses.technique += Math.abs(gear.value);
+            bonuses.focus += Math.abs(gear.value);
+            bonuses.flexibility += Math.abs(gear.value);
+        } else if (gear.statEffect === 'strength') {
+            bonuses.strength += Math.abs(gear.value);
+        } else if (gear.statEffect === 'technique') {
+            bonuses.technique += Math.abs(gear.value);
+        } else if (gear.statEffect === 'focus') {
+            bonuses.focus += Math.abs(gear.value);
+        } else if (gear.statEffect === 'flexibility') {
+            bonuses.flexibility += Math.abs(gear.value);
+        }
+    });
+    
+    return bonuses;
+}
+
 // ===== GAME INITIALIZATION =====
 
 function startCharacterSelect() {
-    const numPlayers = parseInt(document.getElementById('numPlayers').value);
-    if (numPlayers < 1 || numPlayers > 4) {
+    console.log('🎯 startCharacterSelect() called');
+    const numPlayersInput = document.getElementById('numPlayers');
+    if (!numPlayersInput) {
+        console.error('❌ numPlayers input not found');
+        return;
+    }
+    
+    const numPlayers = parseInt(numPlayersInput.value);
+    console.log('Number of players:', numPlayers);
+    if (numPlayers < 1 || numPlayers > 4 || isNaN(numPlayers)) {
         alert('Please select 1-4 players');
         return;
     }
@@ -364,13 +525,26 @@ function startCharacterSelect() {
         gameState.players.push({ playerNum: i + 1, character: null });
     }
 
-    document.getElementById('characterSelection').style.display = 'block';
+    const charSelectionDiv = document.getElementById('characterSelection');
+    if (!charSelectionDiv) {
+        console.error('❌ characterSelection div not found');
+        return;
+    }
+    
+    charSelectionDiv.style.display = 'block';
+    console.log('✓ Character selection shown');
     renderCharacterSelect();
 }
 
 function renderCharacterSelect() {
+    console.log('📝 renderCharacterSelect() called');
     const container = document.getElementById('characterSelect');
+    if (!container) {
+        console.error('❌ characterSelect container not found');
+        return;
+    }
     container.innerHTML = '';
+    console.log('✓ Container cleared, rendering characters...');
 
     Object.keys(CHARACTERS).forEach(charKey => {
         const char = CHARACTERS[charKey];
@@ -478,12 +652,26 @@ function initializeRoutes() {
 }
 
 function initializeGearShop() {
-    // Shuffle and select 3 random gear items
-    const gearPool = [...GEAR_SHOP].sort(() => Math.random() - 0.5);
+    // Define access card names that should never be in random rotation
+    const accessCardNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+    
+    // Filter out access cards from the pool
+    const nonAccessGear = GEAR_SHOP.filter(gear => !accessCardNames.includes(gear.name));
+    
+    // Shuffle and select 3 random gear items (excluding access cards)
+    const gearPool = [...nonAccessGear].sort(() => Math.random() - 0.5);
     gameState.availableGear = gearPool.slice(0, 3);
 }
 
 function replaceGearInShop(purchasedGearName) {
+    // Define access card names
+    const accessCardNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+    
+    // Access cards should not be replaced - they stay visible
+    if (accessCardNames.includes(purchasedGearName)) {
+        return; // Don't replace access cards
+    }
+    
     // Remove purchased gear and add a new random one
     const purchasedIndex = gameState.availableGear.findIndex(g => g.name === purchasedGearName);
 
@@ -496,7 +684,8 @@ function replaceGearInShop(purchasedGearName) {
 
         const unavailableGearNames = new Set([
             ...gameState.availableGear.map(g => g.name),
-            ...ownedGearNames
+            ...ownedGearNames,
+            ...accessCardNames // Also exclude access cards from pool
         ]);
 
         const availablePool = GEAR_SHOP.filter(gear =>
@@ -686,8 +875,11 @@ function renderPlayers() {
             </div>
 
             <div style="margin-top: 15px;">
-                <strong>⭐ ${char.specialAbility.name}</strong> ${char.abilityUsed ? '(Used)' : '(Available)'}
-                <div style="font-size: 0.9em; color: #666;">${char.specialAbility.description}</div>
+                <strong>⭐ ${char.specialAbility.name}</strong> 
+                <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; ${char.abilityUsed ? 'background: #dc3545; color: white;' : 'background: #28a745; color: white;'}">
+                    ${char.abilityUsed ? '❌ Used' : '✅ Available'}
+                </span>
+                <div style="font-size: 0.9em; color: #666; margin-top: 5px;">${char.specialAbility.description}</div>
             </div>
 
             ${char.equipment.length > 0 ? `
@@ -749,14 +941,31 @@ function renderTopRopeRoutes() {
         return;
     }
 
-    // Add capacity indicator
-    const playersHere = getPlayersInSection('topRope');
-    const capacity = getSectionCapacity('topRope');
-    const isFull = playersHere.length >= capacity;
-    const capacityDiv = document.createElement('div');
-    capacityDiv.style.cssText = `background: ${isFull ? '#ffe8e8' : '#e8f4f8'}; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid ${isFull ? '#dc3545' : '#007bff'};`;
-    capacityDiv.innerHTML = `<strong>👥 Occupancy: ${playersHere.length}/${capacity}</strong> <span style="color: #666;">(${gameState.belayersUnlocked} belayer${gameState.belayersUnlocked > 1 ? 's' : ''})</span>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>` : ''}${isFull ? `<br><span style="color: #dc3545; font-weight: bold;">⚠️ FULL - No space available</span>` : ''}`;
-    container.appendChild(capacityDiv);
+    // Check if player has access to this area
+    const accessCheck = checkAreaAccess('topRope');
+    
+    if (!accessCheck.hasAccess) {
+        // Show locked message but still display routes
+        const lockedDiv = document.createElement('div');
+        lockedDiv.style.cssText = 'padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; margin-bottom: 15px;';
+        lockedDiv.innerHTML = `
+            <h4 style="color: #856404; margin-top: 0;">🔒 Area Locked</h4>
+            <p style="color: #856404; margin-bottom: 10px;">Required gear to access:</p>
+            <ul style="list-style: none; padding-left: 0; color: #856404; font-weight: bold;">
+                ${accessCheck.missingItems.map(item => `<li>❌ ${item}</li>`).join('')}
+            </ul>
+        `;
+        container.appendChild(lockedDiv);
+    } else {
+        // Add capacity indicator only if unlocked
+        const playersHere = getPlayersInSection('topRope');
+        const capacity = getSectionCapacity('topRope');
+        const isFull = playersHere.length >= capacity;
+        const capacityDiv = document.createElement('div');
+        capacityDiv.style.cssText = `background: ${isFull ? '#ffe8e8' : '#e8f4f8'}; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid ${isFull ? '#dc3545' : '#007bff'};`;
+        capacityDiv.innerHTML = `<strong>👥 Occupancy: ${playersHere.length}/${capacity}</strong> <span style="color: #666;">(${gameState.belayersUnlocked} belayer${gameState.belayersUnlocked > 1 ? 's' : ''})</span>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>` : ''}${isFull ? `<br><span style="color: #dc3545; font-weight: bold;">⚠️ FULL - No space available</span>` : ''}`;
+        container.appendChild(capacityDiv);
+    }
 
     // Add route clearing indicator if this area will be cleared next
     if (gameState.routeClearingPosition === 1) {
@@ -766,8 +975,16 @@ function renderTopRopeRoutes() {
         container.appendChild(indicator);
     }
 
+    // Always show routes, but disable if locked
+    const isLocked = !accessCheck.hasAccess;
     gameState.availableRoutes.topRope.forEach((route, idx) => {
-        container.appendChild(createRouteCard(route, 'topRope', idx));
+        const card = createRouteCard(route, 'topRope', idx);
+        if (isLocked) {
+            card.style.opacity = '0.3';
+            card.style.pointerEvents = 'none';
+            card.style.filter = 'grayscale(80%)';
+        }
+        container.appendChild(card);
     });
 }
 
@@ -775,19 +992,31 @@ function renderLeadClimbingRoutes() {
     const container = document.getElementById('leadClimbingRoutes');
     container.innerHTML = '';
 
-    // Add capacity indicator
-    const playersHere = getPlayersInSection('leadClimbing');
-    const capacity = getSectionCapacity('leadClimbing');
-    const isFull = playersHere.length >= capacity;
-    const capacityDiv = document.createElement('div');
-    capacityDiv.style.cssText = `background: ${isFull ? '#ffe8e8' : '#e8f4f8'}; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid ${isFull ? '#dc3545' : '#007bff'};`;
-    capacityDiv.innerHTML = `<strong>👥 Occupancy: ${playersHere.length}/${capacity}</strong> <span style="color: #666;">(${gameState.belayersUnlocked} belayer${gameState.belayersUnlocked > 1 ? 's' : ''})</span>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>` : ''}${isFull ? `<br><span style="color: #dc3545; font-weight: bold;">⚠️ FULL - No space available</span>` : ''}`;
-    container.appendChild(capacityDiv);
-
-    const requirementsDiv = document.createElement('p');
-    requirementsDiv.style.cssText = 'margin-bottom: 10px; color: #666;';
-    requirementsDiv.textContent = 'Requires: Harness, Lead Rope, Carabiners';
-    container.appendChild(requirementsDiv);
+    // Check if player has access to this area
+    const accessCheck = checkAreaAccess('leadClimbing');
+    
+    if (!accessCheck.hasAccess) {
+        // Show locked message but still display routes
+        const lockedDiv = document.createElement('div');
+        lockedDiv.style.cssText = 'padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; margin-bottom: 15px;';
+        lockedDiv.innerHTML = `
+            <h4 style="color: #856404; margin-top: 0;">🔒 Area Locked</h4>
+            <p style="color: #856404; margin-bottom: 10px;">Required gear to access:</p>
+            <ul style="list-style: none; padding-left: 0; color: #856404; font-weight: bold;">
+                ${accessCheck.missingItems.map(item => `<li>❌ ${item}</li>`).join('')}
+            </ul>
+        `;
+        container.appendChild(lockedDiv);
+    } else {
+        // Add capacity indicator only if unlocked
+        const playersHere = getPlayersInSection('leadClimbing');
+        const capacity = getSectionCapacity('leadClimbing');
+        const isFull = playersHere.length >= capacity;
+        const capacityDiv = document.createElement('div');
+        capacityDiv.style.cssText = `background: ${isFull ? '#ffe8e8' : '#e8f4f8'}; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid ${isFull ? '#dc3545' : '#007bff'};`;
+        capacityDiv.innerHTML = `<strong>👥 Occupancy: ${playersHere.length}/${capacity}</strong> <span style="color: #666;">(${gameState.belayersUnlocked} belayer${gameState.belayersUnlocked > 1 ? 's' : ''})</span>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>` : ''}${isFull ? `<br><span style="color: #dc3545; font-weight: bold;">⚠️ FULL - No space available</span>` : ''}`;
+        container.appendChild(capacityDiv);
+    }
 
     // Add route clearing indicator if this area will be cleared next
     if (gameState.routeClearingPosition === 0) {
@@ -797,8 +1026,16 @@ function renderLeadClimbingRoutes() {
         container.appendChild(indicator);
     }
 
+    // Always show routes, but disable if locked
+    const isLocked = !accessCheck.hasAccess;
     gameState.availableRoutes.leadClimbing.forEach((route, idx) => {
-        container.appendChild(createRouteCard(route, 'leadClimbing', idx));
+        const card = createRouteCard(route, 'leadClimbing', idx);
+        if (isLocked) {
+            card.style.opacity = '0.3';
+            card.style.pointerEvents = 'none';
+            card.style.filter = 'grayscale(80%)';
+        }
+        container.appendChild(card);
     });
 }
 
@@ -997,29 +1234,243 @@ function renderStore() {
         <strong style="color: #ff9800;">🎯 ${xpToGo} XP to next level</strong>
     </p>`;
 
-    const canVisitStore = char.timeRemaining >= 1;
+    const hasGearBag = char.equipment.includes('Gear Bag');
+    const canVisitStore = hasGearBag || char.timeRemaining >= 1;
 
+    // ===== SECTION 1: ESSENTIAL ACCESS GEAR (Always visible) =====
+    const accessGearSection = document.createElement('div');
+    accessGearSection.style.cssText = 'background: #fff9e6; border: 2px solid #ffc107; border-radius: 10px; padding: 15px; margin-bottom: 20px;';
+    accessGearSection.innerHTML = '<h3 style="margin: 0 0 10px 0; color: #856404; font-size: 1.1em;">🔑 Essential Access Gear (Required for Areas)</h3>';
+    
+    // Define the 4 essential access cards
+    const accessCardNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+    const accessCards = GEAR_SHOP.filter(g => accessCardNames.includes(g.name));
+    
+    accessCards.forEach(gear => {
+        const owned = char.equipment.includes(gear.name);
+        const canAfford = !owned && canVisitStore && spendableXP >= gear.cost;
+
+        // Check prerequisites
+        let prerequisitesMet = true;
+        let prerequisiteText = '';
+        
+        if (gear.prerequisiteLevel && char.level < gear.prerequisiteLevel) {
+            prerequisitesMet = false;
+            prerequisiteText += `<div style="color: #dc3545; font-size: 0.85em; margin-top: 5px;">⚠️ Requires Level ${gear.prerequisiteLevel}</div>`;
+        }
+        
+        if (gear.prerequisiteItems && gear.prerequisiteItems.length > 0) {
+            const missingItems = gear.prerequisiteItems.filter(item => !char.equipment.includes(item));
+            if (missingItems.length > 0) {
+                prerequisitesMet = false;
+                prerequisiteText += `<div style="color: #dc3545; font-size: 0.85em; margin-top: 5px;">⚠️ Requires: ${missingItems.join(', ')}</div>`;
+            }
+        }
+
+        const card = document.createElement('div');
+        card.className = 'gear-card access-gear-card' + (owned ? ' owned' : '') + (!prerequisitesMet ? ' locked' : '');
+        if (!owned && (!canAfford || !prerequisitesMet)) card.style.opacity = '0.5';
+
+        card.onclick = () => !owned && canAfford && prerequisitesMet && purchaseGear(gear);
+
+        card.innerHTML = `
+            <div class="gear-name">${gear.name} ${owned ? '✓' : ''}</div>
+            <div class="gear-category" style="font-size: 0.8em; color: #6c757d; margin-bottom: 5px;">${gear.category}</div>
+            <div class="gear-cost">${gear.cost} XP</div>
+            ${prerequisiteText}
+            <div style="background: #f0f8ff; padding: 8px; border-radius: 5px; margin: 8px 0; font-weight: bold; color: #007bff; font-size: 0.9em;">
+                ${gear.effectDisplay}
+            </div>
+            <div class="gear-effect" style="font-size: 0.85em; color: #666; font-style: italic;">
+                ${gear.description}
+            </div>
+            ${gear.accessRequirement ? `<div style="background: #d4edda; padding: 6px; border-radius: 4px; margin-top: 8px; font-size: 0.85em; color: #155724; font-weight: bold;">🔓 Unlocks ${gear.accessRequirement} Access</div>` : ''}
+        `;
+
+        accessGearSection.appendChild(card);
+    });
+    
+    container.appendChild(accessGearSection);
+
+    // ===== SECTION 2: AVAILABLE GEAR (Rotating selection) =====
+    const availableGearSection = document.createElement('div');
+    availableGearSection.innerHTML = '<h3 style="margin: 0 0 10px 0; color: #333; font-size: 1.1em;">🎒 Available Gear</h3>';
+    
     gameState.availableGear.forEach(gear => {
         const owned = char.equipment.includes(gear.name);
         const canAfford = !owned && canVisitStore && spendableXP >= gear.cost;
 
-        const card = document.createElement('div');
-        card.className = 'gear-card' + (owned ? ' owned' : '');
-        if (!owned && !canAfford) card.style.opacity = '0.5';
+        // Check prerequisites
+        let prerequisitesMet = true;
+        let prerequisiteText = '';
+        
+        if (gear.prerequisiteLevel && char.level < gear.prerequisiteLevel) {
+            prerequisitesMet = false;
+            prerequisiteText += `<div style="color: #dc3545; font-size: 0.85em; margin-top: 5px;">⚠️ Requires Level ${gear.prerequisiteLevel}</div>`;
+        }
+        
+        if (gear.prerequisiteItems && gear.prerequisiteItems.length > 0) {
+            const missingItems = gear.prerequisiteItems.filter(item => !char.equipment.includes(item));
+            if (missingItems.length > 0) {
+                prerequisitesMet = false;
+                prerequisiteText += `<div style="color: #dc3545; font-size: 0.85em; margin-top: 5px;">⚠️ Requires: ${missingItems.join(', ')}</div>`;
+            }
+        }
 
-        card.onclick = () => !owned && canAfford && purchaseGear(gear);
+        const card = document.createElement('div');
+        card.className = 'gear-card' + (owned ? ' owned' : '') + (!prerequisitesMet ? ' locked' : '');
+        if (!owned && (!canAfford || !prerequisitesMet)) card.style.opacity = '0.5';
+
+        card.onclick = () => !owned && canAfford && prerequisitesMet && purchaseGear(gear);
 
         card.innerHTML = `
             <div class="gear-name">${gear.name} ${owned ? '✓' : ''}</div>
+            <div class="gear-category" style="font-size: 0.8em; color: #6c757d; margin-bottom: 5px;">${gear.category}</div>
             <div class="gear-cost">${gear.cost} XP</div>
+            ${prerequisiteText}
             <div style="background: #f0f8ff; padding: 8px; border-radius: 5px; margin: 8px 0; font-weight: bold; color: #007bff; font-size: 0.9em;">
                 ${gear.effectDisplay}
             </div>
-            <div class="gear-effect">${gear.description}</div>
+            <div class="gear-effect" style="font-size: 0.85em; color: #666; font-style: italic;">
+                ${gear.description}
+            </div>
+            ${gear.accessRequirement ? `<div style="background: #d4edda; padding: 6px; border-radius: 4px; margin-top: 8px; font-size: 0.85em; color: #155724; font-weight: bold;">🔓 Unlocks ${gear.accessRequirement} Access</div>` : ''}
         `;
 
-        container.appendChild(card);
+        availableGearSection.appendChild(card);
     });
+    
+    container.appendChild(availableGearSection);
+}
+
+// ===== CHARACTER ABILITY SYSTEM =====
+
+function canUseAbility(char, route, area) {
+    if (char.abilityUsed) return false;
+    
+    const abilityName = CHARACTERS[char.key].specialAbility.name;
+    
+    // Check area-specific abilities
+    if (abilityName === 'Boulder Bias' && area !== 'bouldering') return false;
+    if (abilityName === 'Friction Trust' && route.routeType !== 'Slab') return false;
+    
+    // Iron Lung and Boulderer abilities are passive, not activated here
+    if (abilityName === 'Endless Stamina') return false;
+    if (abilityName === 'Boulder Bias') return false; // Handled automatically in dice rolling
+    
+    return true;
+}
+
+function promptAbilityUse(char, route, area) {
+    const abilityName = CHARACTERS[char.key].specialAbility.name;
+    const abilityDesc = CHARACTERS[char.key].specialAbility.description;
+    
+    // Abilities that need pre-climb activation
+    const preClimbAbilities = ['Unshakeable', 'Elastic Advantage', 'Versatile', 'Flash Speed', 'Preview Vision'];
+    
+    if (preClimbAbilities.includes(abilityName)) {
+        const use = confirm(`🌟 Use ${abilityName}?\n\n${abilityDesc}\n\nThis can only be used once per round.`);
+        if (use) {
+            char.abilityUsed = true;
+            return abilityName;
+        }
+    }
+    
+    return null;
+}
+
+function applyAbilityToStats(char, abilityName, totalStats) {
+    // Apply stat modifications from abilities
+    if (abilityName === 'Versatile') {
+        // Prompt for stat redistribution
+        const result = promptStatRedistribution(char, totalStats);
+        if (result) {
+            return result; // Returns modified stats
+        }
+    }
+    
+    return totalStats; // No modification
+}
+
+function applyAbilityToRequirements(char, abilityName, effectiveRequirements, route) {
+    const modified = {...effectiveRequirements};
+    
+    if (abilityName === 'Unshakeable') {
+        modified.focus = 0; // Ignore all focus requirements
+    }
+    
+    if (abilityName === 'Elastic Advantage') {
+        modified.flexibility = Math.max(0, modified.flexibility - 10);
+    }
+    
+    if (abilityName === 'Friction Trust' && route.routeType === 'Slab') {
+        // This is handled during dice application
+    }
+    
+    return modified;
+}
+
+function applyAbilityToDice(char, abilityName, route, diceEffects, area) {
+    let modified = [...diceEffects];
+    
+    if (abilityName === 'Perfect Beta') {
+        // Find first nerf dice (+1) and neutralize it
+        for (let i = 0; i < modified.length; i++) {
+            if (modified[i].modifier === 1) {
+                modified[i] = {...modified[i], modifier: 0, abilityNeutralized: true};
+                break;
+            }
+        }
+    }
+    
+    if (abilityName === 'Friction Trust' && route.routeType === 'Slab') {
+        // Find first buff dice (-1) and neutralize it, then add permanent technique
+        for (let i = 0; i < modified.length; i++) {
+            if (modified[i].modifier === -1) {
+                modified[i] = {...modified[i], modifier: 0, abilityNeutralized: true};
+                // Add permanent technique bonus
+                if (!char.gearBonuses.technique) char.gearBonuses.technique = 0;
+                char.gearBonuses.technique += 5;
+                break;
+            }
+        }
+    }
+    
+    return modified;
+}
+
+function promptStatRedistribution(char, totalStats) {
+    // Simplified implementation - could be expanded with a dialog
+    const statNames = ['strength', 'technique', 'focus', 'flexibility'];
+    const fromStat = prompt(`Versatile: Take points FROM which stat?\n\nOptions: strength, technique, focus, flexibility\n\nYou can move up to 10 points.`);
+    
+    if (!fromStat || !statNames.includes(fromStat.toLowerCase())) return null;
+    
+    const toStat = prompt(`Take points from ${fromStat} and move TO which stat?\n\nOptions: strength, technique, focus, flexibility`);
+    
+    if (!toStat || !statNames.includes(toStat.toLowerCase()) || toStat.toLowerCase() === fromStat.toLowerCase()) return null;
+    
+    const amount = parseInt(prompt(`How many points to move? (1-10)`, '5'));
+    
+    if (isNaN(amount) || amount < 1 || amount > 10) return null;
+    
+    const modified = {...totalStats};
+    modified[fromStat.toLowerCase()] -= amount;
+    modified[toStat.toLowerCase()] += amount;
+    
+    return modified;
+}
+
+function applyAbilityToTimeAndXP(char, abilityName, route) {
+    let timeCost = route.time;
+    let xpMultiplier = 1.0;
+    
+    if (abilityName === 'Flash Speed') {
+        timeCost = Math.max(1, timeCost - 2);
+        xpMultiplier = 0.5; // Half XP on success
+    }
+    
+    return { timeCost, xpMultiplier };
 }
 
 // ===== GAME ACTIONS =====
@@ -1047,8 +1498,18 @@ function attemptClimb(route, area) {
         return;
     }
 
-    // Check requirements
-    if (char.timeRemaining < route.time || char.currentEndurance < route.endurance) {
+    // ABILITY: Prompt for ability use before climb
+    let activatedAbility = null;
+    if (canUseAbility(char, route, area)) {
+        activatedAbility = promptAbilityUse(char, route, area);
+    }
+
+    // ABILITY: Apply time/XP modifications (Flash Speed)
+    const abilityName = CHARACTERS[char.key].specialAbility.name;
+    const { timeCost, xpMultiplier } = applyAbilityToTimeAndXP(char, activatedAbility || abilityName, route);
+
+    // Check requirements (with modified time cost)
+    if (char.timeRemaining < timeCost || char.currentEndurance < route.endurance) {
         alert('Not enough time or endurance!');
         return;
     }
@@ -1061,19 +1522,30 @@ function attemptClimb(route, area) {
         char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
     }
 
-    // Calculate total stats
-    const totalStats = {
-        strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength,
-        technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique,
-        focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus,
-        flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility
+    // Calculate gear bonuses for this specific route
+    const routeGearBonuses = calculateGearBonuses(route, area);
+
+    // Calculate total stats (including route-specific gear bonuses)
+    let totalStats = {
+        strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength + routeGearBonuses.strength,
+        technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique + routeGearBonuses.technique,
+        focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus + routeGearBonuses.focus,
+        flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility + routeGearBonuses.flexibility
     };
+
+    // ABILITY: Apply stat modifications (Versatile)
+    if (activatedAbility === 'Versatile') {
+        const modifiedStats = applyAbilityToStats(char, activatedAbility, totalStats);
+        if (modifiedStats) {
+            totalStats = modifiedStats;
+        }
+    }
 
     // Roll dice based on route's rollEffect array
     const numDiceNeeded = route.rollEffect ? route.rollEffect.length : 2;
     let numDice = numDiceNeeded;
 
-    // Boulderer gets 3 dice on bouldering routes and picks best 2
+    // ABILITY: Boulderer gets 3 dice on bouldering routes and picks best 2
     if (char.key === 'boulderer' && area === 'bouldering' && numDiceNeeded === 2) {
         numDice = 3;
     }
@@ -1087,7 +1559,7 @@ function attemptClimb(route, area) {
     const diceToUse = numDice === 3 ? rolls.sort((a, b) => a - b).slice(0, 2) : rolls;
 
     // Apply dice to specific stats based on rollEffect
-    const effectiveRequirements = {
+    let effectiveRequirements = {
         strength: route.strength,
         technique: route.technique,
         focus: route.focus,
@@ -1095,7 +1567,7 @@ function attemptClimb(route, area) {
     };
 
     // Track which die affected which stat for display
-    const diceEffects = [];
+    let diceEffects = [];
 
     if (route.rollEffect) {
         route.rollEffect.forEach((effect, index) => {
@@ -1118,6 +1590,33 @@ function attemptClimb(route, area) {
         });
     }
 
+    // ABILITY: Apply dice modifications (Perfect Beta, Friction Trust)
+    if (activatedAbility === 'Perfect Beta' || activatedAbility === 'Friction Trust') {
+        diceEffects = applyAbilityToDice(char, activatedAbility, route, diceEffects, area);
+        
+        // Recalculate effective requirements with modified dice
+        effectiveRequirements = {
+            strength: route.strength,
+            technique: route.technique,
+            focus: route.focus,
+            flexibility: route.flexibility
+        };
+        
+        diceEffects.forEach(effect => {
+            if (effect.modifier === -1) {
+                effectiveRequirements[effect.stat] -= effect.die;
+            } else if (effect.modifier === 1) {
+                effectiveRequirements[effect.stat] += effect.die;
+            }
+            // modifier 0 means neutralized - don't apply
+        });
+    }
+
+    // ABILITY: Apply requirement modifications (Unshakeable, Elastic Advantage)
+    if (activatedAbility === 'Unshakeable' || activatedAbility === 'Elastic Advantage') {
+        effectiveRequirements = applyAbilityToRequirements(char, activatedAbility, effectiveRequirements, route);
+    }
+
     // Check success against effective requirements
     const strengthCheck = totalStats.strength >= effectiveRequirements.strength;
     const techniqueCheck = totalStats.technique >= effectiveRequirements.technique;
@@ -1126,31 +1625,34 @@ function attemptClimb(route, area) {
 
     const success = strengthCheck && techniqueCheck && focusCheck && flexibilityCheck;
 
-    // Apply costs
-    char.timeRemaining -= route.time;
+    // Apply costs (use modified time cost)
+    char.timeRemaining -= timeCost;
     char.currentEndurance -= route.endurance;
 
     // Mark route as attempted
     gameState.attemptedRoutes[currentPlayer.playerNum].add(routeKey);
 
-    // Award XP
-    const xpGained = success ? route.xpSuccess : route.xpFail;
+    // Award XP (with multiplier for Flash Speed)
+    let xpGained = success ? route.xpSuccess : route.xpFail;
+    xpGained = Math.floor(xpGained * xpMultiplier);
     char.xp += xpGained;
 
     // Check for level up
     checkLevelUp(char);
 
     // Show result modal
-    showClimbResult(route, rolls, diceToUse, totalStats, effectiveRequirements, diceEffects, success, xpGained);
+    showClimbResult(route, rolls, diceToUse, totalStats, effectiveRequirements, diceEffects, success, xpGained, activatedAbility);
 
-    addLog(`Player ${currentPlayer.playerNum} ${success ? 'completed' : 'failed'} ${route.name} (${route.grade}) - ${xpGained} XP gained`);
+    // Add log with ability notation
+    const abilityLog = activatedAbility ? ` (${activatedAbility})` : '';
+    addLog(`Player ${currentPlayer.playerNum} ${success ? 'completed' : 'failed'} ${route.name} (${route.grade})${abilityLog} - ${xpGained} XP gained`);
 
     // Check if turn should end
     checkTurnEnd();
     renderGameBoard();
 }
 
-function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained) {
+function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, activatedAbility) {
     const modal = document.getElementById('climbModal');
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
@@ -1177,10 +1679,21 @@ function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffec
         diceEffectsHTML = diceEffects.map((effect, index) => {
             const icon = statIcons[effect.stat];
             const statName = statNames[effect.stat];
-            const sign = effect.modifier === -1 ? '-' : '+';
-            const color = effect.modifier === -1 ? '#28a745' : '#dc3545';
-            return `<div style="padding: 8px; background: white; border-radius: 5px; border-left: 4px solid ${color};">
-                Die ${index + 1} (${effect.die}): ${sign}${effect.die} to ${icon} ${statName} ${effect.modifier === -1 ? '(easier)' : '(harder)'}
+            let sign = effect.modifier === -1 ? '-' : '+';
+            let color = effect.modifier === -1 ? '#28a745' : '#dc3545';
+            
+            // Handle neutralized dice
+            if (effect.modifier === 0 && effect.abilityNeutralized) {
+                sign = '~';
+                color = '#6c757d';
+            } else if (effect.modifier === 0) {
+                sign = '±';
+                color = '#6c757d';
+            }
+            
+            const neutralizedText = effect.abilityNeutralized ? ' <span style="color: #ffc107;">(Neutralized by Ability)</span>' : '';
+            return `<div style="margin: 5px 0; color: ${color}; font-weight: bold;">
+                Die ${index + 1}: 🎲 ${effect.die} → ${sign}${effect.die} ${icon} ${statName}${neutralizedText}
             </div>`;
         }).join('');
     }
@@ -1295,9 +1808,22 @@ function restAction() {
         recovery = Math.ceil(recovery * 1.5);
     }
 
-    char.currentEndurance = Math.min(char.maxEndurance, char.currentEndurance + recovery);
+    // Calculate rest bonuses from gear
+    let restBonus = 0;
+    char.equipment.forEach(gearName => {
+        const gear = GEAR_SHOP.find(g => g.name === gearName);
+        if (gear && gear.restBonus > 0) {
+            restBonus += gear.restBonus;
+        }
+    });
 
-    addLog(`Player ${currentPlayer.playerNum} rested and recovered endurance to ${char.currentEndurance}`);
+    char.currentEndurance = Math.min(char.maxEndurance + restBonus, char.currentEndurance + recovery);
+
+    if (restBonus > 0) {
+        addLog(`Player ${currentPlayer.playerNum} rested and recovered endurance to ${char.currentEndurance} (+${restBonus} gear bonus)`);
+    } else {
+        addLog(`Player ${currentPlayer.playerNum} rested and recovered endurance to ${char.currentEndurance}`);
+    }
 
     checkTurnEnd();
     renderGameBoard();
@@ -1319,6 +1845,20 @@ function purchaseGear(gear) {
         return;
     }
 
+    // Check prerequisites
+    if (gear.prerequisiteLevel && char.level < gear.prerequisiteLevel) {
+        alert(`This gear requires Level ${gear.prerequisiteLevel}!\n\nYou are currently Level ${char.level}.`);
+        return;
+    }
+    
+    if (gear.prerequisiteItems && gear.prerequisiteItems.length > 0) {
+        const missingItems = gear.prerequisiteItems.filter(item => !char.equipment.includes(item));
+        if (missingItems.length > 0) {
+            alert(`This gear requires the following items:\n\n${missingItems.map(i => `❌ ${i}`).join('\n')}\n\nPurchase these items first.`);
+            return;
+        }
+    }
+
     // Move player to gear shop
     movePlayerToSection(currentPlayer.playerNum, 'gearShop');
 
@@ -1330,26 +1870,43 @@ function purchaseGear(gear) {
         return;
     }
 
-    char.timeRemaining -= 1;
+    // Check if has Gear Bag for free shop visit
+    const hasGearBag = char.equipment.includes('Gear Bag');
+    const timeCost = hasGearBag ? 0 : 1;
+    
+    char.timeRemaining -= timeCost;
     char.xp -= gear.cost;
 
     const newXpToGo = getXPToNextLevel(char);
 
     char.equipment.push(gear.name);
 
-    // Apply permanent stat bonuses to gearBonuses
+    // Apply permanent stat bonuses
     if (gear.statEffect === 'endurance') {
         char.maxEndurance += gear.value;
-    } else if (gear.statEffect === 'strength' && gear.name === 'Grip Strength Trainer') {
+    } else if (gear.statEffect === 'strength' && (gear.name === 'Grip Strength Trainer')) {
         char.gearBonuses.strength += gear.value;
-    } else if (gear.statEffect === 'flexibility' && gear.name === 'Resistance Bands') {
+    } else if (gear.statEffect === 'technique' && (gear.name === 'Technique Training System')) {
+        char.gearBonuses.technique += gear.value;
+    } else if (gear.statEffect === 'focus' && (gear.name === 'Meditation App')) {
+        char.gearBonuses.focus += gear.value;
+    } else if (gear.statEffect === 'flexibility' && (gear.name === 'Resistance Bands')) {
         char.gearBonuses.flexibility += gear.value;
     } else if (gear.statEffect === 'strengthTech') {
-        char.gearBonuses.strength += 3;
+        char.gearBonuses.strength += 2;
         char.gearBonuses.technique += 2;
+    } else if (gear.statEffect === 'strengthTechMixed') {
+        // Campus Board Training Program: +3 Str, -1 Tech
+        char.gearBonuses.strength += 3;
+        char.gearBonuses.technique -= 1;
+    }
+    
+    // Handle enduranceBonus property for items like Comfortable Climbing Apparel and Compression Sleeves
+    if (gear.enduranceBonus) {
+        char.maxEndurance += gear.enduranceBonus;
     }
 
-    addLog(`Player ${currentPlayer.playerNum} purchased ${gear.name} for ${gear.cost} XP (now ${newXpToGo} XP to Level ${char.level + 1})`);
+    addLog(`Player ${currentPlayer.playerNum} purchased ${gear.name} for ${gear.cost} XP${timeCost === 0 ? ' (Gear Bag: free visit)' : ''} (now ${newXpToGo} XP to Level ${char.level + 1})`);
 
     // Replace purchased gear with new one
     replaceGearInShop(gear.name);
@@ -1534,7 +2091,16 @@ function closeModal() {
     document.getElementById('climbModal').classList.remove('show');
 }
 
+// Make sure functions are globally accessible
+window.startCharacterSelect = startCharacterSelect;
+window.startGame = startGame;
+window.closeModal = closeModal;
+window.restAction = restAction;
+
 // Initialize on page load
 window.onload = function() {
+    console.log('✅ game.js fully loaded and initialized');
+    console.log('startCharacterSelect function exists:', typeof startCharacterSelect !== 'undefined');
+    console.log('window.startCharacterSelect function exists:', typeof window.startCharacterSelect !== 'undefined');
     // Game is ready to start
 };
