@@ -264,7 +264,14 @@ let gameState = {
     belayersUnlocked: 1,
     gameLog: [],
     availableGear: [], // Randomized gear available in shop
-    attemptedRoutes: {} // Maps playerNum -> Set of route keys ("area:routeName") attempted this round
+    attemptedRoutes: {}, // Maps playerNum -> Set of route keys ("area:routeName") attempted this round
+    milestoneRoutes: {
+        beginner: null,
+        intermediate: null,
+        expert: null
+    },
+    gameEnded: false,
+    winner: null
 };
 
 // ===== SECTION CAPACITY SYSTEM =====
@@ -503,6 +510,136 @@ function calculateGearBonuses(route, area) {
     return bonuses;
 }
 
+// ===== MILESTONE ROUTES SYSTEM =====
+
+function selectMilestoneRoutes() {
+    console.log('🏆 Selecting milestone routes...');
+    
+    // Define difficulty ranges based on grade
+    const beginnerRoutes = [];
+    const intermediateRoutes = [];
+    const expertRoutes = [];
+    
+    // Categorize all routes by difficulty
+    Object.keys(ROUTES).forEach(area => {
+        ROUTES[area].forEach(route => {
+            const grade = route.grade;
+            
+            // Bouldering grades
+            if (grade === 'V0' || grade === 'V1' || grade === 'V2') {
+                beginnerRoutes.push({ area, route });
+            } else if (grade === 'V3' || grade === 'V4' || grade === 'V5' || grade === 'V6' || grade === 'V7') {
+                intermediateRoutes.push({ area, route });
+            } else if (grade === 'V8' || grade === 'V9' || grade === 'V10' || grade === 'V11' || grade === 'V12') {
+                expertRoutes.push({ area, route });
+            }
+            // Top Rope grades
+            else if (grade === '5.6' || grade === '5.7' || grade === '5.8') {
+                beginnerRoutes.push({ area, route });
+            } else if (grade === '5.9' || grade === '5.10a' || grade === '5.10b' || grade === '5.10d' || grade === '5.11b' || grade === '5.11c') {
+                intermediateRoutes.push({ area, route });
+            } else if (grade === '5.12a' || grade === '5.12b' || grade === '5.12d' || grade === '5.13a' || grade === '5.13c') {
+                expertRoutes.push({ area, route });
+            }
+            // Lead grades (5.8 and 5.9 are beginner for lead)
+            else if (area === 'leadClimbing' && (grade === '5.8' || grade === '5.9')) {
+                beginnerRoutes.push({ area, route });
+            } else if (area === 'leadClimbing' && (grade === '5.10a' || grade === '5.10b' || grade === '5.10d' || grade === '5.11a' || grade === '5.11b' || grade === '5.11c')) {
+                intermediateRoutes.push({ area, route });
+            } else if (area === 'leadClimbing' && (grade === '5.12a' || grade === '5.12b' || grade === '5.12d' || grade === '5.13a' || grade === '5.14a')) {
+                expertRoutes.push({ area, route });
+            }
+        });
+    });
+    
+    // Randomly select one from each difficulty
+    const beginnerIndex = Math.floor(Math.random() * beginnerRoutes.length);
+    const intermediateIndex = Math.floor(Math.random() * intermediateRoutes.length);
+    const expertIndex = Math.floor(Math.random() * expertRoutes.length);
+    
+    gameState.milestoneRoutes.beginner = beginnerRoutes[beginnerIndex];
+    gameState.milestoneRoutes.intermediate = intermediateRoutes[intermediateIndex];
+    gameState.milestoneRoutes.expert = expertRoutes[expertIndex];
+    
+    console.log('✅ Milestone routes selected:');
+    console.log('  Beginner:', gameState.milestoneRoutes.beginner.route.name, `(${gameState.milestoneRoutes.beginner.route.grade})`);
+    console.log('  Intermediate:', gameState.milestoneRoutes.intermediate.route.name, `(${gameState.milestoneRoutes.intermediate.route.grade})`);
+    console.log('  Expert:', gameState.milestoneRoutes.expert.route.name, `(${gameState.milestoneRoutes.expert.route.grade})`);
+}
+
+function renderMilestonePanel() {
+    const container = document.getElementById('milestonePanel');
+    if (!container) return;
+    
+    let html = `
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);">
+            <h2 style="margin: 0 0 15px 0; font-size: 1.8em; text-align: center;">
+                🏆 MILESTONE ROUTES - First to Complete All 3 WINS! 🏆
+            </h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+    `;
+    
+    const difficulties = ['beginner', 'intermediate', 'expert'];
+    const colors = { beginner: '#4ade80', intermediate: '#fbbf24', expert: '#ef4444' };
+    const icons = { beginner: '🟢', intermediate: '🟡', expert: '🔴' };
+    
+    difficulties.forEach(difficulty => {
+        const milestone = gameState.milestoneRoutes[difficulty];
+        if (!milestone) return;
+        
+        const route = milestone.route;
+        const area = milestone.area;
+        const areaIcon = area === 'bouldering' ? '🪨' : (area === 'topRope' ? '🧗' : '⛰️');
+        
+        html += `
+            <div style="background: white; color: #2c3e50; padding: 15px; border-radius: 10px; border-left: 5px solid ${colors[difficulty]};">
+                <div style="font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">
+                    ${icons[difficulty]} ${difficulty.toUpperCase()}
+                </div>
+                <div style="font-size: 1.1em; font-weight: bold; color: #667eea; margin-bottom: 5px;">
+                    ${areaIcon} ${route.name}
+                </div>
+                <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+                    Grade: ${route.grade} | Time: ${route.time} | Endurance: ${route.endurance}
+                </div>
+                <div style="font-size: 0.85em; margin-bottom: 10px;">
+                    💪 ${route.strength} | 🎯 ${route.technique} | 🧠 ${route.focus} | 🤸 ${route.flexibility}
+                </div>
+                <div style="border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px;">
+                    <div style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">Player Progress:</div>
+        `;
+        
+        gameState.players.forEach(player => {
+            const completed = player.character.milestonesCompleted[difficulty];
+            const statusIcon = completed ? '✅' : '⏳';
+            const statusText = completed ? 'COMPLETE' : 'Not Complete';
+            const statusColor = completed ? '#22c55e' : '#6b7280';
+            
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 0.85em;">
+                    <span>${player.character.name}</span>
+                    <span style="color: ${statusColor}; font-weight: bold;">${statusIcon} ${statusText}</span>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+                <button class="btn" onclick="attemptMilestoneRoute('${difficulty}')" style="width: 100%; margin-top: 10px; font-size: 0.9em; padding: 10px;">
+                    Attempt ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Route
+                </button>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
 // ===== GAME INITIALIZATION =====
 
 function startCharacterSelect() {
@@ -606,7 +743,8 @@ function selectCharacter(charKey) {
         gearBonuses: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
         timeRemaining: 10,
         abilityUsed: false,
-        location: 'lobby' // Track which section of the gym the player is at
+        location: 'lobby', // Track which section of the gym the player is at
+        milestonesCompleted: { beginner: false, intermediate: false, expert: false }
     };
 
     // Mark character as selected
@@ -631,10 +769,14 @@ function startGame() {
     // Initialize attempted routes tracking
     gameState.attemptedRoutes = {};
 
+    // Select milestone routes FIRST (before initializing regular routes)
+    selectMilestoneRoutes();
+    
     initializeRoutes();
     initializeGearShop();
     renderGameBoard();
     addLog("Game started! Round 1 begins.");
+    addLog("🏆 Milestone routes have been set! First player to complete all 3 wins the game!");
 }
 
 function initializeRoutes() {
@@ -722,6 +864,7 @@ function renderLog() {
 // ===== GAME RENDERING =====
 
 function renderGameBoard() {
+    renderMilestonePanel();
     renderGameInfo();
     renderPlayers();
     renderRoutes();
@@ -811,12 +954,23 @@ function renderPlayers() {
 
         const spendableXP = getSpendableXP(char);
         const xpToGo = getXPToNextLevel(char);
+        
+        // Calculate milestone progress
+        const milestonesCompleted = Object.values(char.milestonesCompleted).filter(Boolean).length;
+        const milestoneIcons = [
+            char.milestonesCompleted.beginner ? '✅' : '⏳',
+            char.milestonesCompleted.intermediate ? '✅' : '⏳',
+            char.milestonesCompleted.expert ? '✅' : '⏳'
+        ];
 
         panel.innerHTML = `
             <div class="player-header">
                 <div>
                     <h3>Player ${player.playerNum}: ${char.name}</h3>
                     <div style="color: #667eea; font-weight: bold;">${char.archetype}</div>
+                    <div style="margin-top: 8px; padding: 8px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 8px; font-weight: bold; font-size: 0.95em;">
+                        🏆 Milestones: ${milestonesCompleted}/3 ${milestoneIcons.join(' ')}
+                    </div>
                 </div>
                 <div style="text-align: right;">
                     <div style="font-size: 1.8em; font-weight: bold;">Level ${char.level}</div>
@@ -1829,6 +1983,235 @@ function restAction() {
     renderGameBoard();
 }
 
+// ===== MILESTONE ROUTE ATTEMPTS =====
+
+function attemptMilestoneRoute(difficulty) {
+    if (gameState.gameEnded) {
+        alert('Game has ended!');
+        return;
+    }
+    
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    const char = currentPlayer.character;
+    
+    // Check if already completed
+    if (char.milestonesCompleted[difficulty]) {
+        alert(`You have already completed the ${difficulty} milestone!`);
+        return;
+    }
+    
+    const milestone = gameState.milestoneRoutes[difficulty];
+    if (!milestone) {
+        alert('Milestone route not found!');
+        return;
+    }
+    
+    const route = milestone.route;
+    const area = milestone.area;
+    
+    // Check if player can enter this section (includes capacity checks for belayers)
+    const locationCheck = canEnterSection(area, currentPlayer.playerNum);
+    if (!locationCheck.canEnter) {
+        alert(`Cannot attempt this milestone route!\n\n${locationCheck.reason}`);
+        return;
+    }
+    
+    // Check prerequisites for the route area
+    if (area === 'topRope' || area === 'leadClimbing') {
+        if (!char.equipment.includes('Harness') || !char.equipment.includes('Belay Device')) {
+            alert(`You need a Harness and Belay Device to attempt ${area === 'topRope' ? 'Top Rope' : 'Lead'} routes!`);
+            return;
+        }
+    }
+    
+    if (area === 'leadClimbing') {
+        if (!char.equipment.includes('Locking Carabiner') || !char.equipment.includes('Lead Rope')) {
+            alert('You need a Locking Carabiner and Lead Rope to attempt Lead Climbing routes!');
+            return;
+        }
+    }
+    
+    // Check time and endurance
+    if (char.timeRemaining < route.time) {
+        alert(`Not enough time! This route requires ${route.time} time units, you have ${char.timeRemaining}.`);
+        return;
+    }
+    
+    if (char.currentEndurance < route.endurance) {
+        alert(`Not enough endurance! This route requires ${route.endurance} endurance, you have ${char.currentEndurance}.`);
+        return;
+    }
+    
+    // Move player to this section (important for capacity tracking)
+    movePlayerToSection(currentPlayer.playerNum, area);
+    
+    // Use the climb function with milestone tracking
+    attemptClimbWithMilestone(route, area, difficulty);
+}
+
+function attemptClimbWithMilestone(route, area, difficulty) {
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    const char = currentPlayer.character;
+    
+    // Deduct costs
+    char.timeRemaining -= route.time;
+    char.currentEndurance -= route.endurance;
+    
+    // Ensure gearBonuses exists
+    if (!char.gearBonuses) {
+        char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
+    }
+    
+    // Calculate gear bonuses for this specific route (includes route-specific modifiers)
+    const routeGearBonuses = calculateGearBonuses(route, area);
+    
+    // Calculate total stats with bonuses (including route-specific gear bonuses)
+    const stats = {
+        strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength + routeGearBonuses.strength,
+        technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique + routeGearBonuses.technique,
+        focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus + routeGearBonuses.focus,
+        flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility + routeGearBonuses.flexibility
+    };
+    
+    // Roll dice
+    let numDice = 2;
+    if (char.key === 'boulderer' && area === 'bouldering' && !char.abilityUsed) {
+        numDice = 3;
+    }
+    
+    let rolls = [];
+    for (let i = 0; i < numDice; i++) {
+        rolls.push(Math.floor(Math.random() * 6) + 1);
+    }
+    
+    let diceUsed = numDice === 3 ? rolls.sort((a, b) => a - b).slice(0, 2) : rolls;
+    
+    // Apply dice effects
+    const diceEffects = [];
+    route.rollEffect.forEach((effect, index) => {
+        if (index < diceUsed.length) {
+            diceEffects.push({
+                die: diceUsed[index],
+                stat: effect.stat,
+                modifier: effect.modifier,
+                abilityNeutralized: false
+            });
+        }
+    });
+    
+    // Calculate effective requirements
+    const effectiveReqs = {
+        strength: route.strength,
+        technique: route.technique,
+        focus: route.focus,
+        flexibility: route.flexibility
+    };
+    
+    diceEffects.forEach(effect => {
+        effectiveReqs[effect.stat] += (effect.die * effect.modifier);
+    });
+    
+    // Check success
+    const success = stats.strength >= effectiveReqs.strength &&
+                   stats.technique >= effectiveReqs.technique &&
+                   stats.focus >= effectiveReqs.focus &&
+                   stats.flexibility >= effectiveReqs.flexibility;
+    
+    // Award XP
+    const xpGained = success ? route.xpSuccess : route.xpFail;
+    char.xp += xpGained;
+    
+    // Check for level up
+    checkLevelUp(currentPlayer);
+    
+    // If successful, mark milestone complete
+    if (success) {
+        char.milestonesCompleted[difficulty] = true;
+        addLog(`🏆 Player ${currentPlayer.playerNum} completed the ${difficulty.toUpperCase()} milestone: ${route.name}!`);
+        
+        // Check for victory
+        checkVictory(currentPlayer);
+    } else {
+        addLog(`Player ${currentPlayer.playerNum} attempted ${difficulty} milestone "${route.name}" but failed. Gained ${xpGained} XP.`);
+    }
+    
+    // Show result modal
+    showClimbResultModal(route, area, rolls, diceUsed, diceEffects, effectiveReqs, stats, success, xpGained);
+    
+    checkTurnEnd();
+    renderGameBoard();
+}
+
+function checkVictory(player) {
+    const milestones = player.character.milestonesCompleted;
+    
+    if (milestones.beginner && milestones.intermediate && milestones.expert) {
+        gameState.gameEnded = true;
+        gameState.winner = player;
+        
+        addLog(`🎉🎉🎉 GAME OVER! Player ${player.playerNum} (${player.character.name}) has completed all milestone routes and WINS THE GAME! 🎉🎉🎉`);
+        
+        // Show victory screen after a short delay
+        setTimeout(() => {
+            showVictoryScreen(player);
+        }, 500);
+    }
+}
+
+function showVictoryScreen(winner) {
+    const modal = document.getElementById('victoryModal');
+    const modalBody = document.getElementById('victoryModalBody');
+    
+    let html = `
+        <div style="text-align: center;">
+            <h1 style="font-size: 3em; margin-bottom: 20px;">🎉 GAME OVER! 🎉</h1>
+            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
+                <h2 style="font-size: 2.5em; margin: 0 0 10px 0;">🏆 WINNER 🏆</h2>
+                <h3 style="font-size: 2em; margin: 0;">Player ${winner.playerNum}</h3>
+                <p style="font-size: 1.5em; margin: 10px 0 0 0;">${winner.character.name}</p>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0;">Final Stats</h3>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; text-align: left;">
+                    <div><strong>✅ Milestones:</strong> 3/3 Complete</div>
+                    <div><strong>📊 Level:</strong> ${winner.character.level}</div>
+                    <div><strong>⭐ Total XP:</strong> ${winner.character.xp}</div>
+                    <div><strong>💪 Strength:</strong> ${winner.character.stats.strength}</div>
+                    <div><strong>🎯 Technique:</strong> ${winner.character.stats.technique}</div>
+                    <div><strong>🧠 Focus:</strong> ${winner.character.stats.focus}</div>
+                    <div><strong>🤸 Flexibility:</strong> ${winner.character.stats.flexibility}</div>
+                    <div><strong>💨 Endurance:</strong> ${winner.character.maxEndurance}</div>
+                </div>
+            </div>
+            
+            <div style="background: #fff3cd; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                <h4 style="margin-top: 0;">All Players - Final Standings</h4>
+    `;
+    
+    gameState.players.forEach(player => {
+        const milestonesCount = Object.values(player.character.milestonesCompleted).filter(Boolean).length;
+        html += `
+            <div style="padding: 10px; margin: 5px 0; background: white; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
+                <span><strong>Player ${player.playerNum}:</strong> ${player.character.name}</span>
+                <span>🏆 ${milestonesCount}/3 | Level ${player.character.level} | ${player.character.xp} XP</span>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+            
+            <button class="btn btn-success" onclick="location.reload()" style="font-size: 1.2em; padding: 15px 40px;">
+                Play Again
+            </button>
+        </div>
+    `;
+    
+    modalBody.innerHTML = html;
+    modal.classList.add('show');
+}
+
 function purchaseGear(gear) {
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     const char = currentPlayer.character;
@@ -2096,6 +2479,7 @@ window.startCharacterSelect = startCharacterSelect;
 window.startGame = startGame;
 window.closeModal = closeModal;
 window.restAction = restAction;
+window.attemptMilestoneRoute = attemptMilestoneRoute;
 
 // Initialize on page load
 window.onload = function() {
