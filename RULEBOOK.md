@@ -31,7 +31,7 @@
 Welcome to **All-In Ascent**, where you step into the climbing shoes of an aspiring rock climber at Alpine Indoors climbing gym! Over multiple rounds, you'll attempt challenging routes, train your body, purchase essential gear, and level up your character from a beginner to an elite climber.
 
 **Players:** 1-4  
-**Game Length:** Until players reach maximum level (Level 15)  
+**Game Length:** First player to complete all 3 Milestone Routes wins!  
 **Complexity:** Medium-High
 
 ---
@@ -48,6 +48,7 @@ Welcome to **All-In Ascent**, where you step into the climbing shoes of an aspir
 - **Training Equipment Cards**
 - **Gear Shop Items**
 - **2 Six-Sided Dice** 🎲🎲
+- **3 Milestone Route Cards** (Beginner, Intermediate, Expert)
 - **Route Clearing Token** (moves clockwise)
 - **Experience Points (XP) Tracker**
 
@@ -57,30 +58,42 @@ Welcome to **All-In Ascent**, where you step into the climbing shoes of an aspir
 
 1. Each player selects the **number of players** (1-4)
 2. Players choose their **character** from 10 available climbers
-3. The game board displays:
+3. **Three Milestone Routes are randomly selected:**
+   - One **Beginner** route (V0-V2, 5.6-5.8, or Lead 5.8-5.9)
+   - One **Intermediate** route (V3-V7, 5.9-5.11c, or Lead 5.10a-5.11c)
+   - One **Expert** route (V8-V12, 5.12a-5.13c, or Lead 5.12a-5.14a)
+   - These routes are displayed in the Milestone Panel and are the same for all players
+4. The game board displays:
+   - Milestone Routes panel (top of board)
    - Three climbing areas (Bouldering, Top Rope, Lead Climbing)
    - Training equipment area
    - Gear shop
    - Rest area
-4. Each player starts with:
+5. Each player starts with:
    - **Level 1**
    - **0 XP**
    - **10 Time Units**
    - Character-specific starting stats and endurance
    - No equipment
-5. Place the **Route Clearing Token** between Bouldering and Lead Climbing (Position 0)
+   - **0/3 Milestones Complete**
+6. Place the **Route Clearing Token** between Bouldering and Lead Climbing (Position 0)
 
 ---
 
 ## OBJECTIVE
 
-**Climb routes, gain experience, and level up your character to reach the ultimate level of 15!**
+**Be the FIRST player to successfully complete all 3 Milestone Routes and WIN THE GAME!**
+
+All players compete to complete the same three milestone routes:
+- 🟢 **Beginner Milestone** - An easier route to build confidence
+- 🟡 **Intermediate Milestone** - A moderate challenge requiring some progression
+- 🔴 **Expert Milestone** - An elite route that tests your mastery
 
 Along the way, you'll:
-- Master three climbing disciplines
-- Purchase essential gear to unlock harder routes
-- Train to improve your stats
-- Use your character's unique special ability strategically
+- Level up your character to gain the stats needed for harder milestones
+- Purchase essential gear to unlock climbing areas and boost performance
+- Train strategically to meet milestone requirements
+- Use your character's unique special ability at crucial moments
 
 ---
 
@@ -571,20 +584,91 @@ Routes have attributes that influence dice effects:
 
 ## WINNING THE GAME
 
-**There is no single "winner" in All-In Ascent.** 
+### **🏆 Victory Condition: Complete All 3 Milestones**
 
-The game is about **personal progression and achievement**. Players compete to:
+**The first player to successfully complete all three Milestone Routes WINS THE GAME!**
 
-1. **Reach Level 15** (the maximum level)
-2. **Conquer the hardest routes** (V12 boulders, 5.14a lead climbs)
-3. **Optimize their character build** (gear, stats, abilities)
+At the start of the game, three routes are randomly selected as milestones:
+- 🟢 **Beginner Milestone** (V0-V2, 5.6-5.8, or Lead 5.8-5.9)
+- 🟡 **Intermediate Milestone** (V3-V7, 5.9-5.11c, or Lead 5.10a-5.11c)
+- 🔴 **Expert Milestone** (V8-V12, 5.12a-5.13c, or Lead 5.12a-5.14a)
 
-**End Conditions:**
-- Players can choose when to end the game (reach Level 10? 15? Complete all V12 routes?)
-- In multiplayer, first to Level 15 could be considered the winner
-- Or play cooperatively, helping each other progress!
+**All players compete to complete the SAME three routes.**
 
-The true victory is the climbing progression you made along the way! 🧗‍♀️🧗‍♂️
+### **How Milestone Routes Work**
+
+1. **Always Available** - Milestone routes never rotate or clear. They're permanently displayed in the Milestone Panel at the top of the game board.
+
+2. **Unlimited Attempts** - Unlike regular routes (one attempt per round), you can attempt milestone routes as many times as you want (limited only by time and endurance).
+
+3. **Standard Mechanics** - Milestone routes use the same climbing mechanics as regular routes:
+   - Pay time and endurance costs
+   - Roll dice and apply effects
+   - Meet stat requirements to succeed
+   - Earn XP on success or failure
+
+4. **Individual Progress** - Each player tracks their own milestone completion. Completing a milestone marks it complete for YOU only, not for all players.
+
+5. **Can be Attempted in ANY Order** - You don't need to complete Beginner before Intermediate. Complete them in whatever order you can!
+
+6. **Require Prerequisites** - If a milestone is a Top Rope or Lead route, you still need the appropriate gear to attempt it.
+
+### **Game End**
+
+When a player successfully completes their **third and final milestone**, the game ends immediately and that player is declared the WINNER!
+
+**Victory Screen Shows:**
+- Winner's name and character
+- Final level and total XP
+- All four stats
+- Complete milestone checkmarks (✅✅✅)
+- Leaderboard with all players' standings
+
+### **Why This System Works**
+
+✅ **Clear win condition** - No ambiguity about when the game ends  
+✅ **Balanced difficulty** - Everyone faces the same three challenges  
+✅ **Encourages leveling** - Higher stats make milestones easier  
+✅ **Strategic depth** - Which milestone to attempt first? When to level vs. attempt?  
+✅ **Exciting finish** - Race to complete the final milestone!
+
+---
+
+## MILESTONE STRATEGY TIPS
+
+### **Early Game (Rounds 1-5)**
+
+1. **Complete the Beginner Milestone ASAP** - Get 1/3 done early while building up
+2. **Focus on leveling** - Climb regular routes to gain XP and level up
+3. **Buy essential gear** - Harness + Belay Device if milestones require them
+4. **Train before attempting milestones** - That +5 bonus can mean success vs. failure
+
+### **Mid Game (Rounds 6-12)**
+
+1. **Tackle the Intermediate Milestone** - Your stats should be high enough by Level 4-6
+2. **Balance milestone attempts with progression** - Don't get stuck retrying milestones
+3. **Buy performance gear** - Gear bonuses stack with leveling bonuses
+4. **Watch other players' progress** - If someone has 2/3 milestones, the race is on!
+
+### **Late Game (Race to Victory!)**
+
+1. **All-in on the Expert Milestone** - This is what separates winners from losers
+2. **Train every round** - Max out your stats before each attempt
+3. **Use your special ability** - Save it specifically for the Expert milestone
+4. **Manage time carefully** - One more attempt or level up first?
+
+### **Character-Specific Milestone Tips**
+
+- **Powerhouse:** Pray for Overhang milestones (your specialty)
+- **Technician:** Perfect Beta saves you on high-dice Expert routes
+- **Zen Master:** Ignore Focus on Lead milestones = huge advantage
+- **Contortionist:** -10 Flexibility makes Expert milestone much easier
+- **All-Rounder:** Redistribute stats to match each milestone's requirements
+- **Sprinter:** Flash Speed on milestones? Risky but fast!
+- **Iron Lung:** Train heavily, rest, repeat
+- **Boulderer:** If Expert is a boulder, you've won
+- **Slab Dancer:** +8 all stats on Slab milestones = godmode
+- **Route Reader:** Preview Vision eliminates risk on expensive Expert attempts
 
 ---
 
