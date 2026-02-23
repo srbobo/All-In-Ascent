@@ -2,19 +2,6 @@
 console.log('🎮 game.js is loading...');
 
 const CHARACTERS = {
-    powerhouse: {
-        name: "The Powerhouse",
-        archetype: "Power Climber",
-        description: "A gym rat who focuses on raw pulling power and campus board training. Dominates overhang routes.",
-        startingStats: { strength: 25, technique: 12, focus: 15, flexibility: 13 },
-        startingEndurance: 95,
-        growth: { strength: 4.5, technique: 1.5, focus: 2, flexibility: 1.5, endurance: 6 },
-        specialAbility: {
-            name: "Muscle Memory",
-            description: "Once per round, re-roll any Strength check and take the better result",
-            used: false
-        }
-    },
     technician: {
         name: "The Technician",
         archetype: "Precision Specialist",
@@ -24,46 +11,7 @@ const CHARACTERS = {
         growth: { strength: 1.5, technique: 4.5, focus: 2.5, flexibility: 2, endurance: 5 },
         specialAbility: {
             name: "Perfect Beta",
-            description: "Ignore one nerf dice penalty per climb (converts +1d6 to 0)",
-            used: false
-        }
-    },
-    zenMaster: {
-        name: "The Zen Master",
-        archetype: "Mental Warrior",
-        description: "Maintains perfect composure under pressure. Never lets fear dictate climbing decisions.",
-        startingStats: { strength: 14, technique: 16, focus: 24, flexibility: 12 },
-        startingEndurance: 105,
-        growth: { strength: 2, technique: 2.5, focus: 4.5, flexibility: 1.5, endurance: 7 },
-        specialAbility: {
-            name: "Unshakeable",
-            description: "Once per round, ignore all Focus requirements on a single climb attempt",
-            used: false
-        }
-    },
-    contortionist: {
-        name: "The Contortionist",
-        archetype: "Flexibility Expert",
-        description: "Can reach holds others can't and squeeze into impossible positions with ease.",
-        startingStats: { strength: 13, technique: 15, focus: 14, flexibility: 24 },
-        startingEndurance: 90,
-        growth: { strength: 1.5, technique: 2.5, focus: 2, flexibility: 4.5, endurance: 4 },
-        specialAbility: {
-            name: "Elastic Advantage",
-            description: "Once per round, treat any Flexibility requirement as 10 points lower",
-            used: false
-        }
-    },
-    allRounder: {
-        name: "The All-Rounder",
-        archetype: "Balanced Climber",
-        description: "Jack of all trades who adapts to any climbing style with consistent performance.",
-        startingStats: { strength: 18, technique: 18, focus: 18, flexibility: 18 },
-        startingEndurance: 100,
-        growth: { strength: 3, technique: 3, focus: 3, flexibility: 3, endurance: 5 },
-        specialAbility: {
-            name: "Versatile",
-            description: "Once per round, redistribute up to 10 stat points between any two stats for a single climb",
+            description: "PASSIVE: Negate all nerf dice effects on every climb. All stat requirements reduced by 5. Add +1 time cost to every climb.",
             used: false
         }
     },
@@ -76,46 +24,33 @@ const CHARACTERS = {
         growth: { strength: 4, technique: 2, focus: 1.5, flexibility: 2.5, endurance: 3 },
         specialAbility: {
             name: "Flash Speed",
-            description: "Reduce time cost of any climb by 2 units (minimum 1), but gain only half XP on success",
+            description: "PASSIVE: Reduce time cost of every climb by 2 (min 1), but gain only half XP on success. Rolls an extra d6 nerf die applied to Focus on every climb.",
             used: false
         }
     },
     ironLung: {
         name: "The Iron Lung",
         archetype: "Endurance Athlete",
-        description: "Built for the long haul with incredible stamina. Can climb all day without tiring.",
+        description: "Tackles challenges head-on with determination.",
         startingStats: { strength: 16, technique: 17, focus: 19, flexibility: 14 },
         startingEndurance: 120,
         growth: { strength: 2.5, technique: 2.5, focus: 3, flexibility: 2, endurance: 8 },
         specialAbility: {
-            name: "Endless Stamina",
-            description: "When resting, recover 50% more endurance than normal (rounded up)",
+            name: "Relentless",
+            description: "PASSIVE: On a failed climb, earn 50% more XP than the base fail XP. Also lose an extra 5 Endurance on failure.",
             used: false
         }
     },
-    boulderer: {
-        name: "The Boulderer",
-        archetype: "Problem Crusher",
-        description: "Specializes in powerful sequences. Thrives on V-grade challenges.",
-        startingStats: { strength: 23, technique: 16, focus: 14, flexibility: 12 },
-        startingEndurance: 90,
-        growth: { strength: 4.5, technique: 2.5, focus: 2, flexibility: 1, endurance: 5 },
-        specialAbility: {
-            name: "Boulder Bias",
-            description: "On Bouldering climbs only: roll 3 dice instead of 2 and choose the best 2 results",
-            used: false
-        }
-    },
-    slabDancer: {
-        name: "The Slab Dancer",
-        archetype: "Balance Master",
-        description: "Moves like water on vertical terrain. Trusts footwork over brute force.",
+    freeSolo: {
+        name: "The Free Solo",
+        archetype: "Risk Taker",
+        description: "Dares to perform the impossible with no fear.",
         startingStats: { strength: 11, technique: 23, focus: 20, flexibility: 16 },
         startingEndurance: 100,
         growth: { strength: 1.5, technique: 4, focus: 3, flexibility: 2.5, endurance: 6 },
         specialAbility: {
-            name: "Friction Trust",
-            description: "On Slab routes only: ignore one buff dice (converts -1d6 to 0) to gain +5 permanent to Technique checks",
+            name: "Life or Die",
+            description: "PASSIVE: Can access Top Rope and Lead routes without equipment. All dice roll effects are negated. Can only attempt climbs where all stats guarantee success.",
             used: false
         }
     },
@@ -127,8 +62,8 @@ const CHARACTERS = {
         startingEndurance: 110,
         growth: { strength: 2, technique: 3.5, focus: 4, flexibility: 1.5, endurance: 7 },
         specialAbility: {
-            name: "Preview Vision",
-            description: "Once per round, before attempting a climb, may look at all requirements and roll effects, then decide whether to attempt",
+            name: "Versatility",
+            description: "Resting grants a Beta Boost (+3 all stats) for your next climb. Only 3 of 4 stats need to pass to succeed a climb. Once per round, redistribute up to 10 stat points between two attributes.",
             used: false
         }
     }
@@ -384,7 +319,10 @@ function movePlayerToSection(playerNum, section) {
 function checkAreaAccess(area) {
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     const char = currentPlayer.character;
-    
+
+    // Free Solo bypasses all equipment requirements
+    if (char.key === 'freeSolo') return { hasAccess: true, missingItems: [] };
+
     // Bouldering is always accessible
     if (area === 'bouldering') {
         return { hasAccess: true, missingItems: [] };
@@ -743,6 +681,7 @@ function selectCharacter(charKey) {
         gearBonuses: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
         timeRemaining: 10,
         abilityUsed: false,
+        betaBoostActive: false, // Route Reader: set to true after resting, consumed on next climb
         location: 'lobby', // Track which section of the gym the player is at
         milestonesCompleted: { beginner: false, intermediate: false, expert: false }
     };
@@ -984,25 +923,25 @@ function renderPlayers() {
                 <div class="stat-box">
                     <div class="stat-label">Strength</div>
                     <div class="stat-value">
-                        ${char.stats.strength}${char.trainingBonuses.strength > 0 || char.gearBonuses.strength > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.strength + char.gearBonuses.strength})</span>` : ''}
+                        ${char.stats.strength}${char.trainingBonuses.strength > 0 || char.gearBonuses.strength > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.strength + char.gearBonuses.strength})</span>` : ''}${char.betaBoostActive ? ' <span style="color: #9c27b0; font-weight: bold;">(+3 ⚡)</span>' : ''}
                     </div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Technique</div>
                     <div class="stat-value">
-                        ${char.stats.technique}${char.trainingBonuses.technique > 0 || char.gearBonuses.technique > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.technique + char.gearBonuses.technique})</span>` : ''}
+                        ${char.stats.technique}${char.trainingBonuses.technique > 0 || char.gearBonuses.technique > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.technique + char.gearBonuses.technique})</span>` : ''}${char.betaBoostActive ? ' <span style="color: #9c27b0; font-weight: bold;">(+3 ⚡)</span>' : ''}
                     </div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Focus</div>
                     <div class="stat-value">
-                        ${char.stats.focus}${char.trainingBonuses.focus > 0 || char.gearBonuses.focus > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.focus + char.gearBonuses.focus})</span>` : ''}
+                        ${char.stats.focus}${char.trainingBonuses.focus > 0 || char.gearBonuses.focus > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.focus + char.gearBonuses.focus})</span>` : ''}${char.betaBoostActive ? ' <span style="color: #9c27b0; font-weight: bold;">(+3 ⚡)</span>' : ''}
                     </div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">Flexibility</div>
                     <div class="stat-value">
-                        ${char.stats.flexibility}${char.trainingBonuses.flexibility > 0 || char.gearBonuses.flexibility > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.flexibility + char.gearBonuses.flexibility})</span>` : ''}
+                        ${char.stats.flexibility}${char.trainingBonuses.flexibility > 0 || char.gearBonuses.flexibility > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.flexibility + char.gearBonuses.flexibility})</span>` : ''}${char.betaBoostActive ? ' <span style="color: #9c27b0; font-weight: bold;">(+3 ⚡)</span>' : ''}
                     </div>
                 </div>
             </div>
@@ -1029,11 +968,12 @@ function renderPlayers() {
             </div>
 
             <div style="margin-top: 15px;">
-                <strong>⭐ ${char.specialAbility.name}</strong> 
+                <strong>⭐ ${char.specialAbility.name}</strong>
                 <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; ${char.abilityUsed ? 'background: #dc3545; color: white;' : 'background: #28a745; color: white;'}">
                     ${char.abilityUsed ? '❌ Used' : '✅ Available'}
                 </span>
                 <div style="font-size: 0.9em; color: #666; margin-top: 5px;">${char.specialAbility.description}</div>
+                ${char.betaBoostActive ? `<div style="margin-top: 8px; padding: 8px 12px; background: linear-gradient(135deg, #7b1fa2, #ce93d8); color: white; border-radius: 8px; font-weight: bold; text-align: center; font-size: 0.95em;">⚡ Beta Boost Active — +3 to all stats on next climb!</div>` : ''}
             </div>
 
             ${char.equipment.length > 0 ? `
@@ -1501,102 +1441,88 @@ function renderStore() {
 
 function canUseAbility(char, route, area) {
     if (char.abilityUsed) return false;
-    
+
     const abilityName = CHARACTERS[char.key].specialAbility.name;
-    
-    // Check area-specific abilities
-    if (abilityName === 'Boulder Bias' && area !== 'bouldering') return false;
-    if (abilityName === 'Friction Trust' && route.routeType !== 'Slab') return false;
-    
-    // Iron Lung and Boulderer abilities are passive, not activated here
-    if (abilityName === 'Endless Stamina') return false;
-    if (abilityName === 'Boulder Bias') return false; // Handled automatically in dice rolling
-    
+
+    // Only Versatility has a user-activated component (stat redistribution once per round)
+    // All other abilities are fully passive
+    if (abilityName !== 'Versatility') return false;
+
     return true;
 }
 
 function promptAbilityUse(char, route, area) {
     const abilityName = CHARACTERS[char.key].specialAbility.name;
-    const abilityDesc = CHARACTERS[char.key].specialAbility.description;
-    
-    // Abilities that need pre-climb activation
-    const preClimbAbilities = ['Unshakeable', 'Elastic Advantage', 'Versatile', 'Flash Speed', 'Preview Vision'];
-    
+
+    // Only Versatility prompts the user (for stat redistribution)
+    const preClimbAbilities = ['Versatility'];
+
     if (preClimbAbilities.includes(abilityName)) {
-        const use = confirm(`🌟 Use ${abilityName}?\n\n${abilityDesc}\n\nThis can only be used once per round.`);
+        const use = confirm(`🌟 Use Versatility – Stat Redistribution?\n\nMove up to 10 points between any two stats for this climb.\n\nThis can only be used once per round.`);
         if (use) {
             char.abilityUsed = true;
             return abilityName;
         }
     }
-    
+
     return null;
 }
 
 function applyAbilityToStats(char, abilityName, totalStats) {
-    // Apply stat modifications from abilities
-    if (abilityName === 'Versatile') {
-        // Prompt for stat redistribution
-        const result = promptStatRedistribution(char, totalStats);
+    let modified = { ...totalStats };
+
+    // Route Reader: Beta Boost passive (set after resting, consumed here)
+    if (char.key === 'routeReader' && char.betaBoostActive) {
+        modified.strength += 3;
+        modified.technique += 3;
+        modified.focus += 3;
+        modified.flexibility += 3;
+        char.betaBoostActive = false; // consume the boost
+        addLog(`Beta Boost: +3 to all stats this climb!`);
+    }
+
+    // Versatility: stat redistribution (activated once per round)
+    if (abilityName === 'Versatility') {
+        const result = promptStatRedistribution(char, modified);
         if (result) {
-            return result; // Returns modified stats
+            return result;
         }
     }
-    
-    return totalStats; // No modification
+
+    return modified;
 }
 
 function applyAbilityToRequirements(char, abilityName, effectiveRequirements, route) {
     const modified = {...effectiveRequirements};
-    
-    if (abilityName === 'Unshakeable') {
-        modified.focus = 0; // Ignore all focus requirements
+
+    // Perfect Beta: passive -5 to all stat requirements (min 0)
+    if (char.key === 'technician') {
+        modified.strength = Math.max(0, modified.strength - 5);
+        modified.technique = Math.max(0, modified.technique - 5);
+        modified.focus = Math.max(0, modified.focus - 5);
+        modified.flexibility = Math.max(0, modified.flexibility - 5);
     }
-    
-    if (abilityName === 'Elastic Advantage') {
-        modified.flexibility = Math.max(0, modified.flexibility - 10);
-    }
-    
-    if (abilityName === 'Friction Trust' && route.routeType === 'Slab') {
-        // This is handled during dice application
-    }
-    
+
     return modified;
 }
 
 function applyAbilityToDice(char, abilityName, route, diceEffects, area) {
     let modified = [...diceEffects];
-    
-    if (abilityName === 'Perfect Beta') {
-        // Find first nerf dice (+1) and neutralize it
-        for (let i = 0; i < modified.length; i++) {
-            if (modified[i].modifier === 1) {
-                modified[i] = {...modified[i], modifier: 0, abilityNeutralized: true};
-                break;
-            }
-        }
+
+    // Perfect Beta: negate ALL nerf dice (passive for Technician)
+    if (char.key === 'technician') {
+        modified = modified.map(e =>
+            e.modifier === 1 ? {...e, modifier: 0, abilityNeutralized: true} : e
+        );
     }
-    
-    if (abilityName === 'Friction Trust' && route.routeType === 'Slab') {
-        // Find first buff dice (-1) and neutralize it, then add permanent technique
-        for (let i = 0; i < modified.length; i++) {
-            if (modified[i].modifier === -1) {
-                modified[i] = {...modified[i], modifier: 0, abilityNeutralized: true};
-                // Add permanent technique bonus
-                if (!char.gearBonuses.technique) char.gearBonuses.technique = 0;
-                char.gearBonuses.technique += 5;
-                break;
-            }
-        }
-    }
-    
+
     return modified;
 }
 
 function promptStatRedistribution(char, totalStats) {
     // Simplified implementation - could be expanded with a dialog
     const statNames = ['strength', 'technique', 'focus', 'flexibility'];
-    const fromStat = prompt(`Versatile: Take points FROM which stat?\n\nOptions: strength, technique, focus, flexibility\n\nYou can move up to 10 points.`);
+    const fromStat = prompt(`Versatility: Take points FROM which stat?\n\nOptions: strength, technique, focus, flexibility\n\nYou can move up to 10 points.`);
     
     if (!fromStat || !statNames.includes(fromStat.toLowerCase())) return null;
     
@@ -1618,12 +1544,18 @@ function promptStatRedistribution(char, totalStats) {
 function applyAbilityToTimeAndXP(char, abilityName, route) {
     let timeCost = route.time;
     let xpMultiplier = 1.0;
-    
-    if (abilityName === 'Flash Speed') {
+
+    // Sprinter: Flash Speed is always passive — reduce time by 2, half XP on success
+    if (char.key === 'sprinter') {
         timeCost = Math.max(1, timeCost - 2);
-        xpMultiplier = 0.5; // Half XP on success
+        xpMultiplier = 0.5;
     }
-    
+
+    // Technician: Perfect Beta always adds +1 time cost
+    if (char.key === 'technician') {
+        timeCost += 1;
+    }
+
     return { timeCost, xpMultiplier };
 }
 
@@ -1652,15 +1584,14 @@ function attemptClimb(route, area) {
         return;
     }
 
-    // ABILITY: Prompt for ability use before climb
+    // ABILITY: Prompt for ability use before climb (Versatility only)
     let activatedAbility = null;
     if (canUseAbility(char, route, area)) {
         activatedAbility = promptAbilityUse(char, route, area);
     }
 
-    // ABILITY: Apply time/XP modifications (Flash Speed)
-    const abilityName = CHARACTERS[char.key].specialAbility.name;
-    const { timeCost, xpMultiplier } = applyAbilityToTimeAndXP(char, activatedAbility || abilityName, route);
+    // ABILITY: Apply passive time/XP modifications (Sprinter Flash Speed, Technician Perfect Beta)
+    const { timeCost, xpMultiplier } = applyAbilityToTimeAndXP(char, activatedAbility, route);
 
     // Check requirements (with modified time cost)
     if (char.timeRemaining < timeCost || char.currentEndurance < route.endurance) {
@@ -1687,32 +1618,35 @@ function attemptClimb(route, area) {
         flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility + routeGearBonuses.flexibility
     };
 
-    // ABILITY: Apply stat modifications (Versatile)
-    if (activatedAbility === 'Versatile') {
-        const modifiedStats = applyAbilityToStats(char, activatedAbility, totalStats);
-        if (modifiedStats) {
-            totalStats = modifiedStats;
+    // ABILITY: Free Solo — guarantee check against base requirements (no dice since Life or Die negates them)
+    if (char.key === 'freeSolo') {
+        if (totalStats.strength < route.strength || totalStats.technique < route.technique ||
+            totalStats.focus < route.focus || totalStats.flexibility < route.flexibility) {
+            alert('⚠️ Life or Die: You can only attempt routes you are guaranteed to complete!\n\nYour stats must meet all base requirements.');
+            return;
         }
     }
 
-    // Roll dice based on route's rollEffect array
-    const numDiceNeeded = route.rollEffect ? route.rollEffect.length : 2;
-    let numDice = numDiceNeeded;
+    // ABILITY: Apply stat modifications (beta boost passive + Versatility redistribution)
+    totalStats = applyAbilityToStats(char, activatedAbility, totalStats);
 
-    // ABILITY: Boulderer gets 3 dice on bouldering routes and picks best 2
-    if (char.key === 'boulderer' && area === 'bouldering' && numDiceNeeded === 2) {
-        numDice = 3;
+    // Build local roll effect array (allows Sprinter to add extra Focus nerf without mutating route data)
+    let effectRollArray = route.rollEffect ? [...route.rollEffect] : [];
+
+    // ABILITY: Sprinter Flash Speed — always add an extra d6 nerf die applied to Focus
+    if (char.key === 'sprinter') {
+        effectRollArray.push({ stat: 'focus', modifier: 1 });
     }
 
+    // Roll all required dice
+    const numDice = effectRollArray.length || 2;
     const rolls = [];
     for (let i = 0; i < numDice; i++) {
         rolls.push(Math.floor(Math.random() * 6) + 1);
     }
+    const diceToUse = rolls;
 
-    // For boulderer, take best 2 (lowest for buffs, highest for nerfs - take lowest to be safe)
-    const diceToUse = numDice === 3 ? rolls.sort((a, b) => a - b).slice(0, 2) : rolls;
-
-    // Apply dice to specific stats based on rollEffect
+    // Apply dice to specific stats based on effectRollArray
     let effectiveRequirements = {
         strength: route.strength,
         technique: route.technique,
@@ -1723,53 +1657,47 @@ function attemptClimb(route, area) {
     // Track which die affected which stat for display
     let diceEffects = [];
 
-    if (route.rollEffect) {
-        route.rollEffect.forEach((effect, index) => {
-            const die = diceToUse[index];
-            const stat = effect.stat;
-            const modifier = effect.modifier;
+    effectRollArray.forEach((effect, index) => {
+        const die = diceToUse[index];
+        const stat = effect.stat;
+        const modifier = effect.modifier;
 
-            // modifier -1 means subtract die (buff), +1 means add die (nerf)
-            if (modifier === -1) {
-                effectiveRequirements[stat] -= die;
-            } else {
-                effectiveRequirements[stat] += die;
-            }
+        // modifier -1 means subtract die (buff), +1 means add die (nerf)
+        if (modifier === -1) {
+            effectiveRequirements[stat] -= die;
+        } else {
+            effectiveRequirements[stat] += die;
+        }
 
-            diceEffects.push({
-                die: die,
-                stat: stat,
-                modifier: modifier
-            });
-        });
+        diceEffects.push({ die, stat, modifier });
+    });
+
+    // ABILITY: Life or Die — negate ALL dice effects
+    if (char.key === 'freeSolo') {
+        diceEffects = diceEffects.map(e => ({...e, modifier: 0, abilityNeutralized: true}));
     }
 
-    // ABILITY: Apply dice modifications (Perfect Beta, Friction Trust)
-    if (activatedAbility === 'Perfect Beta' || activatedAbility === 'Friction Trust') {
-        diceEffects = applyAbilityToDice(char, activatedAbility, route, diceEffects, area);
-        
-        // Recalculate effective requirements with modified dice
-        effectiveRequirements = {
-            strength: route.strength,
-            technique: route.technique,
-            focus: route.focus,
-            flexibility: route.flexibility
-        };
-        
-        diceEffects.forEach(effect => {
-            if (effect.modifier === -1) {
-                effectiveRequirements[effect.stat] -= effect.die;
-            } else if (effect.modifier === 1) {
-                effectiveRequirements[effect.stat] += effect.die;
-            }
-            // modifier 0 means neutralized - don't apply
-        });
-    }
+    // ABILITY: Apply dice modifications (Perfect Beta passively negates all nerfs for Technician)
+    diceEffects = applyAbilityToDice(char, activatedAbility, route, diceEffects, area);
 
-    // ABILITY: Apply requirement modifications (Unshakeable, Elastic Advantage)
-    if (activatedAbility === 'Unshakeable' || activatedAbility === 'Elastic Advantage') {
-        effectiveRequirements = applyAbilityToRequirements(char, activatedAbility, effectiveRequirements, route);
-    }
+    // Recalculate effective requirements from final diceEffects
+    effectiveRequirements = {
+        strength: route.strength,
+        technique: route.technique,
+        focus: route.focus,
+        flexibility: route.flexibility
+    };
+    diceEffects.forEach(effect => {
+        if (effect.modifier === -1) {
+            effectiveRequirements[effect.stat] -= effect.die;
+        } else if (effect.modifier === 1) {
+            effectiveRequirements[effect.stat] += effect.die;
+        }
+        // modifier 0 means neutralized — don't apply
+    });
+
+    // ABILITY: Apply requirement modifications (Perfect Beta -5 to all reqs for Technician)
+    effectiveRequirements = applyAbilityToRequirements(char, activatedAbility, effectiveRequirements, route);
 
     // Check success against effective requirements
     const strengthCheck = totalStats.strength >= effectiveRequirements.strength;
@@ -1777,7 +1705,14 @@ function attemptClimb(route, area) {
     const focusCheck = totalStats.focus >= effectiveRequirements.focus;
     const flexibilityCheck = totalStats.flexibility >= effectiveRequirements.flexibility;
 
-    const success = strengthCheck && techniqueCheck && focusCheck && flexibilityCheck;
+    // ABILITY: Route Reader Versatility — only 3 of 4 stats need to pass
+    let success;
+    if (char.key === 'routeReader') {
+        const numPassing = [strengthCheck, techniqueCheck, focusCheck, flexibilityCheck].filter(Boolean).length;
+        success = numPassing >= 3;
+    } else {
+        success = strengthCheck && techniqueCheck && focusCheck && flexibilityCheck;
+    }
 
     // Apply costs (use modified time cost)
     char.timeRemaining -= timeCost;
@@ -1789,6 +1724,15 @@ function attemptClimb(route, area) {
     // Award XP (with multiplier for Flash Speed)
     let xpGained = success ? route.xpSuccess : route.xpFail;
     xpGained = Math.floor(xpGained * xpMultiplier);
+
+    // ABILITY: Relentless (Iron Lung) — on failure, earn 50% more XP and lose extra 5 endurance
+    if (!success && char.key === 'ironLung') {
+        const relentlessBonus = Math.floor(xpGained * 0.5);
+        xpGained += relentlessBonus;
+        char.currentEndurance = Math.max(0, char.currentEndurance - 5);
+        addLog(`Relentless: +${relentlessBonus} bonus XP for failing, -5 extra Endurance`);
+    }
+
     char.xp += xpGained;
 
     // Check for level up
@@ -1958,9 +1902,6 @@ function restAction() {
     char.timeRemaining -= 1;
 
     let recovery = char.maxEndurance;
-    if (char.key === 'ironLung') {
-        recovery = Math.ceil(recovery * 1.5);
-    }
 
     // Calculate rest bonuses from gear
     let restBonus = 0;
@@ -1977,6 +1918,12 @@ function restAction() {
         addLog(`Player ${currentPlayer.playerNum} rested and recovered endurance to ${char.currentEndurance} (+${restBonus} gear bonus)`);
     } else {
         addLog(`Player ${currentPlayer.playerNum} rested and recovered endurance to ${char.currentEndurance}`);
+    }
+
+    // ABILITY: Route Reader Versatility — resting activates Beta Boost for next climb
+    if (char.key === 'routeReader') {
+        char.betaBoostActive = true;
+        addLog(`Player ${currentPlayer.playerNum}: ⚡ Beta Boost active — +3 to all stats on next climb!`);
     }
 
     checkTurnEnd();
@@ -2016,35 +1963,57 @@ function attemptMilestoneRoute(difficulty) {
         return;
     }
     
-    // Check prerequisites for the route area
-    if (area === 'topRope' || area === 'leadClimbing') {
-        if (!char.equipment.includes('Harness') || !char.equipment.includes('Belay Device')) {
-            alert(`You need a Harness and Belay Device to attempt ${area === 'topRope' ? 'Top Rope' : 'Lead'} routes!`);
-            return;
+    // Check prerequisites for the route area (Free Solo bypasses equipment requirements)
+    if (char.key !== 'freeSolo') {
+        if (area === 'topRope' || area === 'leadClimbing') {
+            if (!char.equipment.includes('Harness') || !char.equipment.includes('Belay Device')) {
+                alert(`You need a Harness and Belay Device to attempt ${area === 'topRope' ? 'Top Rope' : 'Lead'} routes!`);
+                return;
+            }
+        }
+
+        if (area === 'leadClimbing') {
+            if (!char.equipment.includes('Locking Carabiner') || !char.equipment.includes('Lead Rope')) {
+                alert('You need a Locking Carabiner and Lead Rope to attempt Lead Climbing routes!');
+                return;
+            }
         }
     }
-    
-    if (area === 'leadClimbing') {
-        if (!char.equipment.includes('Locking Carabiner') || !char.equipment.includes('Lead Rope')) {
-            alert('You need a Locking Carabiner and Lead Rope to attempt Lead Climbing routes!');
-            return;
-        }
-    }
-    
+
+    // Calculate effective time cost (passive abilities may modify it)
+    const { timeCost: effectiveTimeCost } = applyAbilityToTimeAndXP(char, null, route);
+
     // Check time and endurance
-    if (char.timeRemaining < route.time) {
-        alert(`Not enough time! This route requires ${route.time} time units, you have ${char.timeRemaining}.`);
+    if (char.timeRemaining < effectiveTimeCost) {
+        alert(`Not enough time! This route requires ${effectiveTimeCost} time units, you have ${char.timeRemaining}.`);
         return;
     }
-    
+
     if (char.currentEndurance < route.endurance) {
         alert(`Not enough endurance! This route requires ${route.endurance} endurance, you have ${char.currentEndurance}.`);
         return;
     }
-    
+
+    // ABILITY: Free Solo guarantee check — must be able to meet all base requirements
+    if (char.key === 'freeSolo') {
+        if (!char.gearBonuses) char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
+        const routeGearBonuses = calculateGearBonuses(route, area);
+        const tempStats = {
+            strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength + routeGearBonuses.strength,
+            technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique + routeGearBonuses.technique,
+            focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus + routeGearBonuses.focus,
+            flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility + routeGearBonuses.flexibility,
+        };
+        if (tempStats.strength < route.strength || tempStats.technique < route.technique ||
+            tempStats.focus < route.focus || tempStats.flexibility < route.flexibility) {
+            alert('⚠️ Life or Die: You can only attempt routes you are guaranteed to complete!\n\nYour stats must meet all base requirements.');
+            return;
+        }
+    }
+
     // Move player to this section (important for capacity tracking)
     movePlayerToSection(currentPlayer.playerNum, area);
-    
+
     // Use the climb function with milestone tracking
     attemptClimbWithMilestone(route, area, difficulty);
 }
@@ -2052,92 +2021,135 @@ function attemptMilestoneRoute(difficulty) {
 function attemptClimbWithMilestone(route, area, difficulty) {
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     const char = currentPlayer.character;
-    
-    // Deduct costs
-    char.timeRemaining -= route.time;
+
+    // Apply passive time/XP modifications
+    const { timeCost, xpMultiplier } = applyAbilityToTimeAndXP(char, null, route);
+
+    // Deduct costs (using passive-modified time cost)
+    char.timeRemaining -= timeCost;
     char.currentEndurance -= route.endurance;
-    
+
     // Ensure gearBonuses exists
     if (!char.gearBonuses) {
         char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
     }
-    
+
     // Calculate gear bonuses for this specific route (includes route-specific modifiers)
     const routeGearBonuses = calculateGearBonuses(route, area);
-    
+
     // Calculate total stats with bonuses (including route-specific gear bonuses)
-    const stats = {
+    let stats = {
         strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength + routeGearBonuses.strength,
         technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique + routeGearBonuses.technique,
         focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus + routeGearBonuses.focus,
         flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility + routeGearBonuses.flexibility
     };
-    
-    // Roll dice
-    let numDice = 2;
-    if (char.key === 'boulderer' && area === 'bouldering' && !char.abilityUsed) {
-        numDice = 3;
+
+    // ABILITY: Free Solo guarantee check (must pass before deducting costs — already deducted above,
+    // but this function is called after the gate in attemptMilestoneRoute so guarantee was already checked)
+
+    // ABILITY: Apply stat modifications (beta boost + no redistribution for milestone routes)
+    stats = applyAbilityToStats(char, null, stats);
+
+    // Build local roll effect array (allows Sprinter extra Focus nerf without mutating route)
+    let effectRollArray = route.rollEffect ? [...route.rollEffect] : [];
+
+    // ABILITY: Sprinter Flash Speed — always add extra d6 nerf die on Focus
+    if (char.key === 'sprinter') {
+        effectRollArray.push({ stat: 'focus', modifier: 1 });
     }
-    
-    let rolls = [];
+
+    // Roll all required dice
+    const numDice = effectRollArray.length || 2;
+    const rolls = [];
     for (let i = 0; i < numDice; i++) {
         rolls.push(Math.floor(Math.random() * 6) + 1);
     }
-    
-    let diceUsed = numDice === 3 ? rolls.sort((a, b) => a - b).slice(0, 2) : rolls;
-    
-    // Apply dice effects
-    const diceEffects = [];
-    route.rollEffect.forEach((effect, index) => {
-        if (index < diceUsed.length) {
-            diceEffects.push({
-                die: diceUsed[index],
-                stat: effect.stat,
-                modifier: effect.modifier,
-                abilityNeutralized: false
-            });
-        }
+    const diceUsed = rolls;
+
+    // Build initial diceEffects
+    let diceEffects = [];
+    effectRollArray.forEach((effect, index) => {
+        diceEffects.push({
+            die: diceUsed[index],
+            stat: effect.stat,
+            modifier: effect.modifier,
+            abilityNeutralized: false
+        });
     });
-    
-    // Calculate effective requirements
-    const effectiveReqs = {
+
+    // ABILITY: Life or Die — negate ALL dice effects
+    if (char.key === 'freeSolo') {
+        diceEffects = diceEffects.map(e => ({...e, modifier: 0, abilityNeutralized: true}));
+    }
+
+    // ABILITY: Perfect Beta passively negates all nerf dice for Technician
+    diceEffects = applyAbilityToDice(char, null, route, diceEffects, area);
+
+    // Calculate effective requirements from final diceEffects
+    let effectiveReqs = {
         strength: route.strength,
         technique: route.technique,
         focus: route.focus,
         flexibility: route.flexibility
     };
-    
     diceEffects.forEach(effect => {
-        effectiveReqs[effect.stat] += (effect.die * effect.modifier);
+        if (effect.modifier === -1) {
+            effectiveReqs[effect.stat] -= effect.die;
+        } else if (effect.modifier === 1) {
+            effectiveReqs[effect.stat] += effect.die;
+        }
     });
-    
+
+    // ABILITY: Technician Perfect Beta — passive -5 to all stat requirements
+    effectiveReqs = applyAbilityToRequirements(char, null, effectiveReqs, route);
+
     // Check success
-    const success = stats.strength >= effectiveReqs.strength &&
-                   stats.technique >= effectiveReqs.technique &&
-                   stats.focus >= effectiveReqs.focus &&
-                   stats.flexibility >= effectiveReqs.flexibility;
-    
-    // Award XP
-    const xpGained = success ? route.xpSuccess : route.xpFail;
+    const strengthCheck = stats.strength >= effectiveReqs.strength;
+    const techniqueCheck = stats.technique >= effectiveReqs.technique;
+    const focusCheck = stats.focus >= effectiveReqs.focus;
+    const flexibilityCheck = stats.flexibility >= effectiveReqs.flexibility;
+
+    // ABILITY: Route Reader Versatility — only 3 of 4 stats need to pass
+    let success;
+    if (char.key === 'routeReader') {
+        const numPassing = [strengthCheck, techniqueCheck, focusCheck, flexibilityCheck].filter(Boolean).length;
+        success = numPassing >= 3;
+    } else {
+        success = strengthCheck && techniqueCheck && focusCheck && flexibilityCheck;
+    }
+
+    // Award XP (with Sprinter xpMultiplier)
+    let xpGained = success ? route.xpSuccess : route.xpFail;
+    xpGained = Math.floor(xpGained * xpMultiplier);
+
+    // ABILITY: Relentless (Iron Lung) — on failure, earn 50% more XP and lose extra 5 endurance
+    if (!success && char.key === 'ironLung') {
+        const relentlessBonus = Math.floor(xpGained * 0.5);
+        xpGained += relentlessBonus;
+        char.currentEndurance = Math.max(0, char.currentEndurance - 5);
+        addLog(`Relentless: +${relentlessBonus} bonus XP for failing, -5 extra Endurance`);
+    }
+
     char.xp += xpGained;
-    
+
     // Check for level up
-    checkLevelUp(currentPlayer);
-    
+    checkLevelUp(char);
+
     // If successful, mark milestone complete
     if (success) {
         char.milestonesCompleted[difficulty] = true;
         addLog(`🏆 Player ${currentPlayer.playerNum} completed the ${difficulty.toUpperCase()} milestone: ${route.name}!`);
-        
+
         // Check for victory
         checkVictory(currentPlayer);
     } else {
         addLog(`Player ${currentPlayer.playerNum} attempted ${difficulty} milestone "${route.name}" but failed. Gained ${xpGained} XP.`);
     }
-    
+
     // Show result modal
     showClimbResultModal(route, area, rolls, diceUsed, diceEffects, effectiveReqs, stats, success, xpGained);
-    
+
     checkTurnEnd();
     renderGameBoard();
 }
