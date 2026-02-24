@@ -101,58 +101,103 @@ const TRAINING_AREAS = [
 const ROUTES = {
     bouldering: [
         { name: "Beginner's Fortune", grade: "V0", strength: 15, technique: 20, focus: 15, flexibility: 10, time: 2, endurance: 12, xpSuccess: 25, xpFail: 8, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Slab", holdFeatures: ["Jugs"], moveFeatures: [] },
-        { name: "Warm-Up Wonder", grade: "V1", strength: 22, technique: 25, focus: 18, flexibility: 20, time: 2, endurance: 16, xpSuccess: 32, xpFail: 12, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: ["Jugs"], moveFeatures: [] },
+        { name: "Warm-Up Wonder", grade: "V1", strength: 22, technique: 25, focus: 18, flexibility: 20, time: 2, endurance: 16, xpSuccess: 32, xpFail: 12, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }, { stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: ["Jugs"], moveFeatures: [] },
         { name: "Crimson Ladder", grade: "V2", strength: 30, technique: 28, focus: 25, flexibility: 22, time: 2, endurance: 22, xpSuccess: 42, xpFail: 16, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
         { name: "Toe Hook Traverse", grade: "V3", strength: 32, technique: 35, focus: 30, flexibility: 28, time: 3, endurance: 28, xpSuccess: 52, xpFail: 22, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'flexibility', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Traverse", holdFeatures: [], moveFeatures: ["Toe Hook", "Heel Hook"] },
         { name: "Crimper's Delight", grade: "V4", strength: 45, technique: 40, focus: 35, flexibility: 28, time: 4, endurance: 36, xpSuccess: 65, xpFail: 30, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: -1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
-        { name: "Dyno Dilemma", grade: "V5", strength: 52, technique: 38, focus: 36, flexibility: 30, time: 4, endurance: 46, xpSuccess: 78, xpFail: 38, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic", "Dyno"] },
+        { name: "Dyno Dilemma", grade: "V5", strength: 52, technique: 38, focus: 36, flexibility: 30, time: 4, endurance: 46, xpSuccess: 78, xpFail: 38, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }, { stat: 'flexibility', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic", "Dyno"] },
         { name: "Heel Hook Heaven", grade: "V6", strength: 48, technique: 50, focus: 44, flexibility: 42, time: 4, endurance: 56, xpSuccess: 90, xpFail: 46, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'flexibility', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Heel Hook"] },
         { name: "The Roof of Doom", grade: "V7", strength: 58, technique: 48, focus: 42, flexibility: 40, time: 5, endurance: 64, xpSuccess: 100, xpFail: 54, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: ["Jugs"], moveFeatures: ["Roof"] },
-        { name: "Shoulder Shredder", grade: "V8", strength: 65, technique: 48, focus: 44, flexibility: 40, time: 5, endurance: 72, xpSuccess: 100, xpFail: 62, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Shoulder Shredder", grade: "V8", strength: 65, technique: 48, focus: 44, flexibility: 40, time: 5, endurance: 72, xpSuccess: 100, xpFail: 62, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: -1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Roof"] },
         { name: "Dyno Chain", grade: "V9", strength: 70, technique: 52, focus: 50, flexibility: 44, time: 5, endurance: 80, xpSuccess: 100, xpFail: 70, rollEffect: [{ stat: 'strength', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic", "Dyno"] },
         { name: "Precision Impossible", grade: "V10", strength: 58, technique: 70, focus: 68, flexibility: 58, time: 5, endurance: 88, xpSuccess: 100, xpFail: 78, rollEffect: [{ stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
-        { name: "The Impossible Pinch", grade: "V11", strength: 80, technique: 64, focus: 60, flexibility: 52, time: 5, endurance: 96, xpSuccess: 100, xpFail: 86, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: ["Pinch"], moveFeatures: [] },
-        { name: "Project Zero", grade: "V12", strength: 82, technique: 72, focus: 70, flexibility: 58, time: 6, endurance: 100, xpSuccess: 100, xpFail: 90, rollEffect: [{ stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] }
+        { name: "The Impossible Pinch", grade: "V11", strength: 80, technique: 64, focus: 60, flexibility: 52, time: 5, endurance: 96, xpSuccess: 100, xpFail: 86, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: ["Pinch"], moveFeatures: ["Roof"] },
+        { name: "Project Zero", grade: "V12", strength: 82, technique: 72, focus: 70, flexibility: 58, time: 6, endurance: 100, xpSuccess: 100, xpFail: 90, rollEffect: [{ stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype A: Specialist (one stat dominates) ---
+        { name: "Strength Silo", grade: "V3", strength: 55, technique: 18, focus: 20, flexibility: 15, time: 3, endurance: 28, xpSuccess: 52, xpFail: 22, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'strength', modifier: -1 }], gearModifiers: [], routeType: "Traverse", holdFeatures: ["Jugs"], moveFeatures: [] },
+        { name: "Focus Gauntlet", grade: "V7", strength: 35, technique: 40, focus: 75, flexibility: 38, time: 5, endurance: 68, xpSuccess: 100, xpFail: 56, rollEffect: [{ stat: 'focus', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype B: Triple Nerf (3 nerf dice — appears moderate, plays brutal) ---
+        { name: "The Triple Down", grade: "V5", strength: 38, technique: 40, focus: 42, flexibility: 35, time: 4, endurance: 50, xpSuccess: 80, xpFail: 40, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "Spray Wall Chaos", grade: "V6", strength: 42, technique: 42, focus: 45, flexibility: 38, time: 4, endurance: 60, xpSuccess: 92, xpFail: 48, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }, { stat: 'flexibility', modifier: 1 }], gearModifiers: [], routeType: "Traverse", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype C: Pure Skill (empty rollEffect — flat stat check, no luck) ---
+        { name: "The Clean Line", grade: "V4", strength: 40, technique: 42, focus: 38, flexibility: 32, time: 3, endurance: 40, xpSuccess: 65, xpFail: 30, rollEffect: [], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        { name: "Static Control", grade: "V8", strength: 62, technique: 65, focus: 60, flexibility: 55, time: 5, endurance: 74, xpSuccess: 100, xpFail: 62, rollEffect: [], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype D: High Risk / High Reward (xpFail close to xpSuccess) ---
+        { name: "Redemption Arc", grade: "V6", strength: 52, technique: 48, focus: 44, flexibility: 42, time: 4, endurance: 58, xpSuccess: 90, xpFail: 85, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        { name: "Hail Mary", grade: "V9", strength: 68, technique: 60, focus: 56, flexibility: 50, time: 5, endurance: 82, xpSuccess: 100, xpFail: 95, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dyno"] },
+        // --- Archetype E: Speed Demon / Stamina Drain ---
+        { name: "Speed Crimp", grade: "V7", strength: 55, technique: 58, focus: 48, flexibility: 44, time: 2, endurance: 65, xpSuccess: 100, xpFail: 55, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: -1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
+        { name: "The Gauntlet Opener", grade: "V2", strength: 28, technique: 30, focus: 25, flexibility: 22, time: 1, endurance: 50, xpSuccess: 42, xpFail: 16, rollEffect: [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] }
     ],
     topRope: [
         { name: "First Timer's Friend", grade: "5.6", strength: 20, technique: 18, focus: 15, flexibility: 12, time: 3, endurance: 15, xpSuccess: 30, xpFail: 10, rollEffect: [{ stat: 'technique', modifier: -1 }], gearModifiers: ["Harness"], routeType: "Slab", holdFeatures: ["Jugs"], moveFeatures: [] },
         { name: "Learning Curve", grade: "5.8", strength: 30, technique: 28, focus: 26, flexibility: 22, time: 4, endurance: 25, xpSuccess: 42, xpFail: 18, rollEffect: [{ stat: 'technique', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
-        { name: "The Standard", grade: "5.9", strength: 38, technique: 34, focus: 30, flexibility: 26, time: 4, endurance: 35, xpSuccess: 55, xpFail: 26, rollEffect: [{ stat: 'strength', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "The Standard", grade: "5.9", strength: 38, technique: 34, focus: 30, flexibility: 26, time: 4, endurance: 35, xpSuccess: 55, xpFail: 26, rollEffect: [{ stat: 'strength', modifier: -1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
         { name: "Crimson Wall", grade: "5.10a", strength: 40, technique: 38, focus: 35, flexibility: 30, time: 5, endurance: 40, xpSuccess: 62, xpFail: 30, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
         { name: "Overhang Initiation", grade: "5.10b", strength: 45, technique: 38, focus: 34, flexibility: 30, time: 5, endurance: 48, xpSuccess: 70, xpFail: 36, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
         { name: "Crimp Central", grade: "5.10d", strength: 50, technique: 46, focus: 42, flexibility: 36, time: 5, endurance: 56, xpSuccess: 80, xpFail: 44, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
-        { name: "Power Climb", grade: "5.11b", strength: 56, technique: 48, focus: 44, flexibility: 38, time: 6, endurance: 66, xpSuccess: 92, xpFail: 54, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "Power Climb", grade: "5.11b", strength: 56, technique: 48, focus: 44, flexibility: 38, time: 6, endurance: 66, xpSuccess: 92, xpFail: 54, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic"] },
         { name: "Sustained Difficulty", grade: "5.11c", strength: 58, technique: 52, focus: 50, flexibility: 44, time: 6, endurance: 70, xpSuccess: 98, xpFail: 58, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: ["Sloper"], moveFeatures: [] },
-        { name: "Dynamic Moves", grade: "5.12a", strength: 62, technique: 56, focus: 54, flexibility: 48, time: 6, endurance: 78, xpSuccess: 100, xpFail: 66, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic"] },
+        { name: "Dynamic Moves", grade: "5.12a", strength: 62, technique: 56, focus: 54, flexibility: 48, time: 6, endurance: 78, xpSuccess: 100, xpFail: 66, rollEffect: [{ stat: 'focus', modifier: 1 }, { stat: 'strength', modifier: -1 }, { stat: 'flexibility', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic"] },
         { name: "The Power Endurance", grade: "5.12b", strength: 68, technique: 60, focus: 58, flexibility: 54, time: 7, endurance: 84, xpSuccess: 100, xpFail: 72, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
         { name: "Micro Hold Heaven", grade: "5.12d", strength: 66, technique: 66, focus: 64, flexibility: 58, time: 6, endurance: 90, xpSuccess: 100, xpFail: 78, rollEffect: [{ stat: 'technique', modifier: 1 }], gearModifiers: ["Finger Tape"], routeType: "Vertical", holdFeatures: ["Crimp"], moveFeatures: [] },
         { name: "The Upper Echelon", grade: "5.13a", strength: 72, technique: 68, focus: 66, flexibility: 60, time: 7, endurance: 92, xpSuccess: 100, xpFail: 80, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
-        { name: "Professional Grade", grade: "5.13c", strength: 80, technique: 74, focus: 72, flexibility: 66, time: 7, endurance: 100, xpSuccess: 100, xpFail: 88, rollEffect: [{ stat: 'technique', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] }
+        { name: "Professional Grade", grade: "5.13c", strength: 80, technique: 74, focus: 72, flexibility: 66, time: 7, endurance: 100, xpSuccess: 100, xpFail: 88, rollEffect: [{ stat: 'technique', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype A: Specialist ---
+        { name: "The Wall Flower", grade: "5.10a", strength: 25, technique: 60, focus: 30, flexibility: 28, time: 4, endurance: 42, xpSuccess: 62, xpFail: 30, rollEffect: [{ stat: 'technique', modifier: 1 }, { stat: 'technique', modifier: -1 }], gearModifiers: ["Climbing Shoes"], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        { name: "Hip Opener", grade: "5.11c", strength: 40, technique: 45, focus: 44, flexibility: 72, time: 5, endurance: 68, xpSuccess: 98, xpFail: 58, rollEffect: [{ stat: 'flexibility', modifier: 1 }, { stat: 'strength', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype B: Triple Nerf ---
+        { name: "The Fear Factor", grade: "5.11a", strength: 40, technique: 42, focus: 44, flexibility: 38, time: 5, endurance: 65, xpSuccess: 88, xpFail: 50, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }, { stat: 'flexibility', modifier: 1 }], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        { name: "The Punishment Wall", grade: "5.12b", strength: 62, technique: 65, focus: 64, flexibility: 58, time: 7, endurance: 82, xpSuccess: 100, xpFail: 70, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Traverse", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype C: Pure Skill ---
+        { name: "The Sure Thing", grade: "5.10c", strength: 44, technique: 46, focus: 42, flexibility: 36, time: 4, endurance: 50, xpSuccess: 72, xpFail: 38, rollEffect: [], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "The Dialed Rope", grade: "5.12d", strength: 66, technique: 68, focus: 64, flexibility: 60, time: 6, endurance: 90, xpSuccess: 100, xpFail: 78, rollEffect: [], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype D: High Risk / High Reward ---
+        { name: "Win or Learn", grade: "5.11b", strength: 54, technique: 50, focus: 48, flexibility: 44, time: 5, endurance: 66, xpSuccess: 92, xpFail: 88, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: [], routeType: "Traverse", holdFeatures: [], moveFeatures: [] },
+        { name: "The Big Gamble", grade: "5.13b", strength: 78, technique: 72, focus: 70, flexibility: 65, time: 7, endurance: 96, xpSuccess: 100, xpFail: 97, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype E: Speed Demon / Stamina Drain ---
+        { name: "Quick Clip", grade: "5.12b", strength: 65, technique: 62, focus: 58, flexibility: 56, time: 3, endurance: 82, xpSuccess: 100, xpFail: 70, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "The Grind", grade: "5.9", strength: 36, technique: 32, focus: 30, flexibility: 26, time: 2, endurance: 55, xpSuccess: 55, xpFail: 26, rollEffect: [{ stat: 'strength', modifier: -1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] }
     ],
     leadClimbing: [
-        { name: "Lead Introduction", grade: "5.8", strength: 30, technique: 28, focus: 30, flexibility: 22, time: 4, endurance: 25, xpSuccess: 40, xpFail: 15, rollEffect: [{ stat: 'focus', modifier: -1 }], gearModifiers: ["Harness", "Lead Rope"], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "Lead Introduction", grade: "5.8", strength: 30, technique: 28, focus: 30, flexibility: 22, time: 4, endurance: 25, xpSuccess: 40, xpFail: 15, rollEffect: [{ stat: 'focus', modifier: -1 }, { stat: 'strength', modifier: 1 }], gearModifiers: ["Harness", "Lead Rope"], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
         { name: "Clip and Climb", grade: "5.9", strength: 38, technique: 34, focus: 36, flexibility: 28, time: 4, endurance: 32, xpSuccess: 48, xpFail: 22, rollEffect: [{ stat: 'focus', modifier: -1 }], gearModifiers: ["Harness", "Belay Device"], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
         { name: "First Overhang Lead", grade: "5.10a", strength: 42, technique: 38, focus: 40, flexibility: 30, time: 5, endurance: 35, xpSuccess: 52, xpFail: 24, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
         { name: "Pump Management", grade: "5.10b", strength: 45, technique: 44, focus: 46, flexibility: 34, time: 6, endurance: 40, xpSuccess: 58, xpFail: 28, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
         { name: "Power Lead", grade: "5.10d", strength: 52, technique: 48, focus: 50, flexibility: 38, time: 6, endurance: 50, xpSuccess: 70, xpFail: 36, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
-        { name: "The Steep Lead", grade: "5.11a", strength: 54, technique: 50, focus: 52, flexibility: 44, time: 6, endurance: 55, xpSuccess: 75, xpFail: 40, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "The Steep Lead", grade: "5.11a", strength: 54, technique: 50, focus: 52, flexibility: 44, time: 6, endurance: 55, xpSuccess: 75, xpFail: 40, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic"] },
         { name: "Runout Section", grade: "5.11b", strength: 56, technique: 52, focus: 58, flexibility: 48, time: 6, endurance: 60, xpSuccess: 80, xpFail: 44, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
-        { name: "Overhang Lead Challenge", grade: "5.11c", strength: 60, technique: 56, focus: 60, flexibility: 52, time: 7, endurance: 65, xpSuccess: 85, xpFail: 48, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness", "Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
-        { name: "Advanced Clipping", grade: "5.12a", strength: 66, technique: 64, focus: 66, flexibility: 58, time: 7, endurance: 75, xpSuccess: 95, xpFail: 56, rollEffect: [{ stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
-        { name: "The Compression Lead", grade: "5.12b", strength: 72, technique: 66, focus: 66, flexibility: 60, time: 7, endurance: 82, xpSuccess: 100, xpFail: 62, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"], routeType: "Overhang", holdFeatures: ["Pinch"], moveFeatures: [] },
+        { name: "Overhang Lead Challenge", grade: "5.11c", strength: 60, technique: 56, focus: 60, flexibility: 52, time: 7, endurance: 65, xpSuccess: 85, xpFail: 48, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness", "Chalk Bag"], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Roof"] },
+        { name: "Advanced Clipping", grade: "5.12a", strength: 66, technique: 64, focus: 66, flexibility: 58, time: 7, endurance: 75, xpSuccess: 95, xpFail: 56, rollEffect: [{ stat: 'focus', modifier: 1 }, { stat: 'technique', modifier: 1 }, { stat: 'strength', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "The Compression Lead", grade: "5.12b", strength: 72, technique: 66, focus: 66, flexibility: 60, time: 7, endurance: 82, xpSuccess: 100, xpFail: 62, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: ["Harness"], routeType: "Vertical", holdFeatures: ["Pinch"], moveFeatures: [] },
         { name: "Endurance Lead", grade: "5.12d", strength: 72, technique: 72, focus: 72, flexibility: 66, time: 8, endurance: 88, xpSuccess: 100, xpFail: 68, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
         { name: "The Elite Lead", grade: "5.13a", strength: 76, technique: 74, focus: 74, flexibility: 70, time: 8, endurance: 92, xpSuccess: 100, xpFail: 72, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
-        { name: "World Class Leading", grade: "5.14a", strength: 88, technique: 84, focus: 84, flexibility: 80, time: 8, endurance: 100, xpSuccess: 100, xpFail: 88, rollEffect: [{ stat: 'strength', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] }
+        { name: "World Class Leading", grade: "5.14a", strength: 88, technique: 84, focus: 84, flexibility: 80, time: 8, endurance: 100, xpSuccess: 100, xpFail: 88, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype A: Specialist ---
+        { name: "Reach Specialist", grade: "5.10c", strength: 28, technique: 35, focus: 36, flexibility: 60, time: 5, endurance: 46, xpSuccess: 65, xpFail: 32, rollEffect: [{ stat: 'flexibility', modifier: 1 }, { stat: 'flexibility', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "Clench Mode", grade: "5.13a", strength: 50, technique: 58, focus: 90, flexibility: 52, time: 8, endurance: 94, xpSuccess: 100, xpFail: 72, rollEffect: [{ stat: 'focus', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype B: Triple Nerf ---
+        { name: "The Runout Nightmare", grade: "5.11d", strength: 45, technique: 48, focus: 50, flexibility: 42, time: 6, endurance: 70, xpSuccess: 90, xpFail: 52, rollEffect: [{ stat: 'focus', modifier: 1 }, { stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "The Crux Gauntlet", grade: "5.12c", strength: 65, technique: 68, focus: 68, flexibility: 60, time: 7, endurance: 84, xpSuccess: 100, xpFail: 65, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Roof"] },
+        // --- Archetype C: Pure Skill ---
+        { name: "The Dialed Lead", grade: "5.11b", strength: 55, technique: 54, focus: 56, flexibility: 48, time: 5, endurance: 62, xpSuccess: 80, xpFail: 44, rollEffect: [], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] },
+        { name: "The Known Route", grade: "5.13b", strength: 80, technique: 76, focus: 76, flexibility: 72, time: 8, endurance: 96, xpSuccess: 100, xpFail: 76, rollEffect: [], gearModifiers: [], routeType: "Traverse", holdFeatures: [], moveFeatures: [] },
+        // --- Archetype D: High Risk / High Reward ---
+        { name: "Gambler's Ascent", grade: "5.12b", strength: 70, technique: 66, focus: 66, flexibility: 62, time: 7, endurance: 84, xpSuccess: 100, xpFail: 95, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }], gearModifiers: [], routeType: "Slab", holdFeatures: [], moveFeatures: [] },
+        { name: "All In", grade: "5.13d", strength: 86, technique: 82, focus: 82, flexibility: 78, time: 8, endurance: 100, xpSuccess: 100, xpFail: 98, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: 1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: ["Dynamic"] },
+        // --- Archetype E: Speed Demon / Stamina Drain ---
+        { name: "The Sprint Lead", grade: "5.12c", strength: 72, technique: 68, focus: 66, flexibility: 60, time: 3, endurance: 84, xpSuccess: 100, xpFail: 64, rollEffect: [{ stat: 'strength', modifier: 1 }, { stat: 'technique', modifier: -1 }], gearModifiers: [], routeType: "Overhang", holdFeatures: [], moveFeatures: [] },
+        { name: "The Quick Send", grade: "5.10a", strength: 40, technique: 38, focus: 42, flexibility: 30, time: 2, endurance: 55, xpSuccess: 52, xpFail: 24, rollEffect: [{ stat: 'focus', modifier: -1 }, { stat: 'technique', modifier: -1 }], gearModifiers: [], routeType: "Vertical", holdFeatures: [], moveFeatures: [] }
     ]
 };
 
 const GEAR_SHOP = [
-    { name: "Climbing Shoes", cost: 75, category: "Essential Safety Gear", statEffect: "technique", value: -3, routeFilter: ["Slab"], holdFeatureFilter: ["Heel Hook", "Toe Hook"], description: "Sticky rubber provides superior footwork precision", effectDisplay: "🎯 -3 Technique on Slab, -2 on Heel/Toe Hook routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
-    { name: "Chalk", cost: 50, category: "Performance Gear", statEffect: "strength", value: -2, routeFilter: [], holdFeatureFilter: ["Crimp", "Sloper"], description: "Maintains friction on challenging holds", effectDisplay: "💪 -2 Strength on Crimp/Sloper holds", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Climbing Shoes", cost: 75, category: "Essential Safety Gear", statEffect: "technique", value: -3, routeFilter: ["Slab"], holdFeatureFilter: ["Heel Hook", "Toe Hook"], description: "Sticky rubber provides superior footwork precision", effectDisplay: "🎯 -3 Technique on Slab routes OR Heel/Toe Hook routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Chalk", cost: 28, category: "Performance Gear", statEffect: "strength", value: -2, routeFilter: [], holdFeatureFilter: ["Crimp", "Sloper"], description: "Maintains friction on challenging holds", effectDisplay: "💪 -2 Strength on Crimp/Sloper holds", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Chalk Bag", cost: 60, category: "Performance Gear", statEffect: "strength", value: -2, routeFilter: ["All"], holdFeatureFilter: [], description: "Convenient chalk access during climbs", effectDisplay: "💪 -2 Strength on all routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Harness", cost: 80, category: "Essential Safety Gear", statEffect: "all", value: -2, routeFilter: ["Top Rope", "Lead"], holdFeatureFilter: [], description: "Essential safety equipment for roped climbing", effectDisplay: "✨ -2 All Stats on rope routes | 🔓 Unlocks Top Rope", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: "Top Rope", restBonus: 0 },
-    { name: "Belay Device", cost: 70, category: "Essential Safety Gear", statEffect: "focus", value: -2, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Controls rope friction for safe belaying", effectDisplay: "🧠 -2 Focus on Lead routes | 🔓 Unlocks Top Rope", prerequisiteItems: ["Harness"], prerequisiteLevel: 1, accessRequirement: "Top Rope", restBonus: 0 },
-    { name: "Locking Carabiner", cost: 60, category: "Essential Safety Gear", statEffect: "focus", value: -1, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Secures belay device to harness", effectDisplay: "🧠 -1 Focus on Lead routes | 🔓 Part of Lead system", prerequisiteItems: ["Harness", "Belay Device"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
+    { name: "Belay Device", cost: 70, category: "Essential Safety Gear", statEffect: "strength", value: -2, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Managing a heavy rope builds arm strength", effectDisplay: "💪 -2 Strength on Lead routes | 🔓 Unlocks Top Rope", prerequisiteItems: ["Harness"], prerequisiteLevel: 1, accessRequirement: "Top Rope", restBonus: 0 },
+    { name: "Locking Carabiner", cost: 60, category: "Essential Safety Gear", statEffect: "endurance", value: 5, routeFilter: ["Lead"], holdFeatureFilter: [], description: "A secure system builds confidence, reducing mental fatigue", effectDisplay: "💨 +5 Max Endurance | 🔓 Part of Lead system", prerequisiteItems: ["Harness", "Belay Device"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
     { name: "Lead Rope", cost: 120, category: "Essential Safety Gear", statEffect: "strength", value: -3, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Dynamic rope absorbs fall energy", effectDisplay: "💪 -3 Strength on Lead routes | 🔓 Unlocks Lead", prerequisiteItems: ["Harness", "Belay Device", "Locking Carabiner"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
     { name: "Quickdraws Set", cost: 140, category: "Performance Gear", statEffect: "focus", value: -4, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Enables efficient clipping during lead climbs", effectDisplay: "🧠 -4 Focus on Lead routes", prerequisiteItems: ["Lead Rope"], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Finger Tape", cost: 85, category: "Performance Gear", statEffect: "strength", value: -4, routeFilter: [], holdFeatureFilter: ["Crimp"], description: "Protects fingers and supports tendons on sharp holds", effectDisplay: "💪 -4 Strength on Crimp holds", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
@@ -165,7 +210,7 @@ const GEAR_SHOP = [
     { name: "Comfortable Climbing Apparel", cost: 90, category: "Comfort Gear", statEffect: "all", value: -1, routeFilter: ["All"], holdFeatureFilter: [], description: "Full range of motion and breathability", effectDisplay: "✨ -1 All Stats, 💨 +10 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0, enduranceBonus: 10 },
     { name: "Water Bottle", cost: 40, category: "Comfort Gear", statEffect: "endurance", value: 5, routeFilter: ["All"], holdFeatureFilter: [], description: "Proper hydration during sessions", effectDisplay: "💨 +5 Max Endurance, +3 Rest Bonus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 3 },
     { name: "Foam Roller", cost: 120, category: "Recovery Gear", statEffect: "endurance", value: 8, routeFilter: ["All"], holdFeatureFilter: [], description: "Muscle recovery and tension release", effectDisplay: "💨 +8 Max Endurance, +5 Rest Bonus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 5 },
-    { name: "Approach Shoes", cost: 55, category: "Comfort Gear", statEffect: "time", value: -1, routeFilter: ["All"], holdFeatureFilter: [], description: "Comfortable for walking around gym", effectDisplay: "⏱️ -1 time when moving areas", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Approach Shoes", cost: 55, category: "Comfort Gear", statEffect: "timePerRound", value: 1, routeFilter: ["All"], holdFeatureFilter: [], description: "Ergonomic footwear that keeps you fresh and ready — gain 1 extra time unit at the start of each round", effectDisplay: "⏱️ +1 Time at round start (11 instead of 10)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Yoga Mat", cost: 95, category: "Training Equipment", statEffect: "endurance", value: 10, routeFilter: ["All"], holdFeatureFilter: [], description: "Used for stretching and mobility work", effectDisplay: "💨 +10 Max Endurance, +4 Rest Bonus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 4 },
     { name: "Grip Strength Trainer", cost: 180, category: "Training Equipment", statEffect: "strength", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Builds finger and forearm strength", effectDisplay: "💪 +2 Permanent Strength", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Portable Hangboard", cost: 240, category: "Training Equipment", statEffect: "strengthTech", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Advanced finger strength training", effectDisplay: "💪 +2 Str, 🎯 +2 Tech (Permanent)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
@@ -174,14 +219,16 @@ const GEAR_SHOP = [
     { name: "Technique Training System", cost: 180, category: "Training Equipment", statEffect: "technique", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Deliberate practice for movement precision", effectDisplay: "🎯 +2 Permanent Technique", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Meditation App", cost: 160, category: "Training Equipment", statEffect: "focus", value: 2, routeFilter: ["All"], holdFeatureFilter: [], description: "Mental training for composure", effectDisplay: "🧠 +2 Permanent Focus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Gear Bag", cost: 70, category: "Convenience Gear", statEffect: "time", value: -1, routeFilter: ["All"], holdFeatureFilter: [], description: "Organized gear storage", effectDisplay: "⏱️ Gear shop costs 0 time", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
-    { name: "Non-Locking Carabiner", cost: 35, category: "Convenience Gear", statEffect: "special", value: 0, routeFilter: ["All"], holdFeatureFilter: [], description: "Quick clipping of accessories", effectDisplay: "🔗 Utility item", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
-    { name: "Climbing Brush", cost: 55, category: "Convenience Gear", statEffect: "endurance", value: 3, routeFilter: ["All"], holdFeatureFilter: [], description: "Cleans holds of chalk buildup", effectDisplay: "💨 +3 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
-    { name: "Route Notebook", cost: 100, category: "Strategy Gear", statEffect: "technique", value: -2, routeFilter: ["Repeated"], holdFeatureFilter: [], description: "Record beta and learn from attempts", effectDisplay: "🎯 -2 Technique on repeated routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Non-Locking Carabiner", cost: 35, category: "Convenience Gear", statEffect: "leadDiscount", value: 20, routeFilter: ["All"], holdFeatureFilter: [], description: "A versatile clip that saves you money on your Lead setup — 20 XP off Locking Carabiner or Quickdraws Set", effectDisplay: "🔗 -20 XP on Locking Carabiner & Quickdraws Set", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Climbing Brush", cost: 30, category: "Convenience Gear", statEffect: "endurance", value: 3, routeFilter: ["All"], holdFeatureFilter: [], description: "Cleans holds of chalk buildup", effectDisplay: "💨 +3 Max Endurance, +2 Rest Bonus", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 2 },
+    { name: "Route Notebook", cost: 100, category: "Strategy Gear", statEffect: "technique", value: -2, routeFilter: ["All"], holdFeatureFilter: [], description: "Documenting beta sharpens your movement reading on every climb", effectDisplay: "🎯 -2 Technique on all routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Power Grips", cost: 130, category: "Performance Gear", statEffect: "strength", value: -3, routeFilter: [], holdFeatureFilter: ["Sloper", "Pinch"], description: "Enhanced grip for difficult holds", effectDisplay: "💪 -3 Strength on Sloper/Pinch holds", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
     { name: "Compression Sleeves", cost: 75, category: "Recovery Gear", statEffect: "strength", value: -1, routeFilter: ["All"], holdFeatureFilter: [], description: "Reduces muscle fatigue and pump", effectDisplay: "💪 -1 Strength, 💨 +8 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0, enduranceBonus: 8 },
     { name: "Dynamic Shoes", cost: 110, category: "Specialized Gear", statEffect: "flexibility", value: -3, routeFilter: [], holdFeatureFilter: ["Dynamic", "Dyno"], description: "Specialized shoes for explosive movements", effectDisplay: "🤸 -3 Flexibility on Dynamic/Dyno routes", prerequisiteItems: ["Climbing Shoes"], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
-    { name: "Mental Training Card Set", cost: 140, category: "Strategy Gear", statEffect: "focus", value: -3, routeFilter: ["Repeated"], holdFeatureFilter: [], description: "Visualization and mental rehearsal techniques", effectDisplay: "🧠 -3 Focus on repeated routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
-    { name: "Recovery Supplements", cost: 90, category: "Recovery Gear", statEffect: "endurance", value: 12, routeFilter: ["All"], holdFeatureFilter: [], description: "Optimized nutrition for sustained performance", effectDisplay: "💨 +12 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 }
+    { name: "Mental Training Card Set", cost: 140, category: "Strategy Gear", statEffect: "focus", value: -3, routeFilter: ["All"], holdFeatureFilter: [], description: "Visualization and mental rehearsal sharpen focus on every climb", effectDisplay: "🧠 -3 Focus on all routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Recovery Supplements", cost: 90, category: "Recovery Gear", statEffect: "endurance", value: 12, routeFilter: ["All"], holdFeatureFilter: [], description: "Optimized nutrition for sustained performance", effectDisplay: "💨 +12 Max Endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Tension Board Program", cost: 110, category: "Training Equipment", statEffect: "strength", value: -3, routeFilter: ["Overhang"], holdFeatureFilter: [], description: "Systematic overhang training builds pulling power and body tension for steep routes", effectDisplay: "💪 -3 Strength on Overhang routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+    { name: "Balance Board", cost: 80, category: "Training Equipment", statEffect: "technique", value: -3, routeFilter: ["Traverse"], holdFeatureFilter: [], description: "Balance board training sharpens footwork precision and body positioning for lateral movement", effectDisplay: "🎯 -3 Technique on Traverse routes", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 }
 ];
 
 // ===== GAME STATE =====
@@ -396,36 +443,44 @@ function calculateGearBonuses(route, area) {
             if (!isRepeated) return; // Only applies to repeated routes
         }
         
-        // Skip if gear doesn't apply to this route type
-        if (gear.routeFilter && gear.routeFilter.length > 0 && !gear.routeFilter.includes("All") && !gear.routeFilter.includes("Repeated")) {
-            let applies = false;
-            
-            // Check area match (Bouldering, Top Rope, Lead)
-            if (area === 'bouldering' && gear.routeFilter.includes('Bouldering')) applies = true;
-            if (area === 'topRope' && gear.routeFilter.includes('Top Rope')) applies = true;
-            if (area === 'leadClimbing' && gear.routeFilter.includes('Lead')) applies = true;
-            
-            // Check route type match (Slab, Overhang, Vertical, Traverse)
-            if (route.routeType && gear.routeFilter.includes(route.routeType)) applies = true;
-            
-            if (!applies) return;  // Skip this gear
-        }
-        
-        // Check hold/move feature filter
-        if (gear.holdFeatureFilter && gear.holdFeatureFilter.length > 0) {
-            let featureMatches = false;
-            if (route.holdFeatures) {
-                route.holdFeatures.forEach(feature => {
-                    if (gear.holdFeatureFilter.includes(feature)) featureMatches = true;
-                });
+        // Check route and feature filters.
+        // When BOTH routeFilter and holdFeatureFilter are present, use OR logic (either match qualifies).
+        // When only one is present, that filter must pass.
+        const hasRouteFilter = gear.routeFilter && gear.routeFilter.length > 0 &&
+            !gear.routeFilter.includes("All") && !gear.routeFilter.includes("Repeated");
+        const hasFeatureFilter = gear.holdFeatureFilter && gear.holdFeatureFilter.length > 0;
+
+        if (hasRouteFilter || hasFeatureFilter) {
+            let routeFilterPasses = false;
+            let featureFilterPasses = false;
+
+            if (hasRouteFilter) {
+                if (area === 'bouldering' && gear.routeFilter.includes('Bouldering')) routeFilterPasses = true;
+                if (area === 'topRope' && gear.routeFilter.includes('Top Rope')) routeFilterPasses = true;
+                if (area === 'leadClimbing' && gear.routeFilter.includes('Lead')) routeFilterPasses = true;
+                if (route.routeType && gear.routeFilter.includes(route.routeType)) routeFilterPasses = true;
             }
-            if (route.moveFeatures) {
-                route.moveFeatures.forEach(feature => {
-                    if (gear.holdFeatureFilter.includes(feature)) featureMatches = true;
-                });
+
+            if (hasFeatureFilter) {
+                if (route.holdFeatures) {
+                    route.holdFeatures.forEach(feature => {
+                        if (gear.holdFeatureFilter.includes(feature)) featureFilterPasses = true;
+                    });
+                }
+                if (route.moveFeatures) {
+                    route.moveFeatures.forEach(feature => {
+                        if (gear.holdFeatureFilter.includes(feature)) featureFilterPasses = true;
+                    });
+                }
             }
-            
-            if (!featureMatches) return;  // Skip this gear
+
+            // OR logic when both filters specified; AND logic when only one is specified
+            if (hasRouteFilter && hasFeatureFilter) {
+                if (!routeFilterPasses && !featureFilterPasses) return;
+            } else {
+                if (hasRouteFilter && !routeFilterPasses) return;
+                if (hasFeatureFilter && !featureFilterPasses) return;
+            }
         }
         
         // Apply gear effect (negative values reduce requirements, which is a bonus)
@@ -528,7 +583,9 @@ function renderMilestonePanel() {
         const route = milestone.route;
         const area = milestone.area;
         const areaIcon = area === 'bouldering' ? '🪨' : (area === 'topRope' ? '🧗' : '⛰️');
-        
+        const milestoneRouteTypeColors = { Slab: '#17a2b8', Vertical: '#28a745', Overhang: '#fd7e14', Traverse: '#6f42c1' };
+        const milestoneRouteTypeColor = milestoneRouteTypeColors[route.routeType] || '#6c757d';
+
         html += `
             <div style="background: white; color: #2c3e50; padding: 15px; border-radius: 10px; border-left: 5px solid ${colors[difficulty]};">
                 <div style="font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">
@@ -536,6 +593,9 @@ function renderMilestonePanel() {
                 </div>
                 <div style="font-size: 1.1em; font-weight: bold; color: #667eea; margin-bottom: 5px;">
                     ${areaIcon} ${route.name}
+                </div>
+                <div style="margin-bottom: 6px;">
+                    <span style="display: inline-block; background: ${milestoneRouteTypeColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold;">${route.routeType || 'Unknown'}</span>
                 </div>
                 <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
                     Grade: ${route.grade} | Time: ${route.time} | Endurance: ${route.endurance}
@@ -1177,6 +1237,9 @@ function createRouteCard(route, area, idx) {
         flexibility: 'Flex'
     };
 
+    const routeTypeColors = { Slab: '#17a2b8', Vertical: '#28a745', Overhang: '#fd7e14', Traverse: '#6f42c1' };
+    const routeTypeColor = routeTypeColors[route.routeType] || '#6c757d';
+
     let diceEffectsHTML = '';
     if (route.rollEffect && route.rollEffect.length > 0) {
         diceEffectsHTML = `
@@ -1218,6 +1281,7 @@ function createRouteCard(route, area, idx) {
         ` : ''}
         <div class="route-name">${route.name}</div>
         <div class="route-grade">${route.grade}</div>
+        <div style="display: inline-block; background: ${routeTypeColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; margin-bottom: 5px;">${route.routeType || 'Unknown'}</div>
         ${playerHasGear.length > 0 ? `
             <div style="background: #d4edda; border: 2px solid #28a745; padding: 5px; border-radius: 5px; margin: 5px 0; font-size: 0.85em; font-weight: bold; color: #155724;">
                 ✅ Gear Bonus: ${playerHasGear.join(', ')}
@@ -2148,7 +2212,7 @@ function attemptClimbWithMilestone(route, area, difficulty) {
     }
 
     // Show result modal
-    showClimbResultModal(route, area, rolls, diceUsed, diceEffects, effectiveReqs, stats, success, xpGained);
+    showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, null);
 
     checkTurnEnd();
     renderGameBoard();
@@ -2257,20 +2321,27 @@ function purchaseGear(gear) {
     // Move player to gear shop
     movePlayerToSection(currentPlayer.playerNum, 'gearShop');
 
+    // Apply Non-Locking Carabiner discount on Lead gear purchases
+    const leadDiscountItems = ['Locking Carabiner', 'Quickdraws Set'];
+    const hasNonLockingCarabiner = char.equipment.includes('Non-Locking Carabiner');
+    const carabinerDiscount = (hasNonLockingCarabiner && leadDiscountItems.includes(gear.name)) ? 20 : 0;
+    const effectiveCost = Math.max(0, gear.cost - carabinerDiscount);
+
     const spendableXP = getSpendableXP(char);
     const xpToGo = getXPToNextLevel(char);
 
-    if (spendableXP < gear.cost) {
-        alert(`Not enough spendable XP!\n\nYou have ${spendableXP} XP earned in Level ${char.level}.\nYou need ${gear.cost} XP to purchase this item.\n\nCurrently ${xpToGo} XP away from Level ${char.level + 1}.`);
+    if (spendableXP < effectiveCost) {
+        const costDisplay = carabinerDiscount > 0 ? `${effectiveCost} XP (${gear.cost} - 20 Carabiner discount)` : `${effectiveCost} XP`;
+        alert(`Not enough spendable XP!\n\nYou have ${spendableXP} XP earned in Level ${char.level}.\nYou need ${costDisplay} to purchase this item.\n\nCurrently ${xpToGo} XP away from Level ${char.level + 1}.`);
         return;
     }
 
     // Check if has Gear Bag for free shop visit
     const hasGearBag = char.equipment.includes('Gear Bag');
     const timeCost = hasGearBag ? 0 : 1;
-    
+
     char.timeRemaining -= timeCost;
-    char.xp -= gear.cost;
+    char.xp -= effectiveCost;
 
     const newXpToGo = getXPToNextLevel(char);
 
@@ -2301,7 +2372,8 @@ function purchaseGear(gear) {
         char.maxEndurance += gear.enduranceBonus;
     }
 
-    addLog(`Player ${currentPlayer.playerNum} purchased ${gear.name} for ${gear.cost} XP${timeCost === 0 ? ' (Gear Bag: free visit)' : ''} (now ${newXpToGo} XP to Level ${char.level + 1})`);
+    const discountNote = carabinerDiscount > 0 ? ` (-${carabinerDiscount} Carabiner discount)` : '';
+    addLog(`Player ${currentPlayer.playerNum} purchased ${gear.name} for ${effectiveCost} XP${discountNote}${timeCost === 0 ? ' (Gear Bag: free visit)' : ''} (now ${newXpToGo} XP to Level ${char.level + 1})`);
 
     // Replace purchased gear with new one
     replaceGearInShop(gear.name);
@@ -2426,7 +2498,8 @@ function endRound() {
 
     // Reset player time, abilities, and locations (training bonuses are permanent and not reset)
     gameState.players.forEach(player => {
-        player.character.timeRemaining = 10;
+        const hasApproachShoes = player.character.equipment.includes('Approach Shoes');
+        player.character.timeRemaining = 10 + (hasApproachShoes ? 1 : 0);
         player.character.abilityUsed = false;
         player.character.location = 'lobby'; // Return all players to lobby
     });
