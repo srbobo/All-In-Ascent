@@ -45,6 +45,24 @@
             opacity: 0.9;
         }
 
+        /* Header link to the rulebook — small, unobtrusive, opens in new tab. */
+        .rulebook-link {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 6px 14px;
+            color: white;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 0.95em;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .rulebook-link:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
         .game-setup {
             padding: 30px;
             background: #f8f9fa;
@@ -712,6 +730,140 @@
                 box-shadow: 0 6px 12px rgba(255, 193, 7, 0.5);
             }
         }
+
+        /* ── Level-Up Popup ── */
+        @keyframes levelUpEntrance {
+            0%   { transform: scale(0.5); opacity: 0; }
+            70%  { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes shimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+
+        .level-up-modal-content {
+            animation: levelUpEntrance 0.4s ease-out;
+            border: 3px solid gold !important;
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.7) !important;
+            text-align: center;
+        }
+
+        .level-up-headline {
+            font-size: 2.5em;
+            font-weight: bold;
+            background: linear-gradient(90deg, #f5a623, #f8e71c, #f5a623, #f8e71c);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 2s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        .level-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: gold;
+            color: #2c3e50;
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            font-size: 1.8em;
+            font-weight: bold;
+            margin: 10px auto 15px;
+        }
+
+        .stat-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .stat-table th {
+            background: #f0f0f0;
+            padding: 8px 12px;
+            font-weight: bold;
+            color: #2c3e50;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .stat-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stat-up {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        /* ── Turn Start Banner ── */
+        @keyframes bannerSlideIn {
+            0%   { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+            15%  { transform: translateX(-50%) translateY(0);    opacity: 1; }
+            80%  { transform: translateX(-50%) translateY(0);    opacity: 1; }
+            100% { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+        }
+
+        .turn-banner {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100%);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 50px;
+            border-radius: 0 0 15px 15px;
+            font-size: 1.3em;
+            font-weight: bold;
+            text-align: center;
+            z-index: 2000;
+            pointer-events: none;
+            opacity: 0;
+            min-width: 300px;
+        }
+
+        .turn-banner.active {
+            animation: bannerSlideIn 2.5s ease-in-out forwards;
+        }
+
+        /* ── Out-of-Time Indicators ── */
+        @keyframes timePulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.35; }
+        }
+
+        .time-warning {
+            color: #c07000;
+            font-weight: bold;
+        }
+
+        .time-out {
+            color: #dc3545 !important;
+            font-weight: bold;
+            animation: timePulse 1s ease-in-out infinite;
+        }
+
+        .player-panel.time-exhausted {
+            border-color: #dc3545 !important;
+        }
+
+        .time-exhausted-badge {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-left: 6px;
+            animation: timePulse 1s ease-in-out infinite;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
@@ -719,6 +871,9 @@
         <header>
             <h1>🧗 All-In Ascent</h1>
             <p class="subtitle">Alpine Indoors Rock Climbing Board Game</p>
+            <a class="rulebook-link" href="RULEBOOK.md" target="_blank" rel="noopener">
+                📖 View Rulebook
+            </a>
         </header>
 
         <div class="game-setup" id="gameSetup">
@@ -737,6 +892,7 @@
         </div>
 
         <div class="game-board" id="gameBoard">
+            <div id="turnBanner" class="turn-banner"></div>
             <div class="turn-indicator" id="turnIndicator"></div>
 
             <!-- Milestone Routes Panel -->
@@ -793,7 +949,7 @@
             <div class="modal-header" id="modalTitle"></div>
             <div id="modalBody"></div>
             <div class="action-buttons">
-                <button class="btn" onclick="closeModal()">Close</button>
+                <button class="btn" onclick="closeClimbModal()">Close</button>
             </div>
         </div>
     </div>
@@ -801,6 +957,15 @@
     <div class="modal" id="victoryModal">
         <div class="modal-content" style="max-width: 800px;">
             <div id="victoryModalBody"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="levelUpModal">
+        <div class="modal-content level-up-modal-content">
+            <div id="levelUpBody"></div>
+            <div class="action-buttons" style="margin-top: 20px;">
+                <button class="btn btn-success" onclick="closeLevelUpModal()">Continue</button>
+            </div>
         </div>
     </div>
 
