@@ -45,6 +45,24 @@
             opacity: 0.9;
         }
 
+        /* Header link to the rulebook — small, unobtrusive, opens in new tab. */
+        .rulebook-link {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 6px 14px;
+            color: white;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 0.95em;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .rulebook-link:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
         .game-setup {
             padding: 30px;
             background: #f8f9fa;
@@ -853,6 +871,9 @@
         <header>
             <h1>🧗 All-In Ascent</h1>
             <p class="subtitle">Alpine Indoors Rock Climbing Board Game</p>
+            <a class="rulebook-link" href="RULEBOOK.md" target="_blank" rel="noopener">
+                📖 View Rulebook
+            </a>
         </header>
 
         <div class="game-setup" id="gameSetup">
