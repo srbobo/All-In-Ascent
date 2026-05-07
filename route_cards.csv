@@ -1,0 +1,170 @@
+Area,Name,Description,Grade,Strength_Required,Technique_Required,Focus_Required,Flexibility_Required,Gear_Modifier,XP_Success,XP_Failure,Endurance,Roll_Effect,Time_Units
+Bouldering,Beginner's Fortune,A welcoming slab with positive jugs to build confidence,V0,15,20,15,10,Climbing Shoes: -5 Technique,25,8,12,"-1d6 Technique (large holds), -1d6 Focus (clear beta)",2
+Bouldering,Easy Street,Straightforward holds and comfortable angles for newcomers,V0,18,18,12,15,Crash Pad: -3 all stats,28,10,14,"-1d6 Strength (jugs), -1d6 Technique (easy movement)",1
+Bouldering,Warm-Up Wonder,Perfect for loosening up before harder sends,V1,22,25,18,20,None,32,12,16,"-1d6 Technique (clear sequences), -1d6 Focus (straightforward), +1d6 Strength (still some effort)",2
+Bouldering,The Friendly Giant,Large holds on a gentle overhang,V1,25,22,20,18,Chalk Bag: -5 Strength,35,14,18,"-1d6 Strength (bucket holds), -1d6 Technique (easy beta)",2
+Bouldering,Jug Haul,Big holds test basic pulling power,V1,28,24,22,16,Climbing Shoes: -5 Technique,38,15,20,"-1d6 Strength (positive grips), -1d6 Focus (simple)",3
+Bouldering,Crimson Ladder,Sequential crimps up a vertical wall,V2,30,28,25,22,Finger Tape: -8 Strength,42,16,22,"+1d6 Strength (sharp crimps), +1d6 Technique (precise)",2
+Bouldering,Balancing Act,Requires steady footwork and body positioning,V2,28,32,28,25,None,45,18,24,"-1d6 Technique (good footholds), -1d6 Focus (obvious beta)",3
+Bouldering,The Pinch Problem,Tests thumb strength on compression holds,V2,35,30,24,20,Chalk Bag: -5 Strength,48,20,26,"+1d6 Strength (pinches), -1d6 Technique (large volumes)",2
+Bouldering,Toe Hook Traverse,Lateral movement with crucial heel and toe hooks,V3,32,35,30,28,Climbing Shoes: -8 Technique,52,22,28,"-1d6 Technique (efficient hooks), -1d6 Flexibility (good rests)",3
+Bouldering,Power Pocket,Dynamic moves between deep two-finger pockets,V3,40,32,28,24,Finger Tape: -10 Strength,55,24,30,"+1d6 Strength (finger strain), -1d6 Focus (clear target)",3
+Bouldering,Slopey Situation,Frustrating slopes demand perfect weight distribution,V3,38,36,32,26,Chalk Bag: -8 Strength,58,26,32,"+1d6 Strength (grip), +1d6 Technique (friction)",4
+Bouldering,The Gaston Gateway,Wide stance requiring opposing pressure moves,V3,42,34,30,30,None,60,28,34,"+1d6 Strength (opposition), -1d6 Flexibility (natural position)",3
+Bouldering,Crimper's Delight,Tiny edges reward precise finger positioning,V4,45,40,35,28,Finger Tape: -12 Strength,65,30,36,"+1d6 Strength (razor edges), -1d6 Technique (good feet)",4
+Bouldering,Roof Raider,Inverted climbing tests core and shoulder strength,V4,48,38,32,30,Harness: -5 Strength,68,32,38,"-1d6 Strength (good holds), -1d6 Flexibility (short problem)",3
+Bouldering,Technical Marvel,Complex beta requires careful route reading,V4,40,45,40,32,None,70,34,40,"-1d6 Technique (multiple solutions), -1d6 Focus (clear after reading)",4
+Bouldering,The Mantle Challenge,Awkward topout demands precise weight shifts,V4,44,42,38,35,Climbing Shoes: -10 Technique,72,35,42,"+1d6 Technique (tricky), +1d6 Flexibility (awkward position)",3
+Bouldering,Compression Test,Squeezes body between volumes and wall,V4,50,40,34,28,Chalk Bag: -10 Strength,75,36,44,"-1d6 Strength (good squeeze holds), -1d6 Focus (straightforward)",4
+Bouldering,Dyno Dilemma,Requires explosive jump to distant hold,V5,52,38,36,30,None,78,38,46,"+1d6 Strength (explosive), +1d6 Focus (commitment), -1d6 Flexibility (good body position)",4
+Bouldering,Crimp or Crumble,Unforgiving micro crimps on steep terrain,V5,48,46,42,34,Finger Tape: -15 Strength,80,40,48,"+1d6 Strength (micro holds), -1d6 Technique (good sequence)",4
+Bouldering,The Slab Enigma,Delicate smearing and balance on nearly featureless rock,V5,35,52,45,38,Climbing Shoes: -12 Technique,82,42,50,"+1d6 Technique (invisible), -1d6 Focus (good rubber works)",5
+Bouldering,Volume Voyage,Navigate bulbous volumes with creative movement,V5,46,48,40,36,None,85,44,52,"-1d6 Technique (fun beta), -1d6 Focus (playful)",4
+Bouldering,Undercling Alley,Sustained underclings drain forearms quickly,V5,54,44,38,32,Chalk Bag: -12 Strength,88,45,54,"+1d6 Strength (pump), -1d6 Technique (good undercling holds)",5
+Bouldering,Heel Hook Heaven,Multiple heel hooks required for efficiency,V6,48,50,44,42,Climbing Shoes: -15 Technique,90,46,56,"-1d6 Technique (efficient), -1d6 Flexibility (hooks)",4
+Bouldering,The Pinch Fest,Relentless pinches with no rest positions,V6,56,46,40,36,None,92,48,58,"+1d6 Strength (pinching), +1d6 Focus (no rest)",5
+Bouldering,Coordination Crisis,Strange body positions test spatial awareness,V6,50,48,46,44,Harness: -8 Flexibility,95,50,60,"+1d6 Technique (coordination), -1d6 Focus (logical once solved)",4
+Bouldering,Crimp City,Extended sequence of razor-sharp crimps,V6,52,52,48,38,Finger Tape: -18 Strength,98,52,62,"+1d6 Strength (crimps), +1d6 Technique (endurance)",5
+Bouldering,The Roof of Doom,Long overhang requires sustained power,V7,58,48,42,40,Chalk Bag: -15 Strength,100,54,64,"+1d6 Strength (power), -1d6 Focus (good holds)",5
+Bouldering,Sloper Nightmare,Massive slopers with desperate slaps,V7,55,54,50,42,None,100,56,66,"+1d6 Strength (friction), +1d6 Technique (body position)",5
+Bouldering,Micro Beta,Subtle movements make or break the ascent,V7,50,56,55,46,Climbing Shoes: -18 Technique,100,58,68,"-1d6 Technique (secret), -1d6 Focus (rest spot)",4
+Bouldering,The Bicep Burner,Lock-offs and pulls without foot relief,V7,62,50,46,38,None,100,60,70,"-1d6 Strength (good locks), -1d6 Technique (simple beta)",5
+Bouldering,Shoulder Shredder,Campus-style moves destroy upper body,V8,65,48,44,40,Chalk Bag: -18 Strength,100,62,72,"+1d6 Strength (campus), +1d6 Strength (pure power), -1d6 Technique (some footholds help)",5
+Bouldering,Technical Nightmare,Obscure beta hidden in plain sight,V8,54,60,58,48,None,100,64,74,"+1d6 Technique (cryptic), +1d6 Focus (mental strain)",5
+Bouldering,The Knee Bar Crux,Rest position exists but hard to find,V8,58,56,52,50,Knee Pads: -15 all stats,100,66,76,"-1d6 Strength (knee bar rest), -1d6 Focus (discoverable)",4
+Bouldering,Compression Beast,Full-body squeeze through entire problem,V8,68,54,48,42,None,100,68,78,"+1d6 Strength (crushing), +1d6 Flexibility (squeeze)",5
+Bouldering,Dyno Chain,Multiple dynamic moves in succession,V9,70,52,50,44,Chalk Bag: -20 Strength,100,70,80,"-1d6 Strength (good catches), -1d6 Focus (clear targets)",5
+Bouldering,The Crimp Destroyer,Tendon-testing crimps on extreme overhang,V9,64,58,56,46,Finger Tape: -25 Strength,100,72,82,"+1d6 Strength (injury risk), +1d6 Technique (precision)",5
+Bouldering,Slab of Insanity,Psychological crux on vertical nothingness,V9,45,68,65,55,Climbing Shoes: -25 Technique,100,74,84,"+1d6 Technique (balance), +1d6 Focus (mental)",5
+Bouldering,The Power Roof,Raw strength demanded for multiple moves,V9,75,56,52,48,None,100,76,86,"+1d6 Strength (pure power), +1d6 Focus (endurance)",5
+Bouldering,Precision Impossible,Millimeter accuracy required on every move,V10,58,70,68,58,None,100,78,88,"+1d6 Technique (perfect), -1d6 Focus (clear sequence)",5
+Bouldering,The Full Monty,Tests every skill simultaneously,V10,68,65,62,56,Harness: -15 all stats,100,80,90,"+1d6 Strength (complex), -1d6 Technique (variety helps)",5
+Bouldering,Shoulder Breaker,Unnatural positions strain joints,V10,72,62,58,52,None,100,82,92,"+1d6 Strength (positions), +1d6 Flexibility (painful)",5
+Bouldering,Elite Compression,Only the strongest can squeeze through,V10,78,60,55,50,Chalk Bag: -25 Strength,100,84,94,"+1d6 Strength (maximum), -1d6 Technique (good body position)",5
+Bouldering,The Impossible Pinch,Legendary pinch few can close,V11,80,64,60,52,None,100,86,96,"+1d6 Strength (insane), -1d6 Focus (one move wonder)",5
+Bouldering,Crimp Hell,Pushes finger strength beyond limits,V11,75,68,66,54,Finger Tape: -30 Strength,100,88,98,"+1d6 Strength (destroyer), +1d6 Technique (endurance)",5
+Bouldering,Project Zero,The gym's hardest problem awaits a first ascent,V12,82,72,70,58,None,100,90,100,"+1d6 Technique (unsolved), +1d6 Focus (mystery)",5
+Bouldering,The Gauntlet,Combines every challenge into one masterpiece,V12,85,75,72,60,All Gear: -20 all stats,100,92,100,"-1d6 Strength (variety), -1d6 Technique (good holds)",5
+Bouldering,Campus Chaos,No feet allowed on this power endurance test,V13,88,70,68,55,Chalk Bag: -30 Strength,100,94,100,"+1d6 Strength (campus hell), +1d6 Focus (no feet)",5
+Bouldering,The Final Boss,Reserved for only the most elite boulderers,V13,90,78,75,62,None,100,96,100,"+1d6 Strength (elite), -1d6 Technique (dialed beta)",5
+Bouldering,Apex Predator,The ultimate test of bouldering mastery,V14,95,80,78,65,All Gear: -25 all stats,100,98,100,"+1d6 Strength (apex), -1d6 Focus (pure movement)",5
+Bouldering,Legendary Send,Whispered about but rarely completed,V15,98,85,82,68,None,100,100,100,"+1d6 Technique (legendary), -1d6 Focus (historic beta exists)",5
+Top Rope,First Timer's Friend,Gentle introduction to rope climbing with large holds,5.6,20,18,15,12,Harness: -5 all stats,30,10,15,-1d6 Technique (beginner friendly),3
+Top Rope,Vertical Avenue,Straight up with positive holds throughout,5.6,22,20,18,15,Climbing Shoes: -5 Technique,32,12,17,-1d6 Strength (easy jugs),3
+Top Rope,The Easy Column,Build endurance on this beginner-friendly route,5.7,25,24,22,18,Belay Device: -3 Focus,36,14,20,-1d6 Focus (straightforward),4
+Top Rope,Jug Journey,Follow the jugs to the anchors,5.7,28,26,24,20,None,38,16,22,-1d6 Strength (positive holds),3
+Top Rope,Learning Curve,Introduces basic climbing movements safely,5.8,30,28,26,22,Quickdraws: -5 Technique,42,18,25,-1d6 Technique (clear movement),4
+Top Rope,Ledge to Ledge,Rest positions available between sections,5.8,32,30,28,24,Harness: -8 all stats,45,20,28,-1d6 Strength (good rests),5
+Top Rope,The Beginner's Overhang,Slight angle increase with good holds,5.8,35,32,30,20,Chalk Bag: -8 Strength,48,22,30,-1d6 Strength (manageable angle),4
+Top Rope,Footwork Focus,Teaches importance of precise foot placement,5.9,34,36,32,28,Climbing Shoes: -10 Technique,52,24,32,-1d6 Technique (good footholds),4
+Top Rope,The Standard,Classic moderate climb everyone should try,5.9,38,34,30,26,None,55,26,35,"-1d6 Strength (classic line), +1d6 Focus (tricky crux)",4
+Top Rope,Reach for the Sky,Extended moves test wingspan,5.9,36,32,28,32,Rope: -5 Flexibility,58,28,38,+1d6 Flexibility (long reaches),5
+Top Rope,Crimson Wall,Vertical wall with smaller holds appears,5.10a,40,38,35,30,Finger Tape: -10 Strength,62,30,40,+1d6 Strength (smaller holds),5
+Top Rope,Balance Beam,Narrow features demand careful positioning,5.10a,38,42,38,34,Climbing Shoes: -12 Technique,65,32,42,+1d6 Technique (balance crux),4
+Top Rope,The Crack Intro,Basic crack technique on moderate angle,5.10a,42,40,36,28,None,68,34,45,+1d6 Technique (crack technique),5
+Top Rope,Overhang Initiation,First real roof climbing experience,5.10b,45,38,34,30,Harness: -10 all stats,70,36,48,+1d6 Strength (overhang pump),5
+Top Rope,Endurance Builder,Pumpy climb with few rest opportunities,5.10b,48,42,38,32,Chalk Bag: -12 Strength,72,38,50,+1d6 Strength (sustained effort),6
+Top Rope,Technical Terrain,Requires thinking through each section,5.10c,44,46,42,36,None,75,40,52,+1d6 Focus (complex sequences),5
+Top Rope,The Pinch Route,Introduces pinch grips on vertical wall,5.10c,46,44,40,34,Belay Device: -8 Focus,78,42,54,+1d6 Strength (pinch grips),5
+Top Rope,Crimp Central,Small edges test finger strength,5.10d,50,46,42,36,Finger Tape: -15 Strength,80,44,56,+1d6 Strength (tiny crimps),5
+Top Rope,Steep Learning,Overhanging wall with thoughtful sequences,5.10d,52,44,40,38,Harness: -12 all stats,82,46,58,+1d6 Strength (steep sections),6
+Top Rope,The Gaston Section,Side pulls and opposition moves featured,5.11a,48,50,46,42,None,85,48,60,+1d6 Technique (opposition moves),5
+Top Rope,Sloper City,Frustrating slopes at moderate height,5.11a,50,48,44,40,Chalk Bag: -15 Strength,88,50,62,+1d6 Strength (slippery slopes),6
+Top Rope,Heel Hook Required,Learn advanced foot techniques here,5.11a,46,52,48,46,Climbing Shoes: -18 Technique,90,52,64,-1d6 Technique (efficient hooks),5
+Top Rope,Power Climb,Upper body strength gets you through,5.11b,56,48,44,38,None,92,54,66,"+1d6 Strength (power moves), -1d6 Technique (precise movers rewarded)",6
+Top Rope,The Crux Wall,Distinct difficulty spike mid-route,5.11b,54,50,48,42,Quickdraws: -10 Technique,95,56,68,+1d6 Focus (hard crux),5
+Top Rope,Sustained Difficulty,No easy sections on this pumpy line,5.11c,58,52,50,44,Chalk Bag: -18 Strength,98,58,70,+1d6 Strength (no rest),6
+Top Rope,Technical Overhang,Steep angle demands perfect technique,5.11c,52,56,54,48,Harness: -15 all stats,100,60,72,+1d6 Technique (technical crux),6
+Top Rope,The Roof Problem,Navigate through horizontal section,5.11d,60,54,52,46,None,100,62,74,+1d6 Strength (roof section),6
+Top Rope,Crimp Fest Supreme,Extended crimp sequence to the top,5.11d,56,58,56,50,Finger Tape: -20 Strength,100,64,76,+1d6 Strength (crimp endurance),6
+Top Rope,Dynamic Moves,Several long reaches between holds,5.12a,62,56,54,48,None,100,66,78,"+1d6 Focus (dynamic timing), -1d6 Strength (momentum helps), +1d6 Flexibility (awkward positions)",6
+Top Rope,The Compression Line,Body tension crucial throughout,5.12a,64,58,56,52,Chalk Bag: -20 Strength,100,68,80,+1d6 Strength (compression),7
+Top Rope,Advanced Technique,Obscure moves separate contenders,5.12b,58,62,60,56,Climbing Shoes: -25 Technique,100,70,82,+1d6 Technique (advanced beta),6
+Top Rope,The Power Endurance,Strength needed for entire ascent,5.12b,68,60,58,54,Harness: -18 all stats,100,72,84,+1d6 Strength (sustained power),7
+Top Rope,Flexibility Test,High steps and wide reaches abound,5.12c,60,58,56,62,Rope: -15 Flexibility,100,74,86,+1d6 Flexibility (extreme positions),6
+Top Rope,The Steep One,Overhanging wall tests everything,5.12c,70,62,60,56,None,100,76,88,+1d6 Strength (steep wall),7
+Top Rope,Micro Hold Heaven,Tiny holds require precision,5.12d,66,66,64,58,Finger Tape: -25 Strength,100,78,90,+1d6 Technique (micro holds),6
+Top Rope,The Upper Echelon,Elite level climbing begins here,5.13a,72,68,66,60,None,100,80,92,+1d6 Strength (elite difficulty),7
+Top Rope,Body Tension Master,Core strength absolutely essential,5.13a,74,70,68,62,Harness: -20 all stats,100,82,94,+1d6 Strength (core intensive),7
+Top Rope,The Crimpfest Ultimate,Unrelenting crimps to the anchors,5.13b,70,72,70,64,Finger Tape: -28 Strength,100,84,96,+1d6 Strength (crimp marathon),7
+Top Rope,Overhang Extreme,Sustained steep climbing at its finest,5.13b,78,70,68,62,Chalk Bag: -25 Strength,100,86,98,+1d6 Strength (extreme overhang),7
+Top Rope,Professional Grade,Requires years of training,5.13c,80,74,72,66,None,100,88,100,+1d6 Technique (pro level),7
+Top Rope,The Competition Route,Used for advanced climbing competitions,5.13d,82,76,74,68,All Gear: -20 all stats,100,90,100,+1d6 Focus (competition stress),7
+Top Rope,Elite Territory,Few can complete this masterpiece,5.14a,85,78,76,70,None,100,92,100,+1d6 Strength (elite status),7
+Top Rope,The Redpoint Project,Pushing the limits of indoor climbing,5.14b,88,80,78,72,Climbing Shoes: -30 Technique,100,94,100,+1d6 Technique (redpoint worthy),7
+Top Rope,World Class,Matches outdoor world-class routes,5.14c,90,82,80,74,All Gear: -25 all stats,100,96,100,+1d6 Strength (world class),7
+Top Rope,The Impossible Dream,Only the absolute best succeed,5.14d,95,85,82,76,None,100,98,100,+1d6 Focus (dream ascent),7
+Top Rope,Legendary Ascent,The hardest top rope in the gym,5.15a,98,88,85,78,All Gear: -30 all stats,100,100,100,+1d6 Strength (legendary),7
+Lead Climbing,Lead Introduction,Perfect first lead with good clipping positions,5.8,30,28,30,22,Quickdraws: -8 all stats,40,15,25,"-1d6 Focus (easy clips), +1d6 Strength (still requires pulling power)",4
+Lead Climbing,Confidence Builder,Builds trust in lead climbing systems,5.8,32,30,32,24,Harness: -10 all stats,42,18,28,-1d6 Focus (confidence boost),4
+Lead Climbing,The Easy Lead,Straightforward clipping with large holds,5.9,35,32,34,26,Belay Device: -8 Focus,46,20,30,-1d6 Technique (simple route),5
+Lead Climbing,Clip and Climb,Learn clipping rhythm on this friendly route,5.9,38,34,36,28,Quickdraws: -10 all stats,48,22,32,-1d6 Focus (good rhythm),4
+Lead Climbing,First Overhang Lead,Introduces lead climbing on angles,5.10a,42,38,40,30,None,52,24,35,+1d6 Strength (overhang clips),5
+Lead Climbing,The Clipping Challenge,Awkward clip positions test efficiency,5.10a,40,42,44,32,Harness: -12 all stats,55,26,38,+1d6 Focus (awkward clips),5
+Lead Climbing,Pump Management,Learn to pace yourself while leading,5.10b,45,44,46,34,Quickdraws: -12 all stats,58,28,40,+1d6 Strength (pump management),6
+Lead Climbing,Mental Game,Overcoming fear is half the battle,5.10b,44,40,50,36,Belay Device: -10 Focus,62,30,42,+1d6 Focus (mental challenge),5
+Lead Climbing,The Long Route,Extended length demands stamina,5.10c,48,46,48,38,Rope: -10 all stats,65,32,45,+1d6 Strength (long distance),7
+Lead Climbing,Clip Rest Clip,Finding rest positions crucial,5.10c,46,48,46,40,None,68,34,48,-1d6 Focus (good rest spots),6
+Lead Climbing,Power Lead,Strength needed between bolts,5.10d,52,48,50,38,Chalk Bag: -15 Strength,70,36,50,+1d6 Strength (power sections),6
+Lead Climbing,Technical Leading,Complex moves while managing rope,5.10d,50,52,54,42,Quickdraws: -15 all stats,72,38,52,+1d6 Technique (technical clips),6
+Lead Climbing,The Steep Lead,Overhanging terrain with good clips,5.11a,54,50,52,44,Harness: -15 all stats,75,40,55,+1d6 Strength (steep clipping),6
+Lead Climbing,Crimper's Lead Route,Small holds between bolt positions,5.11a,52,54,56,46,Finger Tape: -18 Strength,78,42,58,+1d6 Strength (crimp runout),6
+Lead Climbing,Runout Section,Longer distance between some clips,5.11b,56,52,58,48,None,80,44,60,+1d6 Focus (scary runout),6
+Lead Climbing,The Exposure Line,Mental fortitude tested at height,5.11b,54,56,62,50,Belay Device: -15 Focus,82,46,62,+1d6 Focus (exposed position),6
+Lead Climbing,Overhang Lead Challenge,Steep wall demands efficient clipping,5.11c,60,56,60,52,Quickdraws: -18 all stats,85,48,65,+1d6 Strength (steep clips),7
+Lead Climbing,Pump Factory,Forearm endurance critical,5.11c,62,58,58,48,Chalk Bag: -20 Strength,88,50,68,+1d6 Strength (pump fest),7
+Lead Climbing,The Crux Clip,Most difficult move right at bolt,5.11d,58,60,64,54,Harness: -18 all stats,90,52,70,+1d6 Focus (crux clip),6
+Lead Climbing,Sustained Lead,Difficult climbing without respite,5.11d,64,62,62,56,None,92,54,72,+1d6 Strength (no rest),7
+Lead Climbing,Advanced Clipping,Unusual positions for clipping bolts,5.12a,66,64,66,58,Quickdraws: -20 all stats,95,56,75,"+1d6 Focus (complex clipping), +1d6 Technique (awkward positions), -1d6 Strength (momentum helps)",7
+Lead Climbing,The Power Lead Wall,Raw strength between each clip,5.12a,70,62,64,56,Chalk Bag: -22 Strength,98,58,78,+1d6 Strength (power runouts),7
+Lead Climbing,Technical Mastery Lead,Every move demands precision,5.12b,64,68,68,62,None,100,60,80,+1d6 Technique (precise movement),7
+Lead Climbing,The Compression Lead,Body tension while managing rope,5.12b,72,66,66,60,Harness: -20 all stats,100,62,82,+1d6 Strength (compression clips),7
+Lead Climbing,Crimp Lead Challenge,Extended crimping while leading,5.12c,68,70,70,64,Finger Tape: -25 Strength,100,64,84,+1d6 Strength (crimp endurance),7
+Lead Climbing,The Steep Project,Overhanging lead climb paradise,5.12c,75,68,68,62,Quickdraws: -22 all stats,100,66,86,+1d6 Strength (project difficulty),8
+Lead Climbing,Endurance Lead,Tests stamina over length and difficulty,5.12d,72,72,72,66,Rope: -18 all stats,100,68,88,+1d6 Strength (marathon climb),8
+Lead Climbing,Mental Fortress,Psychological challenges throughout,5.12d,70,70,76,68,Belay Device: -20 Focus,100,70,90,+1d6 Focus (psychological),7
+Lead Climbing,The Elite Lead,Where advanced climbers prove themselves,5.13a,76,74,74,70,None,100,72,92,+1d6 Strength (elite test),8
+Lead Climbing,Crimp Lead Extreme,Finger strength while clipping under stress,5.13a,74,76,76,72,Finger Tape: -28 Strength,100,74,94,+1d6 Strength (extreme crimps),7
+Lead Climbing,Overhang Lead Master,Sustained steep climbing while leading,5.13b,80,74,74,70,Quickdraws: -25 all stats,100,76,96,+1d6 Strength (overhang master),8
+Lead Climbing,The Power Endurance Lead,Strength and stamina combined,5.13b,82,76,76,72,Chalk Bag: -28 Strength,100,78,98,+1d6 Strength (power endurance),8
+Lead Climbing,Professional Lead Route,Competition-level difficulty,5.13c,78,80,80,76,Harness: -25 all stats,100,80,100,+1d6 Technique (professional),8
+Lead Climbing,Technical Lead Masterpiece,Intricate sequences while managing gear,5.13c,76,82,82,78,None,100,82,100,+1d6 Technique (masterpiece),8
+Lead Climbing,The Ultimate Lead Challenge,Tests every aspect of lead climbing,5.13d,84,80,80,76,All Gear: -22 all stats,100,84,100,+1d6 Strength (ultimate test),8
+Lead Climbing,Elite Competition Lead,Used in professional competitions,5.13d,86,82,82,78,Quickdraws: -28 all stats,100,86,100,+1d6 Focus (competition),8
+Lead Climbing,World Class Leading,Among the hardest leads in any gym,5.14a,88,84,84,80,None,100,88,100,"+1d6 Strength (world class), +1d6 Technique (perfect precision needed), -1d6 Focus (dialed sequence)",8
+Lead Climbing,The Redpoint Lead,Requires multiple attempts to learn,5.14a,85,86,86,82,All Gear: -25 all stats,100,90,100,+1d6 Technique (redpoint),8
+Lead Climbing,Master Class Lead,Reserved for master climbers,5.14b,90,86,86,82,Finger Tape: -32 Strength,100,92,100,+1d6 Strength (master class),8
+Lead Climbing,The Impossible Lead,Few have completed this route,5.14c,92,88,88,84,All Gear: -28 all stats,100,94,100,+1d6 Strength (impossible),8
+Lead Climbing,Legendary Lead Line,The stuff of climbing legends,5.14d,95,90,90,86,None,100,96,100,+1d6 Focus (legendary),8
+Lead Climbing,Project Infinity,The gym's ultimate lead challenge,5.15a,98,92,92,88,All Gear: -30 all stats,100,98,100,+1d6 Strength (infinite project),8
+Lead Climbing,The Final Ascent,The hardest lead route ever set here,5.15b,100,95,95,90,All Gear: -35 all stats,100,100,100,+1d6 Technique (final challenge),8
+Bouldering,Strength Silo,A pure power roof where only brute strength matters — finesse optional,V3,55,18,20,15,None,52,22,28,"+1d6 Strength (pure power required), -1d6 Strength (good holds reduce strain)",3
+Bouldering,Focus Gauntlet,An eerily featureless slab demanding total mental presence,V7,35,40,75,38,None,100,56,68,"+1d6 Focus (concentration crux), +1d6 Focus (second mental wall)",5
+Bouldering,The Triple Down,Moderate holds that escalate fast under compounding dice pressure,V5,38,40,42,35,None,80,40,50,"+1d6 Strength (sustained effort), +1d6 Technique (precision required), +1d6 Focus (commitment)",4
+Bouldering,Spray Wall Chaos,Spray wall madness: every session is a different sequence,V6,42,42,45,38,None,92,48,60,"+1d6 Strength (varied holds), +1d6 Technique (coordination), +1d6 Flexibility (wild positions)",4
+Bouldering,The Clean Line,Perfectly readable beta on a pristine slab — no excuses,V4,40,42,38,32,Climbing Shoes: -10 Technique,65,30,40,No roll effect (pure skill check),3
+Bouldering,Static Control,Deliberate slow movement on a technical vertical wall,V8,62,65,60,55,None,100,62,74,No roll effect (pure skill check),5
+Bouldering,Redemption Arc,A crowd-pleaser for climbers who learn from every attempt,V6,52,48,44,42,None,90,85,58,"+1d6 Strength (powerful section), +1d6 Technique (crux precision)",4
+Bouldering,Hail Mary,Throw everything at this desperate last-move problem,V9,68,60,56,50,None,100,95,82,"+1d6 Strength (desperate slap), +1d6 Focus (all-or-nothing commitment)",5
+Bouldering,Speed Crimp,A short sharp crimp problem with a blistering time bonus,V7,55,58,48,44,Finger Tape: -15 Strength,100,55,65,"+1d6 Strength (razor crimps), -1d6 Technique (sequence unlocks efficiency)",2
+Bouldering,The Gauntlet Opener,A warm-up that costs you more than it looks — endurance tax,V2,28,30,25,22,None,42,16,50,"-1d6 Technique (clear beta), -1d6 Focus (no surprises)",1
+Top Rope,The Wall Flower,Intimidating technical slab that rewards technique over strength,5.10a,25,60,30,28,Climbing Shoes: -10 Technique,62,30,42,"+1d6 Technique (balance crux), -1d6 Technique (rubber works well)",4
+Top Rope,Hip Opener,Extreme hip flexibility required for high-step sequences,5.11c,40,45,44,72,None,98,58,68,"+1d6 Flexibility (painful high steps), -1d6 Strength (balance replaces power)",5
+Top Rope,The Fear Factor,Every stat gets hammered by compounding dice pressure,5.11a,40,42,44,38,None,88,50,65,"+1d6 Strength (heavy going), +1d6 Focus (mental pressure), +1d6 Flexibility (contorted moves)",5
+Top Rope,The Punishment Wall,Three penalty dice make this moderate-looking wall a true test,5.12b,62,65,64,58,None,100,70,82,"+1d6 Strength (sustained overhang), +1d6 Technique (precise footwork), +1d6 Focus (no rest)",7
+Top Rope,The Sure Thing,Textbook movement on a well-trodden route — skill not luck,5.10c,44,46,42,36,None,72,38,50,No roll effect (pure skill check),4
+Top Rope,The Dialed Rope,A masterpiece of sequence — climbers who know it succeed,5.12d,66,68,64,60,None,100,78,90,No roll effect (pure skill check),6
+Top Rope,Win or Learn,Either you top out clean or you get a useful lesson,5.11b,54,50,48,44,None,92,88,66,"+1d6 Strength (stiff crux), +1d6 Technique (precise sequence)",5
+Top Rope,The Big Gamble,Throw your session at this — success is sweet; failure still pays,5.13b,78,72,70,65,None,100,97,96,"+1d6 Strength (world-class effort), +1d6 Focus (mental fortress required)",7
+Top Rope,Quick Clip,Elite difficulty at a blistering pace for time-efficient climbers,5.12b,65,62,58,56,None,100,70,82,"+1d6 Strength (pump management), -1d6 Focus (dialed clipping rhythm)",3
+Top Rope,The Grind,Simple moves done again and again until your endurance gives out,5.9,36,32,30,26,None,55,26,55,"-1d6 Strength (good holds throughout), -1d6 Focus (familiar sequence)",2
+Lead Climbing,Reach Specialist,Extreme flexibility demands create a route only contortionists love,5.10c,28,35,36,60,None,65,32,46,"+1d6 Flexibility (extreme high-steps), -1d6 Flexibility (good rest positions)",5
+Lead Climbing,Clench Mode,Focus 90 base — the most mentally demanding lead in the gym,5.13a,50,58,90,52,None,100,72,94,"+1d6 Focus (immense concentration), +1d6 Focus (second focus wall)",8
+Lead Climbing,The Runout Nightmare,Longer distances between bolts punish every weak stat,5.11d,45,48,50,42,None,90,52,70,"+1d6 Focus (exposed runout), +1d6 Strength (pumping out), +1d6 Technique (precise clips)",6
+Lead Climbing,The Crux Gauntlet,Three dice attack all your stats simultaneously,5.12c,65,68,68,60,None,100,65,84,"+1d6 Strength (crux power), +1d6 Technique (critical footwork), +1d6 Focus (composure under pressure)",7
+Lead Climbing,The Dialed Lead,Known sequences and good clips — luck removed from the equation,5.11b,55,54,56,48,None,80,44,62,No roll effect (pure skill check),5
+Lead Climbing,The Known Route,A legendary route with every move memorized by the elite,5.13b,80,76,76,72,None,100,76,96,No roll effect (pure skill check),8
+Lead Climbing,Gambler's Ascent,Fail here and Iron Lung still smiles — success here and everyone does,5.12b,70,66,66,62,None,100,95,84,"+1d6 Strength (sustained power), +1d6 Focus (bold clipping)",7
+Lead Climbing,All In,The ultimate gamble — throw your last endurance at glory,5.13d,86,82,82,78,None,100,98,100,"+1d6 Strength (brutal difficulty), +1d6 Technique (elite precision)",8
+Lead Climbing,The Sprint Lead,Elite lead difficulty crushed in record time for the speed demons,5.12c,72,68,66,60,None,100,64,84,"+1d6 Strength (sustained output), -1d6 Technique (efficient clipping sequence)",3
+Lead Climbing,The Quick Send,Entry-level lead with a nasty endurance toll — quick but costly,5.10a,40,38,42,30,None,52,24,55,"-1d6 Focus (easy clips), -1d6 Technique (clear movement)",2

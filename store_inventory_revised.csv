@@ -1,0 +1,42 @@
+Item_Name,Category,XP_Cost,Stat_Effect,Special_Effect,Description,Prerequisite_Level
+Climbing Shoes,Essential Safety Gear,75,"-3 Technique on all climbs, -2 Flexibility on Slab climbs","Improves foothold precision",Provides precise foothold control with sticky rubber and snug fit; better grip on small holds,1
+Chalk,Performance Gear,50,"-2 Strength on climbs with Crimp or Sloper holds","Maintains friction on sweaty hands",Absorbs sweat from hands to maintain friction; stronger grip and less slipping,1
+Chalk Bag,Performance Gear,60,"-2 Strength on all climbs","Allows chalk access without leaving wall",Holds chalk for easy access mid-climb; keeps hands dry without leaving the wall,1
+Harness,Essential Safety Gear,95,"-3 to all stats on Top Rope and Lead climbs","Required for rope climbing",Secures climber to rope system and distributes weight safely during falls,1
+Belay Device,Essential Safety Gear,80,"-2 Focus on Lead climbs","Safer belaying and catching",Adds friction so belayer can control rope during belaying,2
+Locking Carabiner,Essential Safety Gear,90,"None","Unlocks advanced rope climbing features",Connects belay device to harness and locks to prevent accidental opening,2
+Non-Locking Carabiner,Convenience Gear,35,"None","Allows carrying extra chalk bag or accessories",Quick clipping of accessories like chalk bags or small tools,1
+Lead Rope,Essential Safety Gear,120,"-3 Strength on Lead climbs only","Required for lead climbing",Dynamic rope absorbs fall energy for safe catches on lead routes,3
+Helmet,Safety Gear,65,"None","+5 max Exhaustion (reduces injury risk)",Protects head from falling objects or wall impacts,1
+Finger Tape,Performance Gear,85,"-4 Strength on Crimp-heavy climbs","Prevents finger injuries",Wraps fingers to protect skin and support tendons,2
+Liquid Chalk,Performance Gear,95,"-3 Strength on all climbs, stacks with regular Chalk","Long-lasting friction, cleaner than powder",Provides alcohol-based chalk layer with minimal dust,3
+Knee Pads,Specialized Gear,110,"-5 to all stats on climbs with Roof features","Enables knee bar rest positions",Adds friction and padding for knee bar techniques,4
+Climbing Brush,Convenience Gear,55,"None","Restore 1d6 Exhaustion once per round when used",Cleans holds of chalk buildup and rubber residue,2
+Comfortable Climbing Apparel,Comfort Gear,90,"-1 to all stats, +10 max Exhaustion","Improved movement and breathability",Allows full range of motion and breathability,1
+Water Bottle,Comfort Gear,40,"None","When resting, recover +3 additional Exhaustion",Keeps climber hydrated during long sessions,1
+Energy Snacks,Consumable Gear,45,"None","Once per round, recover 2d6 Exhaustion without using rest action",Provides quick fuel during long gym sessions,1
+Gear Bag,Convenience Gear,70,"None","Reduces Store access time from 1 to 0 time units",Carries all climbing gear in an organized way,2
+Grip Strength Trainer,Training Equipment,180,"+2 permanent Strength","Gradual strength building",Strengthens fingers and forearms through regular training,5
+Portable Hangboard,Training Equipment,280,"+3 permanent Strength, +2 permanent Technique","Advanced finger strength training",Training tool for finger strength to build power for harder routes,7
+Resistance Bands,Training Equipment,150,"+2 permanent Flexibility","Mobility and warm-up tool",Used for warm-ups and shoulder stabilization,4
+Foam Roller,Recovery Gear,120,"None","When resting, recover +5 additional Exhaustion",Helps in muscle recovery and tension release,3
+Belay Gloves,Safety Gear,95,"-2 Focus on Lead climbs","Prevents rope burn",Protects hands when managing rope friction,3
+Crash Pad,Safety Gear,130,"-2 to all stats on Bouldering climbs only","Safer bouldering landing",Provides cushioned landing for bouldering falls,2
+Quickdraws Set,Performance Gear,140,"-4 Focus on Lead climbs","Faster clipping during lead",Set of quickdraws for efficient lead climbing,4
+Approach Shoes,Comfort Gear,55,"None","-1 time unit cost when moving to any climbing area",Comfortable shoes for walking around the gym,1
+Climbing Notebook,Strategy Gear,100,"None","Once per round, may re-attempt a failed climb at half time and Exhaustion cost",Records beta and progress for route memory,3
+Pre-Workout Supplement,Consumable Gear,80,"+3 to all stats for next climb only","One-time energy boost",Provides temporary performance enhancement,4
+Protein Shake,Consumable Gear,60,"None","Gain +50% XP from next successful climb",Aids in recovery and muscle building,2
+Athletic Tape,Performance Gear,50,"-2 Flexibility requirements","Joint support and stability",Supports joints and prevents minor injuries,2
+Climbing Guidebook,Strategy Gear,175,"None","Reveal all route cards in one area before choosing which to attempt",Study route information and grades,5
+Wireless Speaker,Motivation Gear,65,"None","Once per round, gain +2 to any one stat for a single climb",Music for motivation and focus,1
+Yoga Mat,Training Equipment,95,"+1 permanent Flexibility","Flexibility and recovery training",Used for stretching and mobility work,3
+Stopwatch,Strategy Gear,50,"None","Gain +1 time unit once per round",Helps plan time management strategy,2
+Climbing Magazine,Inspiration,35,"None","Gain +25 XP immediately upon purchase",Inspiration and technique tips,1
+Private Coaching Session,Training Service,340,"+2 permanent to any one stat of choice","One-time professional instruction",Expert technique analysis and improvement,6
+Gym Membership Upgrade,Facility Access,440,"None","Unlock bonus training area: +5 to all stats on first climb each round",Premium facilities and training zones,8
+Competition Entry Fee,Special Event,280,"+2 permanent Focus","Win or lose, gain +200 XP and test skills in competition",Test skills in competitive environment,7
+Video Analysis Session,Training Service,240,"+3 permanent Focus","Professional movement review",Film and analyze your climbing for improvements,5
+Nutrition Consultation,Training Service,190,"+10 permanent max Exhaustion","Optimized diet for performance",Learn proper fueling for climbing performance,4
+Physical Therapy Session,Recovery Service,270,"None","Immediately remove any accumulated injuries or penalties",Professional recovery and injury prevention,6
+Custom Route Setting,Special Service,450,"None","Create one custom route card at your preferred difficulty",Personalized challenge designed for you,10

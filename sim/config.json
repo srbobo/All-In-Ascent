@@ -1,0 +1,44 @@
+{
+  "_comment_doc": [
+    "Playtest pipeline configuration. Edit this file to change what gets tested.",
+    "The matrix orchestrator (sim/run-matrix.js, added in Commit E) reads this.",
+    "CLI flags override any field here.",
+    "",
+    "Defaults below reflect the user's decisions on 2026-04-21:",
+    "  - 7 repetitions per matchup (not 20)",
+    "  - no duplicate characters per game",
+    "  - max 2 models in the mix",
+    "  - multi-model within a game allowed (seat assignment randomized per rep)",
+    "  - heuristic fallback policy (engine-canonical)",
+    "  - high-granularity telemetry retained"
+  ],
+
+  "repetitions": 7,
+  "maxRounds": 45,
+  "turnTimeoutSeconds": 15,
+  "parallelism": 2,
+
+  "playerCounts": [2, 3, 4],
+
+  "characterSampling": "sample:15",
+  "curatedMatchups": [
+    ["technician", "sprinter"],
+    ["technician", "routeReader"],
+    ["sprinter", "ironLung", "freeSolo"],
+    ["technician", "sprinter", "ironLung", "routeReader"]
+  ],
+
+  "agents": [
+    "heuristic",
+    "ollama:qwen2.5:14b-instruct"
+  ],
+  "baselines": ["random"],
+
+  "outputDir": "results",
+  "seeds": "auto",
+
+  "analysis": {
+    "surfaceTopInterestingGames": 5,
+    "fallbackRateWarnThreshold": 0.05
+  }
+}

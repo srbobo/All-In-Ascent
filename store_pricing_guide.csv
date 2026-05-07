@@ -1,0 +1,16 @@
+Level,Max_XP_Spendable,XP_Gap_To_Next_Level,Items_Available_At_This_Level,Notes
+1,99,100,"Climbing Shoes (75), Chalk (50), Chalk Bag (60), Harness (95), Helmet (65), Comfortable Apparel (90), Water Bottle (40), Energy Snacks (45), Non-Locking Carabiner (35), Approach Shoes (55), Wireless Speaker (65), Climbing Magazine (35)",Starting level - essential gear
+2,149,150,"Belay Device (80), Locking Carabiner (90), Finger Tape (85), Climbing Brush (55), Gear Bag (70), Crash Pad (130), Protein Shake (60), Athletic Tape (50), Stopwatch (50)",Safety and convenience items
+3,199,200,"Lead Rope (120), Liquid Chalk (95), Foam Roller (120), Belay Gloves (95), Climbing Notebook (100), Yoga Mat (95)",Advanced climbing gear
+4,249,250,"Knee Pads (110), Quickdraws Set (140), Pre-Workout Supplement (80), Resistance Bands (150), Nutrition Consultation (190)",Specialized performance gear
+5,299,300,"Grip Strength Trainer (180), Climbing Guidebook (175), Video Analysis Session (240)",Training equipment unlocked
+6,349,350,"Private Coaching Session (340), Physical Therapy Session (270)",Professional services available
+7,399,400,"Portable Hangboard (280), Competition Entry Fee (280)",Advanced training and competition
+8,449,450,"Gym Membership Upgrade (440)",Premium facility access
+9,499,500,None available at this prerequisite,Focus on climbing and leveling
+10,549,550,"Custom Route Setting (450)",Ultimate customization unlocked
+11,599,600,None available at this prerequisite,Elite level climbing
+12,649,650,None available at this prerequisite,Professional grade performance
+13,699,700,None available at this prerequisite,World class level
+14,799,800,None available at this prerequisite,Near legendary status
+15,N/A,N/A,All items available - no level-down risk,Maximum level achieved
