@@ -170,8 +170,24 @@ function makePlayer(playerNum, characterKey) {
 }
 
 // Categorize every route in ROUTES into a difficulty bucket, then pick one
-// from each bucket for the three milestones. Mirrors the grade-to-bucket
-// mapping in game.js:523-545 exactly.
+// route from each bucket for the three milestones.
+//
+// Engine v0.4.0 (Scenario 2C — area exclusion): the three milestones MUST
+// span all three climbing areas (bouldering / topRope / leadClimbing). This
+// is enforced via SEQUENTIAL AREA EXCLUSION:
+//   1. Beginner is picked freely from the beginner bucket.
+//   2. Intermediate is picked from routes in tiers whose area differs from
+//      the beginner pick.
+//   3. Expert is picked from routes whose area differs from BOTH prior picks.
+// The route deck is dense enough in each non-beginner cell (Bouldering has
+// 12 int / 7 exp, Top Rope 10 int / 8 exp, Lead 9 int / 7 exp) that step 2
+// and step 3 always have candidates regardless of step 1's draw.
+//
+// This guarantees every game touches all three climbing areas AND has one
+// beginner, one intermediate, one expert — solving the "3-expert / 3-beginner
+// bad draw" problem that plagued v0.3.x.
+//
+// Grade-to-bucket mapping mirrors game.js:523-545 exactly.
 function pickMilestoneRoutes(rng) {
   const beginner = [];
   const intermediate = [];
@@ -210,9 +226,7 @@ function pickMilestoneRoutes(rng) {
     }
   }
 
-  // Guard: every bucket must have at least one candidate. If the data ever
-  // drifts and a bucket empties, we want to fail loudly, not silently
-  // select `undefined`.
+  // Guard: every bucket must have at least one candidate.
   if (!beginner.length || !intermediate.length || !expert.length) {
     throw new Error(
       `milestone bucket empty: beginner=${beginner.length}, ` +
@@ -220,11 +234,35 @@ function pickMilestoneRoutes(rng) {
     );
   }
 
-  return {
-    beginner: rng.pick(beginner),
-    intermediate: rng.pick(intermediate),
-    expert: rng.pick(expert),
-  };
+  // === Scenario 2C: sequential area-exclusion sampling ===
+  // 1. Beginner — free pick from any area.
+  const beg = rng.pick(beginner);
+
+  // 2. Intermediate — only from routes whose area differs from beg.area.
+  const intCandidates = intermediate.filter(r => r.area !== beg.area);
+  if (!intCandidates.length) {
+    throw new Error(
+      `no intermediate routes outside beginner area "${beg.area}". ` +
+      `Route deck composition has drifted and Scenario 2C cannot satisfy ` +
+      `"three different areas" constraint.`
+    );
+  }
+  const int = rng.pick(intCandidates);
+
+  // 3. Expert — only from routes whose area differs from BOTH prior picks.
+  const expCandidates = expert.filter(
+    r => r.area !== beg.area && r.area !== int.area
+  );
+  if (!expCandidates.length) {
+    throw new Error(
+      `no expert routes outside areas "${beg.area}" and "${int.area}". ` +
+      `Route deck composition has drifted and Scenario 2C cannot satisfy ` +
+      `"three different areas" constraint.`
+    );
+  }
+  const exp = rng.pick(expCandidates);
+
+  return { beginner: beg, intermediate: int, expert: exp };
 }
 
 // Initialize the 3-slot random gear shop. Access cards are handled

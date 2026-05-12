@@ -4,223 +4,349 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>All-In Ascent — Rulebook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;700&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    line-height: 1.6;
-    color: #2c3e50;
-    background: #f0f2f5;
+  html { scroll-behavior: smooth; }
+
+  :root {
+    --wall-base: #c2a07a;
+    --wall-shade: #8a6440;
+    --wall-light: #d8bf95;
+    --wall-deep:  #5a3f28;
+    --coral:    #ff6845;
+    --marigold: #ffae28;
+    --lime:     #b6d62d;
+    --teal:     #1fb8a6;
+    --cobalt:   #2c66cf;
+    --raspberry:#d8347d;
+    --violet:   #8857d4;
+    --chalk:    #f4ede0;
+    --ink:        #2a1d12;
+    --ink-soft:   #5a4530;
+    --tape-cream: #f8f0dc;
   }
+
+  /* Sandstone wall body */
+  body {
+    font-family: 'Hanken Grotesk', sans-serif;
+    color: var(--ink);
+    background-color: var(--wall-base);
+    background-image:
+      radial-gradient(circle at 50% 50%,
+        rgba(36,20,8,0.45) 1px, rgba(36,20,8,0.18) 2px, transparent 3px),
+      radial-gradient(ellipse 80% 60% at 20% 10%,
+        rgba(255,220,170,0.22), transparent 60%),
+      radial-gradient(ellipse 70% 70% at 90% 95%,
+        rgba(60,35,15,0.28), transparent 70%),
+      radial-gradient(ellipse 40% 30% at 35% 60%,
+        rgba(180,140,90,0.25), transparent 70%);
+    background-size: 72px 72px, auto, auto, auto;
+    background-attachment: fixed, fixed, fixed, fixed;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: 24px;
+    position: relative;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.1  0 0 0 0 0.05  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: multiply; opacity: 0.6;
+  }
+
+  /* Tape-cream container — pinned to the wall */
   .page {
+    position: relative;
+    z-index: 1;
     max-width: 880px;
     margin: 0 auto;
-    background: white;
-    box-shadow: 0 0 24px rgba(0,0,0,0.08);
-    min-height: 100vh;
+    background: var(--tape-cream);
+    border-radius: 12px;
+    box-shadow:
+      0 12px 32px rgba(40,20,10,0.32),
+      0 24px 48px rgba(40,20,10,0.16),
+      inset 0 1px 0 rgba(255,255,255,0.5);
+    overflow: hidden;
   }
+  .page::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.25 0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+    mix-blend-mode: multiply; opacity: 0.35;
+    pointer-events: none;
+  }
+  .page > * { position: relative; }
+
+  /* Ink slab header */
   header {
-    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-    color: white;
-    padding: 36px 40px;
+    background: var(--ink);
+    color: var(--chalk);
+    padding: 48px 56px 40px;
     text-align: center;
+    position: relative;
+    overflow: hidden;
   }
-  header h1 { font-size: 2.4em; margin-bottom: 6px; }
-  header p { opacity: 0.9; font-size: 1.05em; }
+  header::after {
+    content: ""; position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.85 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    pointer-events: none; opacity: 0.85;
+  }
+  header > * { position: relative; z-index: 1; }
+  header h1 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-variation-settings: "wdth" 110, "opsz" 96;
+    font-size: clamp(2.4rem, 5.5vw, 4rem);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    color: var(--chalk);
+    margin-bottom: 8px;
+  }
+  header h1 em { font-style: italic; font-weight: 500; color: var(--coral); }
+  header .eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(244,237,224,0.72);
+    margin-top: 8px;
+  }
+  header .eyebrow::before { content: "▸ "; color: var(--coral); margin-right: 0.4rem; }
   header .nav-links {
-    margin-top: 16px;
+    margin-top: 22px;
     display: flex;
     gap: 10px;
     justify-content: center;
+    flex-wrap: wrap;
   }
   header .nav-link {
     display: inline-block;
-    padding: 6px 14px;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 20px;
-    color: white;
+    padding: 8px 18px;
+    background: var(--chalk);
+    color: var(--ink);
+    border: 2px solid var(--chalk);
+    border-radius: 100px;
     text-decoration: none;
-    font-size: 0.95em;
-    transition: background 0.15s, border-color 0.15s;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 0.92em;
+    letter-spacing: 0.02em;
+    box-shadow: 2px 3px 0 rgba(0,0,0,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
   }
   header .nav-link:hover {
-    background: rgba(255,255,255,0.28);
-    border-color: rgba(255,255,255,0.6);
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 4px 0 rgba(0,0,0,0.45);
   }
-  main { padding: 40px 56px 56px 56px; }
+
+  /* Content body */
+  main { padding: 48px 56px 56px; }
   h1, h2, h3, h4, h5, h6 {
-    color: #2c3e50;
-    margin-top: 1.6em;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    color: var(--ink);
+    margin-top: 1.8em;
     margin-bottom: 0.5em;
-    line-height: 1.25;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-weight: 800;
   }
-  /* The first heading inside <main> shouldn't have a top margin — it would
-     duplicate the header's spacing. */
   main > h1:first-child, main > h2:first-child { margin-top: 0; }
-  h1 { font-size: 2em; border-bottom: 2px solid #e0e4e8; padding-bottom: 8px; }
-  h2 { font-size: 1.55em; border-bottom: 1px solid #e0e4e8; padding-bottom: 6px; }
-  h3 { font-size: 1.2em; }
-  h4 { font-size: 1.05em; color: #455a64; }
-  p { margin: 0.7em 0; }
+  h1 {
+    font-size: 2em;
+    border-bottom: 2px solid rgba(40,20,10,0.2);
+    padding-bottom: 8px;
+  }
+  h2 {
+    font-size: 1.55em;
+    padding-bottom: 6px;
+    border-bottom: 2px dashed rgba(40,20,10,0.2);
+  }
+  h3 {
+    font-size: 1.18em;
+    color: var(--ink);
+    font-weight: 700;
+  }
+  h3 em { font-style: italic; font-weight: 500; color: var(--raspberry); }
+  h4 {
+    font-size: 1rem;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    font-family: 'Geist Mono', monospace;
+  }
+
+  p { margin: 0.7em 0; color: var(--ink); }
   ul, ol { margin: 0.7em 0 0.7em 1.6em; }
   li { margin: 0.3em 0; }
-  a { color: #3498db; text-decoration: none; }
-  a:hover { text-decoration: underline; }
+  a { color: var(--cobalt); text-decoration: none; border-bottom: 1px solid rgba(44,102,207,0.4); }
+  a:hover { border-bottom-color: var(--cobalt); }
+
   hr {
     border: none;
-    border-top: 1px solid #e0e4e8;
-    margin: 2em 0;
+    border-top: 1px dashed rgba(40,20,10,0.25);
+    margin: 2.2em 0;
   }
   blockquote {
-    border-left: 4px solid #3498db;
-    background: #f5f8fa;
-    padding: 12px 18px;
-    margin: 1em 0;
+    background: white;
+    border-left: 4px solid var(--marigold);
+    padding: 14px 20px;
+    margin: 1.2em 0;
     border-radius: 4px;
-    color: #455a64;
+    box-shadow: 2px 3px 0 var(--ink), 2px 3px 12px rgba(40,20,10,0.12);
+    color: var(--ink);
+    font-size: 0.95em;
   }
   code {
-    background: #f3f5f7;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-family: 'SF Mono', Menlo, Consolas, monospace;
-    font-size: 0.92em;
-    color: #c0392b;
+    background: rgba(40,20,10,0.08);
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.85em;
+    color: var(--raspberry);
   }
   table {
     width: 100%;
     border-collapse: collapse;
-    margin: 1em 0;
-    font-size: 0.94em;
+    margin: 1.2em 0;
+    font-size: 0.92em;
+    background: white;
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 3px 4px 0 var(--ink);
   }
   th, td {
-    padding: 8px 12px;
-    border: 1px solid #e0e4e8;
+    padding: 10px 14px;
+    border: 1px solid rgba(40,20,10,0.12);
     text-align: left;
     vertical-align: top;
   }
   th {
-    background: #f5f8fa;
-    font-weight: 600;
+    background: var(--ink);
+    color: var(--chalk);
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    font-size: 0.88em;
   }
-  tbody tr:nth-child(even) { background: #fafbfc; }
-  /* Make the table-of-contents list section flow nicely */
-  ol li { margin: 0.25em 0; }
-  /* Anchor offset so headings aren't hidden under any sticky elements */
+  tbody tr:nth-child(odd) { background: rgba(248,240,220,0.4); }
+
+  ol.toc-list, ul.toc-list { padding-left: 1.4em; }
+  /* Anchor offset */
   h1[id], h2[id], h3[id] { scroll-margin-top: 16px; }
+
   /* Print friendliness */
   @media print {
     body { background: white; }
+    body::before { display: none; }
     .page { box-shadow: none; }
     header .nav-links { display: none; }
   }
   /* Mobile */
   @media (max-width: 720px) {
-    main { padding: 24px 20px 40px; }
-    header { padding: 28px 20px; }
-    header h1 { font-size: 1.8em; }
+    main { padding: 28px 24px 40px; }
+    header { padding: 32px 24px 28px; }
+    header h1 { font-size: 1.9em; }
   }
 </style>
 </head>
 <body>
 <div class="page">
   <header>
-    <h1>🧗 All-In Ascent</h1>
-    <p>Alpine Indoors Rock Climbing Board Game — Official Rulebook</p>
+    <h1>All-In <em>Ascent.</em></h1>
+    <p class="eyebrow">Alpine Indoors · Official Rulebook</p>
     <div class="nav-links">
-      <a class="nav-link" href="index.html">← Back to Game</a>
+      <a class="nav-link" href="index.html">Back to Game</a>
       <a class="nav-link" href="#table-of-contents">Table of Contents</a>
     </div>
   </header>
   <main>
-<h1 id="all-in-ascent">🧗 ALL-IN ASCENT</h1>
+<h1 id="all-in-ascent">ALL-IN ASCENT</h1>
 <h2 id="alpine-indoors-rock-climbing-board-game">Alpine Indoors Rock Climbing Board Game</h2>
-<h3 id="official-rulebook-engine-v031">Official Rulebook — Engine v0.3.1</h3>
+<h3 id="official-rulebook-engine-v040">Official Rulebook — Engine v0.4.0</h3>
 <hr>
 <h2 id="table-of-contents">TABLE OF CONTENTS</h2>
 <ol><li><a href="#game-overview">Game Overview</a></li><li><a href="#game-components">Game Components</a></li><li><a href="#setup">Setup</a></li><li><a href="#objective">Objective</a></li><li><a href="#characters">Characters</a></li><li><a href="#understanding-your-character">Understanding Your Character</a></li><li><a href="#how-to-play">How to Play</a></li><li><a href="#actions-you-can-take">Actions You Can Take</a></li><li><a href="#climbing-routes">Climbing Routes</a></li><li><a href="#route-specialty-tags">Route Specialty Tags</a></li><li><a href="#the-dice-system">The Dice System</a></li><li><a href="#training">Training</a></li><li><a href="#the-gear-shop">The Gear Shop</a></li><li><a href="#resting">Resting</a></li><li><a href="#leveling-up">Leveling Up</a></li><li><a href="#route-clearing-system">Route Clearing System</a></li><li><a href="#special-rules">Special Rules</a></li><li><a href="#winning-the-game">Winning the Game</a></li><li><a href="#strategy-tips">Strategy Tips</a></li><li><a href="#quick-reference">Quick Reference</a></li></ol>
 <hr>
 <h2 id="game-overview">GAME OVERVIEW</h2>
-<p>Welcome to <strong>All-In Ascent</strong>, where you step into the climbing shoes of an aspiring rock climber at Alpine Indoors climbing gym! Over multiple rounds, you'll attempt challenging routes, train your body, purchase essential gear, and level up your character from beginner to elite climber.</p>
-<p><strong>Players:</strong> 1–4 <strong>Win condition:</strong> First player to complete all 3 Milestone Routes <strong>Maximum game length:</strong> 45 rounds (game ends with no winner if no one finishes by then) <strong>Complexity:</strong> Medium</p>
+<p>Welcome to<strong>All-In Ascent</strong>, where you step into the climbing shoes of an aspiring rock climber at Alpine Indoors climbing gym! Over multiple rounds, you'll attempt challenging routes, train your body, purchase essential gear, and level up your character from beginner to elite climber.</p>
+<p><strong>Players:</strong>1–4 <strong>Win condition:</strong>First player to complete all 3 Milestone Routes <strong>Maximum game length:</strong>45 rounds (game ends with no winner if no one finishes by then) <strong>Complexity:</strong>Medium</p>
 <hr>
 <h2 id="game-components">GAME COMPONENTS</h2>
-<ul><li><strong>5 unique characters</strong>, each with one special ability</li><li><strong>72 route cards</strong> across three climbing areas:</li></ul>
-<p>  - 🪨 <strong>Bouldering</strong> (26 routes, V0–V12)   - 🧗 <strong>Top Rope</strong> (23 routes, 5.6–5.13c)   - ⛰️ <strong>Lead Climbing</strong> (23 routes, 5.8–5.14a)</p>
-<ul><li>Each route may carry one <strong>specialty tag</strong>: Pinch/Crimp, Toe/Heel Hook, Roof/Sloper, Dynamic, or untagged</li><li><strong>4 core stats</strong>: Strength 💪, Technique 🎯, Focus 🧠, Flexibility 🤸</li><li><strong>Endurance system</strong> 💨 — separate stamina pool that drains with effort</li><li><strong>4 training equipment cards</strong> — one per stat</li><li><strong>18 gear cards</strong> in the shop (4 access cards + 14 permanent-passive cards)</li><li><strong>2 six-sided dice</strong> 🎲🎲 (more on some climbs — see Dice System)</li><li><strong>3 Milestone Route cards</strong> drawn at game start: one Beginner, one Intermediate, one Expert</li><li><strong>Route Clearing Token</strong> (rotates 0 → 1 → 2 → 0)</li><li><strong>Belayer counter</strong> (starts at 1, max 3)</li><li><strong>XP and Level trackers</strong> per player</li></ul>
+<p>-<strong>5 unique characters</strong>, each with one special ability -<strong>72 route cards</strong>across three climbing areas: -<strong>Bouldering</strong>(26 routes, V0–V12) -<strong>Top Rope</strong>(23 routes, 5.6–5.13c) -<strong>Lead Climbing</strong>(23 routes, 5.8–5.14a)</p>
+<ul><li>Each route may carry one<strong>specialty tag</strong>: Pinch/Crimp, Toe/Heel Hook, Roof/Sloper, Dynamic, or untagged</li></ul>
+<p>-<strong>4 core stats</strong>: Strength, Technique, Focus, Flexibility -<strong>Endurance system</strong>— separate stamina pool that drains with effort -<strong>4 training equipment cards</strong>— one per stat -<strong>18 gear cards</strong>in the shop (4 access cards + 14 permanent-passive cards) -<strong>2 six-sided dice</strong>(more on some climbs — see Dice System) -<strong>3 Milestone Route cards</strong>drawn at game start: one Beginner, one Intermediate, one Expert -<strong>Route Clearing Token</strong>(rotates 0 → 1 → 2 → 0) -<strong>Belayer counter</strong>(starts at 1, max 3) -<strong>XP and Level trackers</strong>per player</p>
 <hr>
 <h2 id="setup">SETUP</h2>
-<ol><li>Choose the number of players (1–4).</li><li>Each player picks a character (no duplicates allowed).</li><li><strong>Three Milestone Routes are randomly drawn</strong> from the route deck:</li></ol>
-<p>   - One <strong>Beginner</strong> route (V0–V2 / 5.6–5.8 / Lead 5.8–5.9)    - One <strong>Intermediate</strong> route (V3–V7 / 5.9–5.11c / Lead 5.10a–5.11c)    - One <strong>Expert</strong> route (V8–V12 / 5.12a–5.13c / Lead 5.12a–5.14a)</p>
-<ol><li>Deal <strong>5 random routes</strong> into each climbing area (Bouldering, Top Rope, Lead).</li><li>Deal <strong>3 random non-access gear cards</strong> into the gear shop. The 4 access cards (Harness, Belay Device, Locking Carabiner, Lead Rope) are always available for purchase.</li><li>Place the <strong>Route Clearing Token</strong> at Position 0.</li><li>Set the <strong>Belayer Counter</strong> to 1.</li><li>Each player begins with:</li></ol>
-<p>   - Level 1    - 0 XP    - 10 Time Units    - Character-specific starting stats and endurance    - No equipment    - 0/3 Milestones complete</p>
+<ol><li>Choose the number of players (1–4).</li><li>Each player picks a character (no duplicates allowed).</li></ol>
+<p>3.<strong>Three Milestone Routes are randomly drawn</strong>from the route deck, with two constraints:</p>
+<ul><li>One<strong>Beginner</strong>route (V0–V2 / 5.6–5.8 / Lead 5.8–5.9)</li><li>One<strong>Intermediate</strong>route (V3–V7 / 5.9–5.11c / Lead 5.10a–5.11c)</li><li>One<strong>Expert</strong>route (V8–V12 / 5.12a–5.13c / Lead 5.12a–5.14a)</li><li><strong>All three milestones must come from DIFFERENT climbing areas</strong> (one Bouldering, one Top Rope, one Lead — in any combination). Sort the route deck by tier, then draw cards in order: Beginner first, then Intermediate from a different area, then Expert from the third remaining area. If a drawn card matches an already-taken area, set it aside and draw again; reshuffle set-asides back at the end.</li></ul>
+<ol><li>Deal<strong>5 random routes</strong>into each climbing area (Bouldering, Top Rope, Lead).</li><li>Deal<strong>3 random non-access gear cards</strong>into the gear shop. The 4 access cards (Harness, Belay Device, Locking Carabiner, Lead Rope) are always available for purchase.</li><li>Place the<strong>Route Clearing Token</strong>at Position 0.</li><li>Set the<strong>Belayer Counter</strong>to 1.</li><li>Each player begins with:</li></ol>
+<ul><li>Level 1</li><li>0 XP</li><li>10 Time Units</li><li>Character-specific starting stats and endurance</li><li>No equipment</li><li>0/3 Milestones complete</li></ul>
 <hr>
 <h2 id="objective">OBJECTIVE</h2>
 <p><strong>Be the FIRST player to successfully complete all 3 Milestone Routes — and WIN.</strong></p>
 <p>If no player has all three by the end of round 45, the game ends with no winner. Pace your investments accordingly.</p>
 <hr>
 <h2 id="characters">CHARACTERS</h2>
-<p>There are <strong>5 playable characters</strong>. Each has a unique stat profile, a unique passive ability, and a different optimal strategy.</p>
-<h3 id="the-technician-precision-specialist">🎯 The Technician (Precision Specialist)</h3>
-<p>A movement artist who reads sequences perfectly and wastes no energy on inefficient beta.</p>
-<ul><li><strong>Starting stats:</strong> Str 12 / Tech 26 / Focus 18 / Flex 14</li><li><strong>Starting endurance:</strong> 100</li><li><strong>Growth per level:</strong> +1.5 Str / +4.5 Tech / +2.5 Focus / +2 Flex / +5 endurance</li><li><strong>Passive — Perfect Beta:</strong> All nerf dice on every climb are negated (treated as 0). All stat requirements are reduced by 5. Climbs cost +1 extra time.</li></ul>
-<h3 id="the-sprinter-speed-climber">⚡ The Sprinter (Speed Climber)</h3>
-<p>Climbs explosively with dynamic movements. Burns bright but fast.</p>
-<ul><li><strong>Starting stats:</strong> Str 22 / Tech 14 / Focus 12 / Flex 16</li><li><strong>Starting endurance:</strong> 85</li><li><strong>Growth per level:</strong> +4 Str / +2 Tech / +1.5 Focus / +2.5 Flex / +3 endurance</li><li><strong>Passive — Flash Speed:</strong> Time cost of every climb is reduced by 2 (minimum 1), but successful climbs grant only 50% of normal XP. Rolls one extra d6 nerf die applied to Focus on every climb.</li></ul>
-<h3 id="the-iron-lung-endurance-athlete">💨 The Iron Lung (Endurance Athlete)</h3>
-<p>Tackles challenges head-on with determination.</p>
-<ul><li><strong>Starting stats:</strong> Str 16 / Tech 17 / Focus 19 / Flex 14</li><li><strong>Starting endurance:</strong> 120</li><li><strong>Growth per level:</strong> +2.5 Str / +2.5 Tech / +3 Focus / +2 Flex / +8 endurance</li><li><strong>Passive — Relentless:</strong> On a failed climb, earn 50% more XP than the base fail XP. Lose an extra 5 endurance on every failure.</li></ul>
-<h3 id="the-free-solo-risk-taker">🎲 The Free Solo (Risk Taker)</h3>
-<p>Dares the impossible — but only when the stats are bulletproof.</p>
-<ul><li><strong>Starting stats:</strong> Str 11 / Tech 23 / Focus 20 / Flex 16</li><li><strong>Starting endurance:</strong> 100</li><li><strong>Growth per level:</strong> +1.5 Str / +4 Tech / +3 Focus / +2.5 Flex / +6 endurance</li><li><strong>Passive — Life or Die:</strong> Can attempt Top Rope and Lead routes WITHOUT owning the access cards (Harness, Belay Device, Locking Carabiner, Lead Rope). All dice roll effects are negated (no luck swing). <strong>Can ONLY attempt climbs where your effective stats — base + training + permanent gear bonuses — already meet every requirement.</strong></li></ul>
-<h3 id="the-route-reader-problem-solver">📖 The Route Reader (Problem Solver)</h3>
-<p>Studies routes meticulously before attempting. Knowledge is power.</p>
-<ul><li><strong>Starting stats:</strong> Str 15 / Tech 19 / Focus 22 / Flex 14</li><li><strong>Starting endurance:</strong> 110</li><li><strong>Growth per level:</strong> +2 Str / +3.5 Tech / +4 Focus / +1.5 Flex / +7 endurance</li><li><strong>Passive — Versatility:</strong> When you Rest, you gain a <strong>Beta Boost</strong> (+3 to all stats on your next climb). On any climb, <strong>only 3 of your 4 stats need to meet the requirement</strong> to succeed. Once per round you may <strong>redistribute up to 10 stat points</strong> between any two attributes (lasts until end of round).</li></ul>
+<p>There are<strong>5 playable characters</strong>. Each has a unique stat profile, a unique passive ability, and a different optimal strategy.</p>
+<h3 id="the-technician-precision-specialist">The Technician (Precision Specialist)</h3>
+<p>A movement artist who reads sequences perfectly and wastes no energy on inefficient beta. -<strong>Starting stats:</strong>Str 12 / Tech 26 / Focus 18 / Flex 14 -<strong>Starting endurance:</strong>100 -<strong>Growth per level:</strong>+1.5 Str / +4.5 Tech / +2.5 Focus / +2 Flex / +5 endurance -<strong>Passive — Perfect Beta:</strong>All nerf dice on every climb are negated (treated as 0). All stat requirements are reduced by 5. Climbs cost +1 extra time.</p>
+<h3 id="the-sprinter-speed-climber">The Sprinter (Speed Climber)</h3>
+<p>Climbs explosively with dynamic movements. Burns bright but fast. -<strong>Starting stats:</strong>Str 22 / Tech 14 / Focus 12 / Flex 16 -<strong>Starting endurance:</strong>85 -<strong>Growth per level:</strong>+4 Str / +2 Tech / +1.5 Focus / +2.5 Flex / +3 endurance -<strong>Passive — Flash Speed:</strong>Time cost of every climb is reduced by 2 (minimum 1), but successful climbs grant only 50% of normal XP. Rolls one extra d6 nerf die applied to Focus on every climb.</p>
+<h3 id="the-iron-lung-endurance-athlete">The Iron Lung (Endurance Athlete)</h3>
+<p>Tackles challenges head-on with determination. -<strong>Starting stats:</strong>Str 16 / Tech 17 / Focus 19 / Flex 14 -<strong>Starting endurance:</strong>120 -<strong>Growth per level:</strong>+2.5 Str / +2.5 Tech / +3 Focus / +2 Flex / +8 endurance -<strong>Passive — Relentless:</strong>On a failed climb, earn 50% more XP than the base fail XP. Lose an extra 5 endurance on every failure.</p>
+<h3 id="the-free-solo-risk-taker">The Free Solo (Risk Taker)</h3>
+<p>Dares the impossible — but only when the stats are bulletproof. -<strong>Starting stats:</strong>Str 11 / Tech 23 / Focus 20 / Flex 16 -<strong>Starting endurance:</strong>100 -<strong>Growth per level:</strong>+1.5 Str / +4 Tech / +3 Focus / +2.5 Flex / +6 endurance -<strong>Passive — Life or Die:</strong>Can attempt Top Rope and Lead routes WITHOUT owning the access cards (Harness, Belay Device, Locking Carabiner, Lead Rope). All dice roll effects are negated (no luck swing).<strong>Can ONLY attempt climbs where your effective stats — base + training + permanent gear bonuses — already meet every requirement.</strong></p>
+<h3 id="the-route-reader-problem-solver">The Route Reader (Problem Solver)</h3>
+<p>Studies routes meticulously before attempting. Knowledge is power. -<strong>Starting stats:</strong>Str 15 / Tech 19 / Focus 22 / Flex 14 -<strong>Starting endurance:</strong>110 -<strong>Growth per level:</strong>+2 Str / +3.5 Tech / +4 Focus / +1.5 Flex / +7 endurance -<strong>Passive — Versatility:</strong>When you Rest, you gain a<strong>Beta Boost</strong>(+3 to all stats on your next climb). On any climb,<strong>only 3 of your 4 stats need to meet the requirement</strong>to succeed. Once per round you may<strong>redistribute up to 10 stat points</strong>between any two attributes (lasts until end of round).</p>
 <hr>
 <h2 id="understanding-your-character">UNDERSTANDING YOUR CHARACTER</h2>
 <h3 id="the-four-core-stats">The Four Core Stats</h3>
-<ul><li><strong>💪 Strength</strong> — Power moves, overhang routes, pulling</li><li><strong>🎯 Technique</strong> — Footwork, body positioning, slab climbing, precision</li><li><strong>🧠 Focus</strong> — Mental control, lead climbing, complex sequences</li><li><strong>🤸 Flexibility</strong> — Reach, high steps, body positioning</li></ul>
-<h3 id="endurance">💨 Endurance</h3>
-<p>A separate pool from XP/level. Every climb, train, and rest action moves your endurance.</p>
-<ul><li><strong>Current Endurance:</strong> how much you have right now</li><li><strong>Max Endurance:</strong> the cap (grows when you level up; gear may also raise it)</li></ul>
-<h3 id="time-units">⏰ Time Units</h3>
-<p>Each round, every player has <strong>10 Time Units</strong> (+1 if you own Approach Shoes). When you run out of time, your turn ends; the round continues with other players.</p>
+<p>-<strong>Strength</strong>— Power moves, overhang routes, pulling -<strong>Technique</strong>— Footwork, body positioning, slab climbing, precision -<strong>Focus</strong>— Mental control, lead climbing, complex sequences -<strong>Flexibility</strong>— Reach, high steps, body positioning</p>
+<h3 id="endurance">Endurance</h3>
+<p>A separate pool from XP/level. Every climb, train, and rest action moves your endurance. -<strong>Current Endurance:</strong>how much you have right now -<strong>Max Endurance:</strong>the cap (grows when you level up; gear may also raise it)</p>
+<h3 id="time-units">Time Units</h3>
+<p>Each round, every player has<strong>10 Time Units</strong>(+1 if you own Approach Shoes). When you run out of time, your turn ends; the round continues with other players.</p>
 <table>
 <thead><tr><th>Action</th><th>Time cost</th></tr></thead>
 <tbody><tr><td>Climb (typical)</td><td>2–8</td></tr>
 <tr><td>Climb (with Sprinter passive)</td><td>1–6</td></tr>
 <tr><td>Train</td><td>2</td></tr>
 <tr><td>Rest</td><td>1</td></tr>
-<tr><td>Buy gear</td><td>1 (free with Approach Shoes? <strong>No</strong> — Approach Shoes adds extra time at round start, not at shop)</td></tr></tbody>
+<tr><td>Buy gear</td><td>1 (free with Approach Shoes?<strong>No</strong>— Approach Shoes adds extra time at round start, not at shop)</td></tr></tbody>
 </table>
-<blockquote><strong>Note:</strong> there is no per-round purchase limit on gear. You can buy as many items as you can afford if you have time.</blockquote>
+<blockquote><strong>Note:</strong>there is no per-round purchase limit on gear. You can buy as many items as you can afford if you have time.</blockquote>
 <hr>
 <h2 id="how-to-play">HOW TO PLAY</h2>
-<p>The game proceeds in <strong>rounds</strong>. Within a round:</p>
-<ol><li><strong>Player turns advance by time-remaining priority.</strong> The player with the most time remaining acts next. Ties resolve by player order. When a player has 0 time left, they're skipped.</li><li><strong>A round ends</strong> when every player has 0 time remaining (or has explicitly chosen End Turn).</li><li><strong>At round end:</strong></li></ol>
-<p>   - The Route Clearing Token rotates: 0 → 1 → 2 → 0    - All routes in the cleared area are replaced with new random routes    - Each player's time units reset to 10 (+1 if they own Approach Shoes)    - <strong>Endurance carries over</strong> between rounds (no automatic refill)    - <strong>Training bonuses PERSIST across rounds</strong> (they accumulate over the whole game)    - Once-per-round abilities (e.g. Route Reader's stat redistribute) reset    - At round 5: the 2nd belayer unlocks. At round 12: the 3rd belayer unlocks.</p>
+<p>The game proceeds in<strong>rounds</strong>. Within a round:</p>
+<p>1.<strong>Player turns advance by time-remaining priority.</strong>The player with the most time remaining acts next. Ties resolve by player order. When a player has 0 time left, they're skipped. 2.<strong>A round ends</strong>when every player has 0 time remaining (or has explicitly chosen End Turn). 3.<strong>At round end:</strong></p>
+<ul><li>The Route Clearing Token rotates: 0 → 1 → 2 → 0</li><li>All routes in the cleared area are replaced with new random routes</li><li>Each player's time units reset to 10 (+1 if they own Approach Shoes)</li></ul>
+<p>-<strong>Endurance carries over</strong>between rounds (no automatic refill) -<strong>Training bonuses PERSIST across rounds</strong>(they accumulate over the whole game)</p>
+<ul><li>Once-per-round abilities (e.g. Route Reader's stat redistribute) reset</li><li>At round 5: the 2nd belayer unlocks. At round 12: the 3rd belayer unlocks.</li></ul>
 <p>The game ends as soon as any one player completes their 3rd milestone, OR at the end of round 45 with no winner.</p>
 <hr>
 <h2 id="actions-you-can-take">ACTIONS YOU CAN TAKE</h2>
 <p>On your turn you may take any of these actions, repeatedly, in any order, as long as you have the resources:</p>
-<ul><li>🧗 <strong>Climb a route</strong> — see <a href="#climbing-routes">Climbing Routes</a></li><li>⭐ <strong>Attempt a Milestone</strong> — same mechanic as climb, but on the milestone routes (no per-round attempt limit)</li><li>💪 <strong>Train</strong> — see <a href="#training">Training</a></li><li>🏪 <strong>Buy gear</strong> — see <a href="#the-gear-shop">The Gear Shop</a></li><li>😌 <strong>Rest</strong> — see <a href="#resting">Resting</a></li><li>⏭️ <strong>End your turn</strong> — voluntarily forfeit any remaining time units this round</li></ul>
+<p>-<strong>Climb a route</strong>— see <a href="#climbing-routes">Climbing Routes</a> -<strong>Attempt a Milestone</strong>— same mechanic as climb, but on the milestone routes (no per-round attempt limit) -<strong>Train</strong>— see <a href="#training">Training</a> -<strong>Buy gear</strong>— see <a href="#the-gear-shop">The Gear Shop</a> -<strong>Rest</strong>— see <a href="#resting">Resting</a> -<strong>End your turn</strong>— voluntarily forfeit any remaining time units this round</p>
 <hr>
 <h2 id="climbing-routes">CLIMBING ROUTES</h2>
-<h3 id="bouldering-v0v12">🪨 Bouldering (V0–V12)</h3>
-<p>Short, powerful problems without ropes.</p>
-<ul><li><strong>No equipment required</strong> to attempt. Always accessible to all players.</li><li>5 routes available at any time, drawn from the bouldering deck (26 cards total)</li><li>Time cost: 2–6. Endurance cost: 12–100. XP rewards: 25–100 success / 8–95 fail</li></ul>
-<h3 id="top-rope-56513c">🧗 Top Rope (5.6–5.13c)</h3>
-<p>Roped climbing with a belay from above.</p>
-<ul><li><strong>Required equipment:</strong> Harness AND Belay Device</li><li><strong>Belayer-gated:</strong> at most N players may have status "in topRope" at the same time, where N = belayer count (1 → 2 → 3)</li><li>5 routes available at a time (23 in deck)</li><li>Time cost: 3–7. Endurance cost: 15–100. XP rewards: 30–100 success / 10–88 fail</li></ul>
-<h3 id="lead-climbing-58514a">⛰️ Lead Climbing (5.8–5.14a)</h3>
-<p>The highest-stakes discipline — clip the rope as you ascend.</p>
-<ul><li><strong>Required equipment:</strong> Harness + Belay Device + Locking Carabiner + Lead Rope</li><li><strong>Belayer-gated</strong> (same counter as Top Rope)</li><li>5 routes available at a time (23 in deck)</li><li>Time cost: 4–8. Endurance cost: 25–100. XP rewards: 40–100 success / 15–98 fail</li></ul>
+<h3 id="bouldering-v0v12">Bouldering (V0–V12)</h3>
+<p>Short, powerful problems without ropes. -<strong>No equipment required</strong>to attempt. Always accessible to all players.</p>
+<ul><li>5 routes available at any time, drawn from the bouldering deck (26 cards total)</li><li>Time cost: 2–6. Endurance cost: 12–100. XP rewards: 25–100 success / 8–95 fail</li></ul>
+<h3 id="top-rope-56513c">Top Rope (5.6–5.13c)</h3>
+<p>Roped climbing with a belay from above. -<strong>Required equipment:</strong>Harness AND Belay Device -<strong>Belayer-gated:</strong>at most N players may have status "in topRope" at the same time, where N = belayer count (1 → 2 → 3)</p>
+<ul><li>5 routes available at a time (23 in deck)</li><li>Time cost: 3–7. Endurance cost: 15–100. XP rewards: 30–100 success / 10–88 fail</li></ul>
+<h3 id="lead-climbing-58514a">Lead Climbing (5.8–5.14a)</h3>
+<p>The highest-stakes discipline — clip the rope as you ascend. -<strong>Required equipment:</strong>Harness + Belay Device + Locking Carabiner + Lead Rope -<strong>Belayer-gated</strong>(same counter as Top Rope)</p>
+<ul><li>5 routes available at a time (23 in deck)</li><li>Time cost: 4–8. Endurance cost: 25–100. XP rewards: 40–100 success / 15–98 fail</li></ul>
 <h3 id="free-solo-exception">Free Solo Exception</h3>
 <p>The Free Solo character bypasses ALL access-card requirements for Top Rope and Lead — they can attempt those routes from turn 1 without owning Harness, Belay Device, Locking Carabiner, or Lead Rope. The trade-off is severe: see the character description above.</p>
 <hr>
 <h2 id="route-specialty-tags">ROUTE SPECIALTY TAGS</h2>
-<p>Every route is <strong>either tagged or untagged</strong>. The four specialty tags are:</p>
+<p>Every route is<strong>either tagged or untagged</strong>. The four specialty tags are:</p>
 <table>
 <thead><tr><th>Tag</th><th>Theme</th><th>Routes in deck</th></tr></thead>
 <tbody><tr><td><strong>Pinch/Crimp</strong></td><td>Finger-intensive holds</td><td>16 (22%)</td></tr>
@@ -229,38 +355,34 @@
 <tr><td><strong>Roof/Sloper</strong></td><td>Body tension, gymnastic</td><td>8 (11%)</td></tr>
 <tr><td><strong>(untagged)</strong></td><td>Pure stat checks, varied</td><td>25 (35%)</td></tr></tbody>
 </table>
-<p>Tags do nothing on their own. They're a hook for <strong>gear cards</strong> — four specialty gear cards each target one tag and grant a specific advantage on tagged routes only. See <a href="#the-gear-shop">The Gear Shop</a> for details.</p>
-<blockquote><strong>Strategic note:</strong> when the milestone routes are revealed at game start, check their tags. If two milestones share a tag, the matching specialty card becomes especially valuable.</blockquote>
+<p>Tags do nothing on their own. They're a hook for<strong>gear cards</strong>— four specialty gear cards each target one tag and grant a specific advantage on tagged routes only. See <a href="#the-gear-shop">The Gear Shop</a> for details.</p>
+<blockquote><strong>Strategic note:</strong>when the milestone routes are revealed at game start, check their tags. If two milestones share a tag, the matching specialty card becomes especially valuable.</blockquote>
 <hr>
 <h2 id="the-dice-system">THE DICE SYSTEM</h2>
 <h3 id="how-a-climb-works">How a climb works</h3>
-<ol><li><strong>Pay costs first</strong> — the time and endurance cost are deducted whether you succeed or fail.</li><li><strong>Look up the route's <code>rollEffect</code></strong> — a list of dice modifiers, e.g. <code>[{stat: 'technique', modifier: -1}, {stat: 'strength', modifier: +1}]</code>.</li><li><strong>Roll dice</strong> — number of dice = max(2, number of effects in <code>rollEffect</code>). The Sprinter rolls one ADDITIONAL die targeting Focus with a +1 (nerf) modifier on every climb.</li><li><strong>Apply each die to its stat:</strong></li></ol>
-<p>   - Modifier <strong>−1</strong> (buff, green): <strong>subtract</strong> the die value from the stat requirement (easier!)    - Modifier <strong>+1</strong> (nerf, red): <strong>add</strong> the die value to the stat requirement (harder!)    - Modifier <strong>0</strong>: no change</p>
-<ol><li><strong>Compute your effective stats:</strong></li></ol>
-<p>   <code>effective = base stat + training bonus + permanent gear bonus + per-route gear bonus</code></p>
-<ol><li><strong>Apply character-ability adjustments</strong> (Route Reader's Beta Boost, Technician's −5 blanket, etc.).</li><li><strong>Compare:</strong> does each effective stat meet or exceed each modified requirement?</li></ol>
-<p>   - <strong>Success</strong> if all 4 stats pass (3 of 4 for Route Reader)    - <strong>Failure</strong> otherwise</p>
-<ol><li><strong>Earn XP</strong> — success XP if you cleared, fail XP if you didn't. Iron Lung adds +50% to fail XP. Sprinter halves success XP.</li></ol>
+<p>1.<strong>Pay costs first</strong>— the time and endurance cost are deducted whether you succeed or fail. 2.<strong>Look up the route's <code>rollEffect</code></strong>— a list of dice modifiers, e.g. <code>[{stat: 'technique', modifier: -1}, {stat: 'strength', modifier: +1}]</code>. 3.<strong>Roll dice</strong>— number of dice = max(2, number of effects in <code>rollEffect</code>). The Sprinter rolls one ADDITIONAL die targeting Focus with a +1 (nerf) modifier on every climb. 4.<strong>Apply each die to its stat:</strong></p>
+<ul><li>Modifier<strong>−1</strong>(buff, green):<strong>subtract</strong>the die value from the stat requirement (easier!)</li><li>Modifier<strong>+1</strong>(nerf, red):<strong>add</strong>the die value to the stat requirement (harder!)</li><li>Modifier<strong>0</strong>: no change</li></ul>
+<p>5.<strong>Compute your effective stats:</strong> <code>effective = base stat + training bonus + permanent gear bonus + per-route gear bonus</code> 6.<strong>Apply character-ability adjustments</strong>(Route Reader's Beta Boost, Technician's −5 blanket, etc.). 7.<strong>Compare:</strong>does each effective stat meet or exceed each modified requirement? -<strong>Success</strong>if all 4 stats pass (3 of 4 for Route Reader) -<strong>Failure</strong>otherwise 8.<strong>Earn XP</strong>— success XP if you cleared, fail XP if you didn't. Iron Lung adds +50% to fail XP. Sprinter halves success XP.</p>
 <h3 id="character-specific-dice-rules">Character-specific dice rules</h3>
-<ul><li><strong>Technician:</strong> Every nerf die (+1 modifier) is treated as a 0. Every requirement is reduced by 5 (floored at 0).</li><li><strong>Sprinter:</strong> Adds an extra Focus-nerf die.</li><li><strong>Free Solo:</strong> Every dice modifier is treated as 0. Effectively no luck swing — but Free Solo can only attempt climbs where they already pass on stats alone.</li><li><strong>Route Reader:</strong> Only 3 of 4 stats need to pass.</li></ul>
+<p>-<strong>Technician:</strong>Every nerf die (+1 modifier) is treated as a 0. Every requirement is reduced by 5 (floored at 0). -<strong>Sprinter:</strong>Adds an extra Focus-nerf die. -<strong>Free Solo:</strong>Every dice modifier is treated as 0. Effectively no luck swing — but Free Solo can only attempt climbs where they already pass on stats alone. -<strong>Route Reader:</strong>Only 3 of 4 stats need to pass.</p>
 <h3 id="one-attempt-per-round-rule-regular-routes-only">One-attempt-per-round rule (regular routes only)</h3>
-<p>You can only attempt each specific regular route once per round. After a success or failure, that route is "marked attempted" and you must wait until next round to retry — or the route may be cleared by then. <strong>Milestone routes are NOT subject to this rule</strong> — you may retry them as many times as you like.</p>
+<p>You can only attempt each specific regular route once per round. After a success or failure, that route is "marked attempted" and you must wait until next round to retry — or the route may be cleared by then.<strong>Milestone routes are NOT subject to this rule</strong>— you may retry them as many times as you like.</p>
 <hr>
 <h2 id="training">TRAINING</h2>
-<p>The training area has 4 stations. Training grants <strong>permanent bonuses</strong> to a stat that <strong>accumulate over the entire game</strong> (not just one round).</p>
+<p>The training area has 4 stations. Training grants<strong>permanent bonuses</strong>to a stat that<strong>accumulate over the entire game</strong>(not just one round).</p>
 <table>
 <thead><tr><th>Station</th><th>Boosts</th><th>Time</th><th>Endurance</th><th>Bonus</th></tr></thead>
-<tbody><tr><td>💪 Campus Board</td><td>Strength</td><td>2</td><td>15</td><td>+5</td></tr>
-<tr><td>🎯 Continuous MoonBoard</td><td>Technique</td><td>2</td><td>12</td><td>+5</td></tr>
-<tr><td>🧠 Grip Board</td><td>Focus</td><td>2</td><td>10</td><td>+5</td></tr>
-<tr><td>🤸 Balance and Core</td><td>Flexibility</td><td>2</td><td>8</td><td>+5</td></tr></tbody>
+<tbody><tr><td>Campus Board</td><td>Strength</td><td>2</td><td>15</td><td>+5</td></tr>
+<tr><td>Continuous MoonBoard</td><td>Technique</td><td>2</td><td>12</td><td>+5</td></tr>
+<tr><td>Grip Board</td><td>Focus</td><td>2</td><td>10</td><td>+5</td></tr>
+<tr><td>Balance and Core</td><td>Flexibility</td><td>2</td><td>8</td><td>+5</td></tr></tbody>
 </table>
-<ul><li><strong>Capacity:</strong> one player per station per round. If another player took a station this round, you can't use it until next round.</li><li><strong>Stacking:</strong> training bonuses accumulate game-wide. Train Strength three times → +15 permanent strength training bonus.</li><li><strong>Per-round persistence:</strong> unlike older versions of this game, training bonuses do <strong>NOT</strong> reset at round end. They stay until game end.</li><li><strong>Affected by gear:</strong> Old Climbing Journal upgrades every training session from +5 to +6.</li></ul>
+<p>-<strong>Capacity:</strong>one player per station per round. If another player took a station this round, you can't use it until next round. -<strong>Stacking:</strong>training bonuses accumulate game-wide. Train Strength three times → +15 permanent strength training bonus. -<strong>Per-round persistence:</strong>unlike older versions of this game, training bonuses do<strong>NOT</strong>reset at round end. They stay until game end. -<strong>Affected by gear:</strong>Old Climbing Journal upgrades every training session from +5 to +6.</p>
 <hr>
 <h2 id="the-gear-shop">THE GEAR SHOP</h2>
-<p>The shop contains <strong>18 cards total</strong>: 4 access cards (always available) and 14 permanent-passive cards (3 visible at any time, refreshed when bought).</p>
-<p>You spend XP from your <strong>current level</strong> to buy gear. This is the XP you've earned since your last level-up — it does NOT carry over when you level up.</p>
-<h3 id="access-cards-always-visible-gate-climbing-areas">🔓 Access cards (always visible, gate climbing areas)</h3>
+<p>The shop contains<strong>18 cards total</strong>: 4 access cards (always available) and 14 permanent-passive cards (3 visible at any time, refreshed when bought).</p>
+<p>You spend XP from your<strong>current level</strong>to buy gear. This is the XP you've earned since your last level-up — it does NOT carry over when you level up.</p>
+<h3 id="access-cards-always-visible-gate-climbing-areas">Access cards (always visible, gate climbing areas)</h3>
 <table>
 <thead><tr><th>Card</th><th>Cost</th><th>Effect</th></tr></thead>
 <tbody><tr><td>Harness</td><td>80</td><td>Unlocks Top Rope. −2 to all stats on any rope route</td></tr>
@@ -268,8 +390,8 @@
 <tr><td>Locking Carabiner</td><td>60</td><td>Part of the Lead system. +5 max endurance (requires Harness + Belay Device)</td></tr>
 <tr><td>Lead Rope</td><td>120</td><td>Unlocks Lead. −3 Strength on Lead routes (requires all three above)</td></tr></tbody>
 </table>
-<blockquote><strong>Free Solo</strong> ignores all four — they can attempt Top Rope and Lead from turn 1 without buying any of these.</blockquote>
-<h3 id="specialty-cards-target-tagged-routes">✨ Specialty cards (target tagged routes)</h3>
+<blockquote><strong>Free Solo</strong>ignores all four — they can attempt Top Rope and Lead from turn 1 without buying any of these.</blockquote>
+<h3 id="specialty-cards-target-tagged-routes">Specialty cards (target tagged routes)</h3>
 <table>
 <thead><tr><th>Card</th><th>Cost</th><th>Tag</th><th>Effect</th></tr></thead>
 <tbody><tr><td>Crimp Sequence Decoder</td><td>130</td><td>Pinch/Crimp</td><td>On Pinch/Crimp climbs, re-roll one die of your choice</td></tr>
@@ -277,7 +399,7 @@
 <tr><td>Body Tension Belt</td><td>150</td><td>Roof/Sloper</td><td>Roof/Sloper climbs cost half endurance (round up)</td></tr>
 <tr><td>Power Tap Belt</td><td>120</td><td>Dynamic</td><td>On Dynamic climbs, roll an extra die and use the best 2</td></tr></tbody>
 </table>
-<h3 id="boost-fix-cards-permanent-passive-abilities">🛠️ Boost & Fix cards (permanent passive abilities)</h3>
+<h3 id="boost-fix-cards-permanent-passive-abilities">Boost & Fix cards (permanent passive abilities)</h3>
 <table>
 <thead><tr><th>Card</th><th>Cost</th><th>Effect</th></tr></thead>
 <tbody><tr><td>Approach Shoes</td><td>55</td><td>+1 time at round start (every round)</td></tr>
@@ -291,14 +413,14 @@
 <tr><td>Climbing Coach</td><td>180</td><td>On milestone climbs, every die is +1</td></tr>
 <tr><td>Mountain Mentor</td><td>200</td><td>On every climb, treat one nerf die as 0</td></tr></tbody>
 </table>
-<blockquote><strong>Permanent means permanent.</strong> Every card here applies for the rest of the game once bought. There are no consumables, no charges, no reset markers.</blockquote>
-<blockquote><strong>Stacking:</strong> rest-bonus cards stack — owning both Beta Reading Book (+10) and Pre-Climb Stretching (+12) gives +22 rest endurance.</blockquote>
+<blockquote><strong>Permanent means permanent.</strong>Every card here applies for the rest of the game once bought. There are no consumables, no charges, no reset markers.</blockquote>
+<blockquote><strong>Stacking:</strong>rest-bonus cards stack — owning both Beta Reading Book (+10) and Pre-Climb Stretching (+12) gives +22 rest endurance.</blockquote>
 <hr>
 <h2 id="resting">RESTING</h2>
 <p>When endurance is low, visit the rest area.</p>
-<ol><li>Spend <strong>1 time unit</strong>.</li><li>Restore endurance up to your <strong>Max Endurance + Rest Bonus from gear</strong>, where the heal amount equals your full Max Endurance.</li><li>The Route Reader gains a <strong>Beta Boost</strong> (+3 to all stats on the next climb) immediately upon resting.</li></ol>
-<p><strong>Worked example</strong> — Iron Lung at Max 120, current 30:</p>
-<ul><li>No gear: heal up to min(120 + 0, 30 + 120) = <strong>120</strong> (full restore)</li><li>With Beta Reading Book (+10 rest): heal up to min(120 + 10, 30 + 120) = <strong>130</strong> (above max!)</li><li>With Pre-Climb Stretching (+12 rest) AND Beta Reading Book (+10): heal up to min(120 + 22, 30 + 120) = <strong>142</strong></li></ul>
+<ol><li>Spend<strong>1 time unit</strong>.</li><li>Restore endurance up to your<strong>Max Endurance + Rest Bonus from gear</strong>, where the heal amount equals your full Max Endurance.</li><li>The Route Reader gains a<strong>Beta Boost</strong>(+3 to all stats on the next climb) immediately upon resting.</li></ol>
+<p><strong>Worked example</strong>— Iron Lung at Max 120, current 30:</p>
+<ul><li>No gear: heal up to min(120 + 0, 30 + 120) =<strong>120</strong>(full restore)</li><li>With Beta Reading Book (+10 rest): heal up to min(120 + 10, 30 + 120) =<strong>130</strong>(above max!)</li><li>With Pre-Climb Stretching (+12 rest) AND Beta Reading Book (+10): heal up to min(120 + 22, 30 + 120) =<strong>142</strong></li></ul>
 <hr>
 <h2 id="leveling-up">LEVELING UP</h2>
 <p>Earning XP raises your level, which automatically raises your stats and max endurance.</p>
@@ -321,14 +443,14 @@
 <tr><td><strong>Level 15</strong></td><td>—</td><td>(cap)</td></tr></tbody>
 </table>
 <p>When you level up:</p>
-<ul><li>All four stats increase by your character's growth rate (e.g. Technician +4.5 Tech)</li><li>Max endurance increases by your character's endurance growth rate</li><li><strong>Spendable XP for gear continues to accumulate from total XP</strong> — it does NOT reset to 0 at level-up. Whatever you had before the level-up, you keep.</li></ul>
+<ul><li>All four stats increase by your character's growth rate (e.g. Technician +4.5 Tech)</li><li>Max endurance increases by your character's endurance growth rate</li></ul>
+<p>-<strong>Spendable XP for gear continues to accumulate from total XP</strong>— it does NOT reset to 0 at level-up. Whatever you had before the level-up, you keep.</p>
 <hr>
 <h2 id="route-clearing-system">ROUTE CLEARING SYSTEM</h2>
 <p>The gym is dynamic. Routes get cleared and reset throughout the game.</p>
-<p>The <strong>Route Clearing Token</strong> sits at one of three positions:</p>
-<ul><li><strong>Position 0</strong> → next round-end clears Lead Climbing (then advances to position 1)</li><li><strong>Position 1</strong> → next round-end clears Top Rope (then advances to position 2)</li><li><strong>Position 2</strong> → next round-end clears Bouldering (then advances back to position 0)</li></ul>
+<p>The<strong>Route Clearing Token</strong>sits at one of three positions: -<strong>Position 0</strong>→ next round-end clears Lead Climbing (then advances to position 1) -<strong>Position 1</strong>→ next round-end clears Top Rope (then advances to position 2) -<strong>Position 2</strong>→ next round-end clears Bouldering (then advances back to position 0)</p>
 <p>When an area is cleared, its 5 visible routes are discarded and 5 new routes are drawn at random from that area's deck.</p>
-<p><strong>Belayer unlocks</strong> are tied to round number, not the token:</p>
+<p><strong>Belayer unlocks</strong>are tied to round number, not the token:</p>
 <ul><li>Round 5: belayers go from 1 → 2</li><li>Round 12: belayers go from 2 → 3</li></ul>
 <hr>
 <h2 id="special-rules">SPECIAL RULES</h2>
@@ -337,27 +459,29 @@
 <h3 id="one-attempt-per-round-regular-routes">One-attempt-per-round (regular routes)</h3>
 <p>You may attempt each specific regular route only once per round. Milestone routes have no such limit — attempt them as often as you like.</p>
 <h3 id="special-abilities-are-passive">Special abilities are PASSIVE</h3>
-<p>Every character's special ability in this version is a <strong>passive</strong> that fires automatically. There are no "activate once per round" buttons. The only "active" character power is Route Reader's once-per-round stat redistribution (and the Beta Boost is also automatic when they rest).</p>
+<p>Every character's special ability in this version is a<strong>passive</strong>that fires automatically. There are no "activate once per round" buttons. The only "active" character power is Route Reader's once-per-round stat redistribution (and the Beta Boost is also automatic when they rest).</p>
 <h3 id="free-solos-strict-guarantee">Free Solo's strict guarantee</h3>
-<p>Free Solo's "Life or Die" passive lets it bypass equipment <strong>but</strong> restricts it to climbs where its <strong>effective stats — base plus training plus permanent gear bonuses — meet every requirement.</strong> Per-route gear bonuses (e.g. Crimp Sequence Decoder's re-roll) do NOT count toward the guarantee. You can NEVER attempt a route where any stat is short, no matter how favorable the dice.</p>
+<p>Free Solo's "Life or Die" passive lets it bypass equipment<strong>but</strong>restricts it to climbs where its<strong>effective stats — base plus training plus permanent gear bonuses — meet every requirement.</strong>Per-route gear bonuses (e.g. Crimp Sequence Decoder's re-roll) do NOT count toward the guarantee. You can NEVER attempt a route where any stat is short, no matter how favorable the dice.</p>
 <hr>
 <h2 id="winning-the-game">WINNING THE GAME</h2>
 <p><strong>The first player to complete all 3 Milestone Routes wins immediately.</strong></p>
 <p>Milestone routes:</p>
-<ul><li>Are randomly drawn at game start (one per difficulty tier)</li><li>Are visible to all players from turn 1</li><li>Use the same climb mechanics as regular routes</li><li><strong>Have no per-round attempt limit</strong> — retry as often as you can afford</li><li>Are tracked individually per player — your milestones complete for YOU only</li><li>Can be attempted in any order</li></ul>
+<ul><li>Are randomly drawn at game start: <strong>one per difficulty tier AND one per climbing area</strong> (Beginner / Intermediate / Expert, and Bouldering / Top Rope / Lead — every game guarantees mastery of all three areas)</li><li>Are visible to all players from turn 1</li><li>Use the same climb mechanics as regular routes</li></ul>
+<p>-<strong>Have no per-round attempt limit</strong>— retry as often as you can afford</p>
+<ul><li>Are tracked individually per player — your milestones complete for YOU only</li><li>Can be attempted in any order</li></ul>
 <p>If round 45 ends with no player having all three milestones, the game ends with no winner.</p>
 <h3 id="climbing-area-requirements-still-apply">Climbing area requirements still apply</h3>
 <p>A milestone in the Top Rope deck still requires the Harness + Belay Device (or the Free Solo passive). A milestone in the Lead deck still requires the full Lead system.</p>
 <hr>
 <h2 id="strategy-tips">STRATEGY TIPS</h2>
 <h3 id="general">General</h3>
-<ol><li><strong>Read the milestone tags FIRST.</strong> If two milestones share a tag, the matching specialty gear card is your highest-value purchase.</li><li><strong>Buy access cards EARLY</strong> if any of your milestones are in Top Rope or Lead. Without them, you cannot reach those routes (Free Solo excepted).</li><li><strong>Train the stat with the LARGEST gap</strong> to your milestone requirements — not the lowest absolute stat. The lowest stat may not be the bottleneck.</li><li><strong>Level up matters more than spendable XP.</strong> Level-ups grant permanent stat increases that compound.</li><li><strong>Watch the Route Clearing Token.</strong> A route you've been planning to attempt may disappear next round.</li></ol>
+<p>1.<strong>Read the milestone tags FIRST.</strong>If two milestones share a tag, the matching specialty gear card is your highest-value purchase. 2.<strong>Buy access cards EARLY.</strong>Every game guarantees one milestone in Top Rope and one in Lead Climbing (or vice versa), so the Harness + Belay Device + Locking Carabiner + Lead Rope path is structurally mandatory (Free Solo excepted). 3.<strong>Train the stat with the LARGEST gap</strong>to your milestone requirements — not the lowest absolute stat. The lowest stat may not be the bottleneck. 4.<strong>Level up matters more than spendable XP.</strong>Level-ups grant permanent stat increases that compound. 5.<strong>Watch the Route Clearing Token.</strong>A route you've been planning to attempt may disappear next round.</p>
 <h3 id="per-character">Per character</h3>
 <table>
 <thead><tr><th>Character</th><th>Key tip</th></tr></thead>
 <tbody><tr><td><strong>Technician</strong></td><td>High Tech + nerf-die immunity → attempt routes that look brutal on paper. The +1 time per climb is the cost; outpace it with success rate.</td></tr>
 <tr><td><strong>Sprinter</strong></td><td>Half XP on success means you LEVEL slowly. Lean into fail-XP routes (Iron Lung's territory!) or pile into Type-D high-risk routes for net XP.</td></tr>
-<tr><td><strong>Iron Lung</strong></td><td>Buy <strong>Mental Anchor</strong> ASAP — it cancels your only downside (extra fail endurance) and your Relentless passive turns failures into XP.</td></tr>
+<tr><td><strong>Iron Lung</strong></td><td>Buy<strong>Mental Anchor</strong>ASAP — it cancels your only downside (extra fail endurance) and your Relentless passive turns failures into XP.</td></tr>
 <tr><td><strong>Free Solo</strong></td><td>You MUST train aggressively before climbing. Until your effective stats clear the easiest route's requirements, you cannot do anything productive.</td></tr>
 <tr><td><strong>Route Reader</strong></td><td>Stack rest-bonus cards (Beta Reading Book + Pre-Climb Stretching). Resting becomes incredibly powerful: +22 endurance, +3 all stats next climb.</td></tr></tbody>
 </table>
@@ -388,7 +512,7 @@
 <h2 id="designers-notes">DESIGNER'S NOTES</h2>
 <p>All-In Ascent captures the progression, strategy, and risk-reward of real rock climbing. The dice introduce uncertainty (just like real climbing!), while character abilities and gear give you ways to manage that uncertainty. The route-tagging system rewards specialization — gear that helps on Crimp routes is genuinely strong on Crimp routes, and weakness on Dynamic routes — so the strategic question becomes "what's the GYM going to throw at me, and what can I prepare for?"</p>
 <p>The game celebrates progression. From V0 to V12, every successful send feels rewarding.</p>
-<p><strong>Climb on!</strong> 🧗‍♀️⛰️</p>
+<p><strong>Climb on!</strong></p>
 <hr>
 <p><em>Game design: Alpine Indoors Development Team</em> <em>Engine version: 0.3.1 (route-tagged routes; Mixture-3 gear deck; Free Solo training fix)</em> <em>This rulebook reflects the rules as encoded in <code>engine/data.js</code> and <code>engine/engine.js</code>. If a mechanic appears here that disagrees with the engine, the engine is authoritative — please file a rulebook update.</em></p>
   </main>

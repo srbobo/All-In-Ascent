@@ -16,6 +16,14 @@
 // bumps keep the same baseline so you can watch a number move in response to
 // a single tweak.
 
+// 0.4.0 (2026-05-08): Milestone selection now enforces "Scenario 2C —
+//   sequential area-exclusion sampling." The three milestones are still
+//   one Beginner / one Intermediate / one Expert, but they are guaranteed
+//   to span all three climbing areas (bouldering / topRope / leadClimbing).
+//   No more 3-expert or 3-beginner bad draws; no more games locked to a
+//   single area. Minor bump — baseline win-rates from v0.3.x are NOT
+//   directly comparable. Implementation: ~30 lines in engine/state.js
+//   pickMilestoneRoutes; sequential picks with area filters on each step.
 // 0.3.1 (2026-05-03): Free Solo guarantee check now includes training and
 //   permanent gear bonuses (was: base stats only). Patch — same mechanical
 //   rules, balance fix to make Free Solo viable. Comparable to v0.3.0.
@@ -32,5 +40,5 @@
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-export const ENGINE_VERSION = { major: 0, minor: 3, patch: 1 };
+export const ENGINE_VERSION = { major: 0, minor: 4, patch: 0 };
 export const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;
