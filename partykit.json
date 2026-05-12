@@ -1,0 +1,22 @@
+{
+  "name": "all-in-ascent",
+  "main": "party/game.js",
+  "compatibility_date": "2024-11-01",
+  "vars": {
+    "//": "Set LOG_WEBHOOK_URL via `partykit env add LOG_WEBHOOK_URL` after deploy.",
+    "//2": "It must accept a POST with JSON body containing the game log."
+  },
+  "serve": {
+    "path": ".",
+    "exclude": [
+      "node_modules",
+      ".git",
+      "results",
+      "analysis",
+      "sim",
+      "*.md",
+      "_*.js",
+      "_*.json"
+    ]
+  }
+}

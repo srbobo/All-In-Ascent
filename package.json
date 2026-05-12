@@ -1,18 +1,24 @@
 {
   "name": "all-in-ascent",
-  "version": "0.1.0",
-  "description": "Rock climbing board game with automated agent playtest pipeline.",
+  "version": "0.4.0",
+  "description": "Rock climbing board game with automated agent playtest pipeline + multiplayer online play (PartyKit).",
   "type": "module",
   "private": true,
   "scripts": {
-    "test:engine":   "node engine/test-data.js && node engine/test-state.js && node engine/test-helpers.js && node engine/test-engine.js",
-    "playtest":      "npm run test:engine && node sim/run-matrix.js --config=sim/config.json && node analysis/build-report.js --open",
-    "playtest:smoke":"npm run test:engine && node sim/run-matrix.js --config=sim/config.smoke.json && node analysis/build-report.js",
-    "playtest:dry":  "node sim/run-matrix.js --config=sim/config.json --dry-run",
-    "report":        "node analysis/build-report.js",
-    "final-report":  "node analysis/final-report.js",
-    "diff":          "node analysis/diff-runs.js",
-    "detail":        "node analysis/game-detail.js",
-    "game":          "node sim/run-one-game.js"
+    "test:engine":    "node engine/test-data.js && node engine/test-state.js && node engine/test-helpers.js && node engine/test-engine.js",
+    "playtest":       "npm run test:engine && node sim/run-matrix.js --config=sim/config.json && node analysis/build-report.js --open",
+    "playtest:smoke": "npm run test:engine && node sim/run-matrix.js --config=sim/config.smoke.json && node analysis/build-report.js",
+    "playtest:dry":   "node sim/run-matrix.js --config=sim/config.json --dry-run",
+    "report":         "node analysis/build-report.js",
+    "final-report":   "node analysis/final-report.js",
+    "diff":           "node analysis/diff-runs.js",
+    "detail":         "node analysis/game-detail.js",
+    "game":           "node sim/run-one-game.js",
+    "online:dev":     "partykit dev",
+    "online:deploy":  "partykit deploy"
+  },
+  "devDependencies": {
+    "partykit": "^0.0.114",
+    "partysocket": "^1.0.2"
   }
 }
