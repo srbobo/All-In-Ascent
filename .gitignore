@@ -1,0 +1,9 @@
+# Node dependencies (if we ever add any) — never commit the downloaded packages.
+node_modules/
+
+# Simulation outputs — one JSONL file per playtest game, plus aggregated reports.
+# Excluded because they are large and regenerable from the code + config.
+results/
+
+# macOS Finder metadata.
+.DS_Store

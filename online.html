@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>All In Ascent — Online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;700&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wall-base: #c2a07a;
+    --wall-shade: #8a6440;
+    --wall-light: #d8bf95;
+    --wall-deep: #5a3f28;
+    --coral: #ff6845;
+    --marigold: #ffae28;
+    --lime: #b6d62d;
+    --teal: #1fb8a6;
+    --cobalt: #2c66cf;
+    --raspberry: #d8347d;
+    --violet: #8857d4;
+    --chalk: #f4ede0;
+    --ink: #2a1d12;
+    --ink-soft: #5a4530;
+    --tape-cream: #f8f0dc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hanken Grotesk', sans-serif;
+    color: var(--ink);
+    background-color: var(--wall-base);
+    background-image:
+      radial-gradient(circle at 50% 50%, rgba(36,20,8,0.45) 1px, rgba(36,20,8,0.18) 2px, transparent 3px),
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(255,220,170,0.22), transparent 60%),
+      radial-gradient(ellipse 70% 70% at 90% 95%, rgba(60,35,15,0.28), transparent 70%);
+    background-size: 72px 72px, auto, auto;
+    background-attachment: fixed;
+    padding: 24px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  h1, h2, h3 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; letter-spacing: -0.01em; }
+  .mono { font-family: 'Geist Mono', monospace; }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .card {
+    background: var(--tape-cream);
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.25);
+  }
+  .title-card { text-align: center; }
+  .title-card h1 { font-size: 48px; color: var(--ink); }
+  .title-card .sub { color: var(--ink-soft); margin-top: 8px; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; }
+  input, select, button {
+    font-family: inherit;
+    font-size: 15px;
+    padding: 10px 14px;
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    background: white;
+    color: var(--ink);
+  }
+  button {
+    background: var(--coral);
+    color: white;
+    cursor: pointer;
+    font-weight: 700;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    letter-spacing: 0.02em;
+    transition: transform 0.05s;
+  }
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(1px); }
+  button:disabled { background: #b8a89a; cursor: not-allowed; transform: none; }
+  button.secondary { background: var(--cobalt); }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--ink-soft); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  label { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
+  .seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+  .seat {
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    padding: 12px;
+    background: white;
+  }
+  .seat.empty { background: #efe4d2; color: var(--ink-soft); font-style: italic; }
+  .seat.bot { background: #fff3df; }
+  .seat .name { font-weight: 700; }
+  .seat .char { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+  .badge {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--tape-cream);
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+  }
+  .badge.bot { background: var(--marigold); color: var(--ink); }
+  .badge.host { background: var(--raspberry); color: white; }
+  .badge.you  { background: var(--cobalt); color: white; }
+  .badge.disc { background: #888; }
+  .turn-banner {
+    background: var(--marigold);
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .turn-banner.yours { background: var(--lime); }
+  .actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  .action {
+    background: white;
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    padding: 12px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .action:hover { background: var(--lime); }
+  .action .kind {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+  }
+  .action .detail { font-size: 14px; }
+  .state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 880px) { .state-grid { grid-template-columns: 1fr; } }
+  .panel { background: white; border: 2px solid var(--ink); border-radius: 6px; padding: 12px; }
+  .panel h3 { font-size: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .player-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px dotted var(--ink-soft);
+    font-size: 14px;
+  }
+  .player-row:last-child { border-bottom: none; }
+  .player-row.active { background: rgba(255,174,40,0.25); padding-left: 6px; padding-right: 6px; border-radius: 3px; }
+  .stats { font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--ink-soft); }
+  .milestone-tag {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'Geist Mono', monospace;
+    margin-right: 4px;
+  }
+  .ms-beg { background: var(--lime); }
+  .ms-int { background: var(--marigold); }
+  .ms-exp { background: var(--coral); color: white; }
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--ink);
+    color: var(--tape-cream);
+    padding: 12px 16px;
+    border-radius: 6px;
+    z-index: 1000;
+    font-weight: 500;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.25);
+    max-width: 320px;
+  }
+  .log { font-family: 'Geist Mono', monospace; font-size: 12px; max-height: 240px; overflow-y: auto; background: #1a1208; color: #f4ede0; padding: 12px; border-radius: 6px; white-space: pre-wrap; }
+  .hidden { display: none !important; }
+  .end-banner {
+    background: var(--violet); color: white;
+    border: 2px solid var(--ink);
+    padding: 20px;
+    border-radius: 6px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .end-banner h2 { font-size: 32px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- LANDING (room entry) -->
+  <div id="landing" class="card title-card">
+    <h1>All In Ascent</h1>
+    <div class="sub">Online play — two friends + bots</div>
+    <div class="col" style="margin-top: 24px; max-width: 360px; margin-left: auto; margin-right: auto; text-align: left;">
+      <label for="username">Your name</label>
+      <input id="username" maxlength="24" placeholder="climber-handle">
+      <label for="room">Room ID</label>
+      <input id="room" placeholder="e.g. friday-night">
+      <label for="password">Room password</label>
+      <input id="password" type="password" placeholder="set by the host on first join">
+      <label for="host">Backend host (PartyKit URL)</label>
+      <input id="host" placeholder="all-in-ascent.YOUR-USER.partykit.dev">
+      <div class="row" style="margin-top: 12px;">
+        <button id="joinBtn">Join / Create Room</button>
+        <button class="ghost" onclick="window.location='index.html'">Local Play Instead</button>
+      </div>
+      <div class="sub" style="text-align: left; margin-top: 12px; text-transform: none; letter-spacing: 0; font-size: 13px;">
+        First person to join a fresh room is the host and sets the password.
+      </div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="lobby" class="card hidden">
+    <h2>Lobby — <span id="lobbyRoom" class="mono"></span></h2>
+    <div class="sub" style="margin-top: 6px;">Pick a character. Host starts the game when everyone is ready.</div>
+
+    <div class="seats" id="seatList"></div>
+
+    <div style="margin-top: 20px;">
+      <label>Your character</label>
+      <select id="charSelect">
+        <option value="">— pick a character —</option>
+      </select>
+    </div>
+
+    <div class="row" style="margin-top: 16px;">
+      <button id="addBotBtn" class="secondary">Add Bot</button>
+      <button id="startBtn">Start Game</button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="hidden">
+    <div id="endBanner" class="end-banner hidden"></div>
+    <div id="turnBanner" class="turn-banner"></div>
+
+    <div class="state-grid">
+      <div class="panel">
+        <h3>Players</h3>
+        <div id="players"></div>
+      </div>
+      <div class="panel">
+        <h3>Milestones</h3>
+        <div id="milestones"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 16px;" id="actionPanel">
+      <h3 style="margin-bottom: 12px;">Your Actions</h3>
+      <div class="actions" id="actionList"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom: 8px;">Event log</h3>
+      <div id="eventLog" class="log"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+</div>
+
+<script type="module" src="./online/client.js"></script>
+</body>
+</html>

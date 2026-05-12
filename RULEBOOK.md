@@ -1,7 +1,7 @@
 # ALL-IN ASCENT
 ## Alpine Indoors Rock Climbing Board Game
 
-### Official Rulebook — Engine v0.3.1
+### Official Rulebook — Engine v0.4.0
 
 ---
 
@@ -64,10 +64,11 @@ Welcome to**All-In Ascent**, where you step into the climbing shoes of an aspiri
 
 1. Choose the number of players (1–4).
 2. Each player picks a character (no duplicates allowed).
-3.**Three Milestone Routes are randomly drawn**from the route deck:
+3.**Three Milestone Routes are randomly drawn**from the route deck, with two constraints:
  - One**Beginner**route (V0–V2 / 5.6–5.8 / Lead 5.8–5.9)
  - One**Intermediate**route (V3–V7 / 5.9–5.11c / Lead 5.10a–5.11c)
  - One**Expert**route (V8–V12 / 5.12a–5.13c / Lead 5.12a–5.14a)
+ - **All three milestones must come from DIFFERENT climbing areas** (one Bouldering, one Top Rope, one Lead — in any combination). Sort the route deck by tier, then draw cards in order: Beginner first, then Intermediate from a different area, then Expert from the third remaining area. If a drawn card matches an already-taken area, set it aside and draw again; reshuffle set-asides back at the end.
 4. Deal**5 random routes**into each climbing area (Bouldering, Top Rope, Lead).
 5. Deal**3 random non-access gear cards**into the gear shop. The 4 access cards (Harness, Belay Device, Locking Carabiner, Lead Rope) are always available for purchase.
 6. Place the**Route Clearing Token**at Position 0.
@@ -418,7 +419,7 @@ Free Solo's "Life or Die" passive lets it bypass equipment**but**restricts it to
 **The first player to complete all 3 Milestone Routes wins immediately.**
 
 Milestone routes:
-- Are randomly drawn at game start (one per difficulty tier)
+- Are randomly drawn at game start: **one per difficulty tier AND one per climbing area** (Beginner / Intermediate / Expert, and Bouldering / Top Rope / Lead — every game guarantees mastery of all three areas)
 - Are visible to all players from turn 1
 - Use the same climb mechanics as regular routes
 -**Have no per-round attempt limit**— retry as often as you can afford
@@ -436,7 +437,7 @@ A milestone in the Top Rope deck still requires the Harness + Belay Device (or t
 
 ### General
 1.**Read the milestone tags FIRST.**If two milestones share a tag, the matching specialty gear card is your highest-value purchase.
-2.**Buy access cards EARLY**if any of your milestones are in Top Rope or Lead. Without them, you cannot reach those routes (Free Solo excepted).
+2.**Buy access cards EARLY.**Every game guarantees one milestone in Top Rope and one in Lead Climbing (or vice versa), so the Harness + Belay Device + Locking Carabiner + Lead Rope path is structurally mandatory (Free Solo excepted).
 3.**Train the stat with the LARGEST gap**to your milestone requirements — not the lowest absolute stat. The lowest stat may not be the bottleneck.
 4.**Level up matters more than spendable XP.**Level-ups grant permanent stat increases that compound.
 5.**Watch the Route Clearing Token.**A route you've been planning to attempt may disappear next round.

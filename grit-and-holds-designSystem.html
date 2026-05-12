@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Grit & Holds — Tactile Climbing Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;700&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================================================
+     RESET + ROOT TOKENS
+     ============================================================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  :root {
+    /* Wall surface: warm sandstone */
+    --wall-base: #c2a07a;
+    --wall-shade: #8a6440;
+    --wall-light: #d8bf95;
+    --wall-deep: #5a3f28;
+
+    /* Hold colors — saturated, gym-real */
+    --coral:    #ff6845;
+    --marigold: #ffae28;
+    --lime:     #b6d62d;
+    --teal:     #1fb8a6;
+    --cobalt:   #2c66cf;
+    --raspberry:#d8347d;
+    --violet:   #8857d4;
+    --chalk:    #f4ede0;
+
+    /* Ink + neutrals */
+    --ink: #2a1d12;
+    --ink-soft: #5a4530;
+    --tape-cream: #f8f0dc;
+  }
+
+  body {
+    background: var(--wall-base);
+    color: var(--ink);
+    font-family: 'Hanken Grotesk', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     REUSABLE — WALL TEXTURE
+     The base sandstone surface with grit, T-nuts, and chalk wear.
+     ============================================================ */
+  .wall {
+    position: relative;
+    background-color: var(--wall-base);
+    background-image:
+      /* T-nut bolt holes — small dark dots in a grid */
+      radial-gradient(circle at 50% 50%,
+        rgba(36,20,8,0.45) 1px,
+        rgba(36,20,8,0.18) 2px,
+        transparent 3px),
+      /* warm light wash from upper-left */
+      radial-gradient(ellipse 80% 60% at 20% 10%,
+        rgba(255,220,170,0.22), transparent 60%),
+      /* deep shadow lower-right */
+      radial-gradient(ellipse 70% 70% at 90% 95%,
+        rgba(60,35,15,0.28), transparent 70%),
+      /* chalk smudge accent */
+      radial-gradient(ellipse 30% 18% at 70% 28%,
+        rgba(244,237,224,0.18), transparent 70%),
+      /* mottled color variation */
+      radial-gradient(ellipse 40% 30% at 35% 60%,
+        rgba(180,140,90,0.25), transparent 70%);
+    background-size:
+      72px 72px,
+      auto, auto, auto, auto;
+    background-position:
+      0 0,
+      0 0, 0 0, 0 0, 0 0;
+  }
+  /* grit noise overlay — fine sand-paint texture */
+  .wall::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.1  0 0 0 0 0.05  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  /* wall vignette */
+  .wall::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(20,10,5,0.18) 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .wall > * { position: relative; z-index: 2; }
+
+  /* ============================================================
+     REUSABLE — HOLD COMPONENT
+     A tactile, dimensional, grippy climbing hold.
+     ============================================================ */
+  .hold {
+    --c: var(--coral);
+    --c-light: color-mix(in srgb, var(--c) 70%, #ffffff);
+    --c-deep:  color-mix(in srgb, var(--c) 55%, #1a0a05);
+    --size: 80px;
+
+    width: var(--size); height: var(--size);
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+    /* organic, hold-like, asymmetric */
+    border-radius: 58% 42% 50% 50% / 50% 55% 45% 50%;
+    /* surface lighting */
+    background:
+      radial-gradient(ellipse at 30% 28%,
+        var(--c-light) 0%,
+        var(--c) 45%,
+        var(--c-deep) 100%);
+    box-shadow:
+      /* inner bevel — top-left highlight */
+      inset 3px 6px 12px rgba(255,255,255,0.35),
+      /* inner shadow — bottom-right depth */
+      inset -5px -8px 14px rgba(0,0,0,0.35),
+      /* drop shadow — bolted to wall */
+      4px 5px 10px rgba(40,20,10,0.4),
+      8px 12px 24px rgba(40,20,10,0.18);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s;
+  }
+  /* grit texture overlay on the hold */
+  .hold::before {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='3.5' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+    mix-blend-mode: overlay;
+    opacity: 0.85;
+    pointer-events: none;
+  }
+  /* bolt hole */
+  .hold::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 9px; height: 9px;
+    background: radial-gradient(circle at 30% 30%, #2a1808, #0a0402 70%);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow:
+      inset 0 1px 2px rgba(0,0,0,0.8),
+      0 0 0 2px color-mix(in srgb, var(--c-deep) 80%, black);
+    pointer-events: none;
+  }
+  .hold:hover {
+    transform: translateY(-3px) rotate(-3deg);
+    box-shadow:
+      inset 3px 6px 12px rgba(255,255,255,0.4),
+      inset -5px -8px 14px rgba(0,0,0,0.35),
+      6px 8px 14px rgba(40,20,10,0.45),
+      12px 18px 32px rgba(40,20,10,0.25);
+  }
+
+  /* hold variants — color */
+  .hold.coral    { --c: var(--coral); }
+  .hold.marigold { --c: var(--marigold); }
+  .hold.lime     { --c: var(--lime); }
+  .hold.teal     { --c: var(--teal); }
+  .hold.cobalt   { --c: var(--cobalt); }
+  .hold.raspberry{ --c: var(--raspberry); }
+  .hold.violet   { --c: var(--violet); }
+  .hold.chalk    { --c: var(--chalk); }
+
+  /* hold variants — shape */
+  .hold.crimp     { border-radius: 60% 60% 30% 30% / 70% 70% 25% 25%; --size: 60px; }
+  .hold.jug       { border-radius: 55% 45% 50% 50% / 60% 60% 40% 40%; --size: 100px; }
+  .hold.sloper    { border-radius: 50% 50% 35% 35% / 75% 75% 30% 30%; --size: 130px; }
+  .hold.pinch     { border-radius: 50% 50% 40% 40% / 80% 80% 30% 30%; --size: 70px; }
+  .hold.chip      { border-radius: 50%; --size: 36px; }
+  .hold.pocket    { border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%; --size: 70px; }
+
+  /* ============================================================
+     REUSABLE — TAPE MARKER
+     Climbing-gym route tape: bright, slightly translucent, off-axis.
+     ============================================================ */
+  .tape {
+    display: inline-block;
+    padding: 0.35rem 0.85rem;
+    background: rgba(255,104,69,0.85);
+    color: var(--ink);
+    font-family: 'Hanken Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transform: rotate(-1.5deg);
+    box-shadow: 0 1px 4px rgba(40,20,10,0.25), inset 0 1px 0 rgba(255,255,255,0.3);
+    position: relative;
+  }
+  /* tape grit */
+  .tape::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.25 0'/></filter><rect width='100%25' height='100%25' filter='url(%23t)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .tape.coral     { background: rgba(255,104,69,0.85); }
+  .tape.marigold  { background: rgba(255,174,40,0.85); }
+  .tape.lime      { background: rgba(182,214,45,0.85); }
+  .tape.teal      { background: rgba(31,184,166,0.85); color: var(--chalk); }
+  .tape.cobalt    { background: rgba(44,102,207,0.85); color: var(--chalk); }
+  .tape.raspberry { background: rgba(216,52,125,0.85); color: var(--chalk); }
+  .tape.violet    { background: rgba(136,87,212,0.85); color: var(--chalk); }
+  .tape.chalk     { background: rgba(244,237,224,0.9); }
+
+  /* ============================================================
+     LAYOUT — SECTIONS + HEADERS
+     ============================================================ */
+  section {
+    padding: 7rem 5vw 8rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .section-eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 1rem;
+  }
+  .section-eyebrow::before {
+    content: "▸ ";
+    color: var(--coral);
+    margin-right: 0.4rem;
+  }
+  .section-title {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-variation-settings: "wdth" 100, "opsz" 96;
+    font-size: clamp(2.5rem, 6vw, 5rem);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    margin-bottom: 2.5rem;
+    max-width: 18ch;
+  }
+  .section-title em {
+    font-style: italic;
+    font-weight: 500;
+    color: var(--coral);
+  }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .hero {
+    min-height: 100vh;
+    padding: 4rem 5vw 6rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .hero-top {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .hero-top .stamp {
+    background: var(--ink);
+    color: var(--chalk);
+    padding: 0.4rem 0.85rem;
+    transform: rotate(-2deg);
+    box-shadow: 2px 3px 0 rgba(40,20,10,0.3);
+    font-weight: 700;
+  }
+  .hero-mid { padding: 4rem 0 2rem; }
+  .hero-eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .hero-eyebrow::before {
+    content: ""; width: 60px; height: 2px;
+    background: var(--coral);
+  }
+  .hero-title {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-variation-settings: "wdth" 110, "opsz" 96;
+    font-size: clamp(4.5rem, 16vw, 16rem);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    color: var(--ink);
+    margin-bottom: 1.5rem;
+  }
+  .hero-title em {
+    font-style: italic;
+    font-weight: 500;
+    color: var(--coral);
+  }
+  .hero-sub {
+    font-size: 1.2rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    font-weight: 400;
+  }
+  .hero-sub b { color: var(--ink); font-weight: 700; }
+
+  .hero-holds {
+    position: absolute;
+    pointer-events: none;
+    inset: 0;
+    z-index: 1;
+  }
+  .hero-holds .hold {
+    position: absolute;
+    pointer-events: auto;
+  }
+  /* scattered holds — composed positioning */
+  .hero-h1 { top: 8%;  right: 8%;  --size: 90px; transform: rotate(15deg); }
+  .hero-h2 { top: 22%; right: 18%; --size: 60px; transform: rotate(-10deg); }
+  .hero-h3 { top: 38%; right: 5%;  --size: 110px; transform: rotate(8deg); }
+  .hero-h4 { top: 58%; right: 22%; --size: 50px; transform: rotate(-25deg); }
+  .hero-h5 { top: 70%; right: 8%;  --size: 75px; transform: rotate(12deg); }
+  .hero-h6 { bottom: 10%; right: 30%; --size: 45px; transform: rotate(-5deg); }
+
+  .hero-bottom {
+    display: flex; justify-content: space-between; align-items: end;
+    flex-wrap: wrap; gap: 1.5rem;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .hero-tape-row {
+    display: flex; flex-wrap: wrap; gap: 0.6rem;
+  }
+
+  /* ============================================================
+     SECTION — PALETTE
+     ============================================================ */
+  .palette {
+    background: var(--chalk);
+  }
+  .palette::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='c'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.4  0 0 0 0 0.3  0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .palette > * { position: relative; }
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 3rem 2rem;
+    margin-top: 2rem;
+  }
+  .palette-item {
+    text-align: center;
+    display: flex; flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  .palette-item .hold { --size: 110px; }
+  .palette-item .name {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+  }
+  .palette-item .hex {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--ink-soft);
+    letter-spacing: 0.1em;
+  }
+  .palette-item .grade {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--ink-soft);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  /* ============================================================
+     SECTION — TYPOGRAPHY
+     ============================================================ */
+  .type-section {
+    /* uses .wall */
+  }
+  .type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: end;
+  }
+  .type-display {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-variation-settings: "wdth" 110, "opsz" 96;
+    font-size: clamp(4rem, 11vw, 10rem);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    margin-bottom: 1rem;
+  }
+  .type-display em {
+    font-style: italic; font-weight: 500;
+    color: var(--coral);
+  }
+  .type-meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.5rem;
+  }
+  .type-spec {
+    background: var(--tape-cream);
+    padding: 1.5rem 1.75rem;
+    border-radius: 6px;
+    box-shadow: 3px 4px 12px rgba(40,20,10,0.18), inset 0 1px 0 rgba(255,255,255,0.5);
+    transform: rotate(-0.5deg);
+    position: relative;
+  }
+  .type-spec::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.25 0 0 0 0.2 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.4;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .type-spec h3 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-size: 2.5rem;
+    line-height: 1;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+  }
+  .type-spec p {
+    font-size: 1rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin-bottom: 0.75rem;
+  }
+  .type-spec p em { color: var(--raspberry); font-style: italic; font-weight: 500; }
+  .type-mono {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    letter-spacing: 0.05em;
+  }
+
+  /* ============================================================
+     SECTION — HOLD ANATOMY
+     ============================================================ */
+  .anatomy {
+    background: var(--chalk);
+  }
+  .anatomy::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='c'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.4  0 0 0 0 0.3  0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .anatomy > * { position: relative; }
+  .anatomy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 3rem 2rem;
+    margin-top: 2rem;
+  }
+  .anatomy-item {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 1.25rem;
+    text-align: center;
+  }
+  .anatomy-item h4 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--ink);
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.01em;
+  }
+  .anatomy-item p {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 22ch;
+  }
+  .anatomy-item .meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--coral);
+  }
+
+  /* ============================================================
+     SECTION — VOLUMES
+     ============================================================ */
+  .volumes {
+    /* uses .wall */
+  }
+  .vol-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+  .vol-item {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 1rem;
+    padding: 2rem 1rem 1.5rem;
+    text-align: center;
+  }
+  .vol-item svg {
+    width: 180px; height: 180px;
+    filter: drop-shadow(6px 8px 16px rgba(40,20,10,0.35));
+  }
+  .vol-item h4 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .vol-item .meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* ============================================================
+     SECTION — COMPONENTS
+     Buttons, route card, stats, tags
+     ============================================================ */
+  .components {
+    background: var(--chalk);
+  }
+  .components::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='c'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.4  0 0 0 0 0.3  0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .components > * { position: relative; }
+  .comp-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+  .comp-card {
+    background: var(--tape-cream);
+    border-radius: 12px;
+    padding: 1.75rem;
+    box-shadow: 4px 6px 20px rgba(40,20,10,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+    position: relative;
+    overflow: hidden;
+  }
+  .comp-card::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.25 0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.35;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .comp-card > * { position: relative; }
+  .comp-card .label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 1.25rem;
+    display: flex; justify-content: space-between;
+  }
+
+  /* Buttons designed as grippy holds */
+  .btn-holds { grid-column: span 6; }
+  .btn-row {
+    display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+  }
+  .btn {
+    --c: var(--coral);
+    --c-light: color-mix(in srgb, var(--c) 70%, white);
+    --c-deep: color-mix(in srgb, var(--c) 60%, #1a0a05);
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--chalk);
+    padding: 1.05rem 1.85rem;
+    border: none;
+    border-radius: 18px 14px 16px 12px / 14px 18px 12px 16px;
+    background: radial-gradient(ellipse at 30% 25%, var(--c-light), var(--c) 50%, var(--c-deep) 110%);
+    cursor: pointer;
+    position: relative;
+    box-shadow:
+      inset 2px 4px 8px rgba(255,255,255,0.3),
+      inset -3px -5px 10px rgba(0,0,0,0.3),
+      3px 4px 8px rgba(40,20,10,0.35),
+      6px 9px 18px rgba(40,20,10,0.15);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    letter-spacing: 0.01em;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+  }
+  .btn::before {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80'><filter id='b'><feTurbulence type='fractalNoise' baseFrequency='3.5' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.45 0'/></filter><rect width='100%25' height='100%25' filter='url(%23b)'/></svg>");
+    mix-blend-mode: overlay;
+    opacity: 0.85;
+    pointer-events: none;
+  }
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 2px 4px 8px rgba(255,255,255,0.35),
+      inset -3px -5px 10px rgba(0,0,0,0.3),
+      4px 6px 12px rgba(40,20,10,0.4),
+      8px 12px 24px rgba(40,20,10,0.2);
+  }
+  .btn:active {
+    transform: translateY(1px);
+    box-shadow:
+      inset 2px 4px 8px rgba(255,255,255,0.25),
+      inset -2px -3px 8px rgba(0,0,0,0.35),
+      2px 2px 4px rgba(40,20,10,0.35);
+  }
+  .btn.coral     { --c: var(--coral); }
+  .btn.marigold  { --c: var(--marigold); color: var(--ink); text-shadow: 0 1px 1px rgba(255,255,255,0.4); }
+  .btn.lime      { --c: var(--lime); color: var(--ink); text-shadow: 0 1px 1px rgba(255,255,255,0.4); }
+  .btn.teal      { --c: var(--teal); }
+  .btn.cobalt    { --c: var(--cobalt); }
+  .btn.violet    { --c: var(--violet); }
+  /* outline / chip-style button */
+  .btn.chip {
+    background: transparent;
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    border-radius: 100px;
+    text-shadow: none;
+    box-shadow: 2px 3px 0 var(--ink), 2px 3px 8px rgba(40,20,10,0.15);
+  }
+  .btn.chip::before { display: none; }
+  .btn.chip:hover {
+    background: var(--ink);
+    color: var(--chalk);
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 4px 0 var(--ink), 3px 4px 8px rgba(40,20,10,0.2);
+  }
+
+  /* Route card */
+  .route-card { grid-column: span 6; padding: 0; overflow: visible; }
+  .route-card-tape {
+    position: absolute;
+    top: -10px; left: 32px;
+    background: rgba(216,52,125,0.92);
+    color: var(--chalk);
+    padding: 0.35rem 0.85rem;
+    transform: rotate(-3deg);
+    font-family: 'Hanken Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    z-index: 4;
+    box-shadow: 0 2px 8px rgba(40,20,10,0.3);
+  }
+  .route-card-tape::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.25 0'/></filter><rect width='100%25' height='100%25' filter='url(%23t)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.6;
+  }
+  .route-card-inner {
+    background: var(--tape-cream);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 4px 6px 20px rgba(40,20,10,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+    position: relative;
+  }
+  .route-card-inner::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.25 0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .route-card-head {
+    padding: 1.5rem 1.75rem 1rem;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 1.5rem;
+    border-bottom: 2px dashed rgba(90,60,40,0.25);
+    position: relative;
+  }
+  .route-card-head h3 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    margin-bottom: 0.25rem;
+  }
+  .route-card-head h3 em {
+    font-style: italic; font-weight: 500;
+    color: var(--raspberry);
+  }
+  .route-card-head .meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--ink-soft);
+  }
+  .route-card-head .grade-hold {
+    --c: var(--raspberry);
+    --c-light: color-mix(in srgb, var(--c) 70%, white);
+    --c-deep:  color-mix(in srgb, var(--c) 55%, #1a0a05);
+    width: 70px; height: 70px;
+    border-radius: 58% 42% 50% 50% / 50% 55% 45% 50%;
+    background: radial-gradient(ellipse at 30% 28%, var(--c-light), var(--c) 50%, var(--c-deep) 100%);
+    box-shadow:
+      inset 2px 4px 8px rgba(255,255,255,0.3),
+      inset -3px -5px 10px rgba(0,0,0,0.3),
+      3px 4px 8px rgba(40,20,10,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--chalk);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .route-card-head .grade-hold::before {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='3.5' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+    mix-blend-mode: overlay;
+    opacity: 0.85;
+  }
+  .route-card-body {
+    padding: 1.25rem 1.75rem 1.5rem;
+  }
+  .route-card-body .desc {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--ink);
+    margin-bottom: 1.5rem;
+    max-width: 55ch;
+  }
+  .route-card-body .desc em { font-style: italic; color: var(--ink-soft); }
+
+  /* stats — bar fills are tape strips */
+  .stats { display: grid; gap: 0.75rem; }
+  .stat {
+    display: grid;
+    grid-template-columns: 90px 1fr 50px;
+    gap: 1rem;
+    align-items: center;
+  }
+  .stat .lbl {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .stat .bar {
+    height: 14px;
+    background: rgba(90,60,40,0.12);
+    border-radius: 100px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);
+  }
+  .stat .bar::after {
+    content: "";
+    position: absolute;
+    top: 2px; left: 2px; bottom: 2px;
+    width: calc(var(--w, 60%) - 4px);
+    background: linear-gradient(180deg,
+      color-mix(in srgb, var(--c, var(--coral)) 75%, white) 0%,
+      var(--c, var(--coral)) 50%,
+      color-mix(in srgb, var(--c, var(--coral)) 70%, black) 100%);
+    border-radius: 100px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.2);
+  }
+  .stat .val {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--ink);
+    text-align: right;
+    letter-spacing: -0.01em;
+  }
+  .stat.stamina .bar::after { --c: var(--lime); }
+  .stat.chalk .bar::after   { --c: var(--chalk); }
+  .stat.gear .bar::after    { --c: var(--cobalt); }
+  .stat.risk .bar::after    { --c: var(--coral); }
+
+  /* tags row */
+  .tags-block { grid-column: span 12; padding: 1.5rem 1.75rem; }
+  .tags-row {
+    display: flex; gap: 0.6rem; flex-wrap: wrap;
+  }
+
+  /* ============================================================
+     SECTION — TOPO / ROUTE PREVIEW
+     ============================================================ */
+  .topo-section {
+    /* uses .wall */
+  }
+  .topo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
+    align-items: start;
+    margin-top: 2rem;
+  }
+  .topo-board {
+    aspect-ratio: 3/4;
+    background: var(--wall-base);
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 6px rgba(40,20,10,0.4), inset 4px 6px 16px rgba(0,0,0,0.2), 0 12px 32px rgba(40,20,10,0.3);
+  }
+  .topo-board::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 50% 50%,
+        rgba(36,20,8,0.45) 1px,
+        rgba(36,20,8,0.18) 2px,
+        transparent 3px),
+      radial-gradient(ellipse 60% 50% at 30% 20%, rgba(255,220,170,0.18), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 70% 80%, rgba(60,35,15,0.3), transparent 60%);
+    background-size: 56px 56px, auto, auto;
+    pointer-events: none;
+  }
+  .topo-board::after {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.1  0 0 0 0 0.05  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  .topo-board .hold,
+  .topo-board .vol-shape {
+    position: absolute;
+    z-index: 1;
+  }
+  /* Route holds positioned on the board */
+  .h-base   { bottom: 5%;  left: 45%; --size: 50px; }
+  .h-1      { bottom: 18%; left: 38%; --size: 60px; }
+  .h-2      { bottom: 30%; left: 56%; --size: 55px; }
+  .h-crux   { bottom: 45%; left: 60%; --size: 85px; }
+  .h-3      { bottom: 60%; left: 42%; --size: 60px; }
+  .h-4      { bottom: 72%; left: 30%; --size: 55px; }
+  .h-top    { bottom: 86%; left: 50%; --size: 75px; }
+  /* small foot chips scattered */
+  .h-c1 { bottom: 12%; left: 65%; --size: 28px; }
+  .h-c2 { bottom: 25%; left: 28%; --size: 30px; }
+  .h-c3 { bottom: 50%; left: 25%; --size: 28px; }
+  .h-c4 { bottom: 68%; left: 60%; --size: 32px; }
+
+  /* SVG route line overlay */
+  .route-line {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .topo-info {
+    background: var(--tape-cream);
+    border-radius: 12px;
+    padding: 1.75rem;
+    box-shadow: 4px 6px 20px rgba(40,20,10,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+    position: relative;
+    transform: rotate(0.4deg);
+  }
+  .topo-info::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.25 0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+    mix-blend-mode: multiply;
+    opacity: 0.35;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .topo-info > * { position: relative; }
+  .topo-info h3 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-size: 1.6rem;
+    color: var(--ink);
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.02em;
+  }
+  .topo-info h3 em { font-style: italic; font-weight: 500; color: var(--raspberry); }
+  .topo-info .grade-line {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 1rem;
+  }
+  .topo-info p {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--ink);
+    margin-bottom: 1.25rem;
+  }
+  .topo-legend {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    border-top: 2px dashed rgba(90,60,40,0.25);
+    padding-top: 1rem;
+  }
+  .topo-legend-row {
+    display: flex; align-items: center; gap: 0.85rem;
+    font-size: 0.85rem;
+    color: var(--ink);
+  }
+  .topo-legend-row .swatch {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: inset -1px -2px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .topo-legend-row .swatch.coral { background: var(--coral); }
+  .topo-legend-row .swatch.raspberry { background: var(--raspberry); }
+  .topo-legend-row .swatch.teal { background: var(--teal); }
+  .topo-legend-row .swatch.lime { background: var(--lime); }
+  .topo-legend-row .swatch.chalk { background: var(--chalk); border: 1px solid rgba(90,60,40,0.3); }
+  .topo-legend-row b {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    margin-right: 0.5rem;
+  }
+  .topo-legend-row span.meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--ink-soft);
+    margin-left: auto;
+    letter-spacing: 0.1em;
+  }
+
+  /* ============================================================
+     SECTION — MOTION
+     ============================================================ */
+  .motion {
+    background: var(--ink);
+    color: var(--chalk);
+  }
+  .motion::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 0.95  0 0 0 0 0.85  0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    pointer-events: none;
+    opacity: 0.9;
+  }
+  .motion > * { position: relative; }
+  .motion .section-eyebrow { color: rgba(244,237,224,0.6); }
+  .motion .section-eyebrow::before { color: var(--marigold); }
+  .motion .section-title { color: var(--chalk); }
+  .motion .section-title em { color: var(--marigold); }
+
+  .motion-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+  .motion-card {
+    padding: 1.75rem;
+    border-radius: 12px;
+    background: rgba(244,237,224,0.04);
+    border: 1px solid rgba(244,237,224,0.1);
+    transition: background 0.3s, transform 0.3s;
+  }
+  .motion-card:hover {
+    background: rgba(244,237,224,0.07);
+    transform: translateY(-3px);
+  }
+  .motion-card .icon {
+    width: 48px; height: 48px;
+    margin-bottom: 1.25rem;
+  }
+  .motion-card .icon .hold {
+    --size: 48px;
+  }
+  .motion-card h4 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  .motion-card .meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--marigold);
+    margin-bottom: 0.5rem;
+  }
+  .motion-card p {
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: rgba(244,237,224,0.78);
+  }
+
+  /* ============================================================
+     OUTRO
+     ============================================================ */
+  .outro {
+    /* uses .wall */
+    text-align: center;
+    padding: 8rem 5vw;
+  }
+  .outro h2 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-variation-settings: "wdth" 110, "opsz" 96;
+    font-size: clamp(2.5rem, 6vw, 5rem);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    max-width: 22ch;
+    margin: 0 auto 1.5rem;
+  }
+  .outro h2 em { font-style: italic; font-weight: 500; color: var(--coral); }
+  .outro p {
+    font-size: 1.1rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0 auto;
+  }
+  .outro .holds-row {
+    display: flex; justify-content: center; gap: 1.25rem;
+    margin-top: 3rem;
+    flex-wrap: wrap;
+  }
+
+  /* ============================================================
+     RESPONSIVE
+     ============================================================ */
+  @media (max-width: 900px) {
+    .type-grid, .topo-grid { grid-template-columns: 1fr; gap: 2rem; }
+    .comp-grid > * { grid-column: span 12 !important; }
+    section { padding: 4.5rem 1.5rem 5.5rem; }
+    .hero { padding: 3rem 1.5rem; }
+    .hero-holds { display: none; }
+    .stat { grid-template-columns: 80px 1fr 50px; gap: 0.75rem; }
+  }
+
+  /* fade-in on scroll */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+  .reveal.in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<!-- =========================================================
+     HERO
+     ========================================================= -->
+<section class="hero wall">
+  <div class="hero-top">
+    <span>Grit & Holds · Tactile System · v.01</span>
+    <span class="stamp">Spec / 2026</span>
+  </div>
+
+  <div class="hero-mid">
+    <div class="hero-eyebrow">A textured design language for climb · the board game</div>
+    <h1 class="hero-title">Grit<br>& <em>holds.</em></h1>
+    <p class="hero-sub">
+      <b>Real climbing has texture.</b> Sandstone walls, gritty plastic holds, the dust of yesterday's
+      chalk, taped routes that change every Wednesday. This system treats every surface as
+      something you could touch — saturated polychrome holds bolted to a warm gritty wall,
+      every shadow earned, every edge worn.
+    </p>
+  </div>
+
+  <div class="hero-holds">
+    <div class="hold coral hero-h1"></div>
+    <div class="hold lime hero-h2"></div>
+    <div class="hold cobalt hero-h3"></div>
+    <div class="hold marigold hero-h4"></div>
+    <div class="hold raspberry hero-h5"></div>
+    <div class="hold teal hero-h6"></div>
+  </div>
+
+  <div class="hero-bottom">
+    <div class="hero-tape-row">
+      <span class="tape coral">Sandstone</span>
+      <span class="tape teal">8 Holds</span>
+      <span class="tape marigold">Tactile</span>
+      <span class="tape violet">Polychrome</span>
+    </div>
+    <span>Scroll · Below ▾</span>
+  </div>
+</section>
+
+<!-- =========================================================
+     PALETTE — HOLDS BY COLOR
+     ========================================================= -->
+<section class="palette">
+  <div class="section-eyebrow">01 · Palette</div>
+  <h2 class="section-title">Eight holds. <em>One bag of chalk.</em></h2>
+
+  <div class="palette-grid">
+    <div class="palette-item reveal">
+      <div class="hold coral"></div>
+      <div>
+        <div class="name">Coral</div>
+        <div class="hex">#FF6845</div>
+      </div>
+      <div class="grade">Grade · V0–V2</div>
+    </div>
+    <div class="palette-item reveal">
+      <div class="hold marigold"></div>
+      <div>
+        <div class="name">Marigold</div>
+        <div class="hex">#FFAE28</div>
+      </div>
+      <div class="grade">Grade · V3</div>
+    </div>
+    <div class="palette-item reveal">
+      <div class="hold lime"></div>
+      <div>
+        <div class="name">Lime</div>
+        <div class="hex">#B6D62D</div>
+      </div>
+      <div class="grade">Grade · V4</div>
+    </div>
+    <div class="palette-item reveal">
+      <div class="hold teal"></div>
+      <div>
+        <div class="name">Teal</div>
+        <div class="hex">#1FB8A6</div>
+      </div>
+      <div class="grade">Grade · V5</div>
+    </div>
+    <div class="palette-item reveal">
+      <div class="hold cobalt"></div>
+      <div>
+        <div class="name">Cobalt</div>
+        <div class="hex">#2C66CF</div>
+      </div>
+      <div class="grade">Grade · V6</div>
+    </div>
+    <div class="palette-item reveal">
+      <div class="hold raspberry"></div>
+      <div>
+        <div class="name">Raspberry</div>
+        <div class="hex">#D8347D</div>
+      </div>
+      <div class="grade">Grade · V7</div>
+    </div>
+    <div class="palette-item reveal">
+      <div class="hold violet"></div>
+      <div>
+        <div class="name">Violet</div>
+        <div class="hex">#8857D4</div>
+      </div>
+      <div class="grade">Grade · V8+</div>
+    </div>
+    <div class="palette-item reveal">
+      <div class="hold chalk"></div>
+      <div>
+        <div class="name">Chalk</div>
+        <div class="hex">#F4EDE0</div>
+      </div>
+      <div class="grade">Surface · paper / dust</div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     TYPOGRAPHY
+     ========================================================= -->
+<section class="type-section wall">
+  <div class="section-eyebrow">02 · Typography</div>
+  <h2 class="section-title">Chunky display. <em>Honest body.</em></h2>
+
+  <div class="type-grid">
+    <div class="reveal">
+      <div class="type-meta">— Display</div>
+      <div class="type-display">Climb<br><em>or fall</em></div>
+      <div class="type-meta">Bricolage Grotesque · 700 / 800 · variable width</div>
+      <p style="margin-top: 0.75rem; color: var(--ink-soft); font-size: 0.95rem; line-height: 1.5; max-width: 50ch;">
+        A modern grotesque with character — slightly humanist, with a variable width axis you can
+        push wider for impact. Looks carved when paired with grit textures.
+      </p>
+    </div>
+
+    <div class="type-spec reveal">
+      <div class="type-meta" style="color: var(--coral); margin-bottom: 0.75rem;">— Body / UI</div>
+      <h3>Hanken Grotesk</h3>
+      <p>
+        A clean, approachable grotesque that holds up in long descriptions and small UI labels.
+        It carries route notes — <em>"crimps the whole way, then a single committing reach at the crux"</em>
+        — without getting in the way of the holds themselves.
+      </p>
+      <div class="type-mono">— Geist Mono · grades, coordinates, metadata · 5.11C / 14:32 UTC</div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     HOLD ANATOMY
+     ========================================================= -->
+<section class="anatomy">
+  <div class="section-eyebrow">03 · Hold Anatomy</div>
+  <h2 class="section-title">Six shapes. <em>Six hand positions.</em></h2>
+  <p style="color: var(--ink-soft); font-size: 1rem; line-height: 1.5; max-width: 60ch; margin-bottom: 2rem;">
+    Holds carry meta-information through their shape, not just their color. Players read them at
+    a glance: a jug means rest, a crimp means commit, a chip means a foothold-only.
+  </p>
+
+  <div class="anatomy-grid">
+    <div class="anatomy-item reveal">
+      <div class="hold jug coral"></div>
+      <h4>Jug</h4>
+      <div class="meta">Restable</div>
+      <p>Big and incut. Use as breath markers — places players regroup between actions.</p>
+    </div>
+    <div class="anatomy-item reveal">
+      <div class="hold sloper marigold"></div>
+      <h4>Sloper</h4>
+      <div class="meta">Friction</div>
+      <p>Wide and rounded. No edge. Costs more stamina — but no risk of slipping if you commit.</p>
+    </div>
+    <div class="anatomy-item reveal">
+      <div class="hold pinch teal"></div>
+      <h4>Pinch</h4>
+      <div class="meta">Grip cost</div>
+      <p>Held with thumb opposed. Costs chalk every turn it's used. Great for stability.</p>
+    </div>
+    <div class="anatomy-item reveal">
+      <div class="hold crimp raspberry"></div>
+      <h4>Crimp</h4>
+      <div class="meta">Risk hold</div>
+      <p>Small edge. High commitment. A failed crimp roll costs double stamina.</p>
+    </div>
+    <div class="anatomy-item reveal">
+      <div class="hold pocket violet"></div>
+      <h4>Pocket</h4>
+      <div class="meta">Specialty</div>
+      <p>One- or two-finger hole. Triggers special abilities for characters with finger-strength traits.</p>
+    </div>
+    <div class="anatomy-item reveal">
+      <div class="hold chip lime"></div>
+      <h4>Foot chip</h4>
+      <div class="meta">Foot only</div>
+      <p>Small. Foot placements only — never countable as a hand hold. Free to use, can't be removed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     VOLUMES
+     ========================================================= -->
+<section class="volumes wall">
+  <div class="section-eyebrow">04 · Volumes</div>
+  <h2 class="section-title">Geometric features. <em>Wall changes.</em></h2>
+  <p style="color: var(--ink-soft); font-size: 1rem; line-height: 1.5; max-width: 60ch; margin-bottom: 1rem;">
+    Volumes are bigger than holds — geometric prisms bolted to the wall that
+    reshape the surface itself. In game terms: terrain modifiers. They occupy multiple grid cells
+    and change which holds can be placed near them.
+  </p>
+
+  <div class="vol-grid">
+    <!-- Volume 1: Triangular prism -->
+    <div class="vol-item reveal">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="vgrit1">
+            <feTurbulence type="fractalNoise" baseFrequency="2.8" numOctaves="2" stitchTiles="stitch"/>
+            <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.4 0"/>
+            <feComposite in2="SourceGraphic" operator="in"/>
+          </filter>
+          <linearGradient id="vol1-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffd0b0"/>
+            <stop offset="100%" stop-color="#cc7044"/>
+          </linearGradient>
+          <linearGradient id="vol1-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#cc7044"/>
+            <stop offset="100%" stop-color="#7a3a18"/>
+          </linearGradient>
+        </defs>
+        <!-- left face -->
+        <polygon points="40,160 100,30 100,180" fill="url(#vol1-light)"/>
+        <!-- right face -->
+        <polygon points="100,30 160,160 100,180" fill="url(#vol1-dark)"/>
+        <!-- grit overlay -->
+        <polygon points="40,160 100,30 100,180" fill="black" opacity="0.5" filter="url(#vgrit1)"/>
+        <polygon points="100,30 160,160 100,180" fill="black" opacity="0.5" filter="url(#vgrit1)"/>
+        <!-- bolt holes -->
+        <circle cx="70" cy="140" r="2.5" fill="#1a0a05"/>
+        <circle cx="130" cy="140" r="2.5" fill="#1a0a05"/>
+        <circle cx="100" cy="60" r="2.5" fill="#1a0a05"/>
+      </svg>
+      <h4>Triangular Prism</h4>
+      <div class="meta">+1 reach · adds dyno target</div>
+    </div>
+
+    <!-- Volume 2: Wedge -->
+    <div class="vol-item reveal">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="vgrit2">
+            <feTurbulence type="fractalNoise" baseFrequency="2.8" numOctaves="2" stitchTiles="stitch"/>
+            <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.4 0"/>
+            <feComposite in2="SourceGraphic" operator="in"/>
+          </filter>
+          <linearGradient id="vol2-light" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#a8e0d8"/>
+            <stop offset="100%" stop-color="#1a8b7c"/>
+          </linearGradient>
+          <linearGradient id="vol2-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1a8b7c"/>
+            <stop offset="100%" stop-color="#0a4f44"/>
+          </linearGradient>
+        </defs>
+        <!-- top face -->
+        <polygon points="20,80 180,40 160,100 40,140" fill="url(#vol2-light)"/>
+        <!-- right face -->
+        <polygon points="180,40 160,100 160,180 180,150" fill="url(#vol2-dark)"/>
+        <!-- bottom-front face -->
+        <polygon points="40,140 160,100 160,180 40,180" fill="url(#vol2-light)" opacity="0.7"/>
+        <!-- grit -->
+        <polygon points="20,80 180,40 160,100 40,140" fill="black" opacity="0.45" filter="url(#vgrit2)"/>
+        <polygon points="180,40 160,100 160,180 180,150" fill="black" opacity="0.45" filter="url(#vgrit2)"/>
+        <polygon points="40,140 160,100 160,180 40,180" fill="black" opacity="0.45" filter="url(#vgrit2)"/>
+        <!-- bolts -->
+        <circle cx="100" cy="105" r="2.5" fill="#0a0402"/>
+        <circle cx="60" cy="160" r="2.5" fill="#0a0402"/>
+        <circle cx="140" cy="160" r="2.5" fill="#0a0402"/>
+      </svg>
+      <h4>Wedge</h4>
+      <div class="meta">−1 stamina · slab approach</div>
+    </div>
+
+    <!-- Volume 3: Dome / hemisphere -->
+    <div class="vol-item reveal">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="vgrit3">
+            <feTurbulence type="fractalNoise" baseFrequency="2.8" numOctaves="2" stitchTiles="stitch"/>
+            <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.4 0"/>
+            <feComposite in2="SourceGraphic" operator="in"/>
+          </filter>
+          <radialGradient id="vol3-grad" cx="35%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#f0d2a8"/>
+            <stop offset="40%" stop-color="#c8956a"/>
+            <stop offset="100%" stop-color="#5a3818"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="100" cy="155" rx="80" ry="20" fill="rgba(20,8,0,0.3)"/>
+        <path d="M 30,155 A 70,90 0 0 1 170,155 Z" fill="url(#vol3-grad)"/>
+        <path d="M 30,155 A 70,90 0 0 1 170,155 Z" fill="black" opacity="0.5" filter="url(#vgrit3)"/>
+        <circle cx="100" cy="105" r="3" fill="#0a0402"/>
+        <circle cx="65" cy="135" r="2.5" fill="#0a0402"/>
+        <circle cx="135" cy="135" r="2.5" fill="#0a0402"/>
+      </svg>
+      <h4>Dome</h4>
+      <div class="meta">Sloper-only · friction roll</div>
+    </div>
+
+    <!-- Volume 4: Pyramid -->
+    <div class="vol-item reveal">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="vgrit4">
+            <feTurbulence type="fractalNoise" baseFrequency="2.8" numOctaves="2" stitchTiles="stitch"/>
+            <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.4 0"/>
+            <feComposite in2="SourceGraphic" operator="in"/>
+          </filter>
+          <linearGradient id="vol4-l" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#d8b8e8"/>
+            <stop offset="100%" stop-color="#6840a0"/>
+          </linearGradient>
+          <linearGradient id="vol4-r" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#6840a0"/>
+            <stop offset="100%" stop-color="#3a1f5c"/>
+          </linearGradient>
+          <linearGradient id="vol4-f" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#9870c8"/>
+            <stop offset="100%" stop-color="#4a2870"/>
+          </linearGradient>
+        </defs>
+        <!-- left face -->
+        <polygon points="100,20 30,160 100,140" fill="url(#vol4-l)"/>
+        <!-- right face -->
+        <polygon points="100,20 170,160 100,140" fill="url(#vol4-r)"/>
+        <!-- front bottom face (visible apex) -->
+        <polygon points="30,160 100,140 170,160 100,180" fill="url(#vol4-f)"/>
+        <!-- grit -->
+        <polygon points="100,20 30,160 100,140" fill="black" opacity="0.5" filter="url(#vgrit4)"/>
+        <polygon points="100,20 170,160 100,140" fill="black" opacity="0.5" filter="url(#vgrit4)"/>
+        <polygon points="30,160 100,140 170,160 100,180" fill="black" opacity="0.5" filter="url(#vgrit4)"/>
+        <!-- bolt -->
+        <circle cx="100" cy="155" r="2.5" fill="#0a0402"/>
+      </svg>
+      <h4>Pyramid</h4>
+      <div class="meta">+2 reach · dyno feature</div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     COMPONENTS — Buttons, Card, Stats, Tags
+     ========================================================= -->
+<section class="components">
+  <div class="section-eyebrow">05 · Components</div>
+  <h2 class="section-title">Buttons that look <em>like holds you'd grab.</em></h2>
+
+  <div class="comp-grid">
+    <!-- Buttons -->
+    <div class="comp-card btn-holds reveal">
+      <div class="label"><span>— Action Buttons</span><span>—</span></div>
+      <div class="btn-row">
+        <button class="btn coral">Climb the Hold</button>
+        <button class="btn marigold">Chalk Up</button>
+      </div>
+      <div class="btn-row" style="margin-top: 1rem;">
+        <button class="btn teal">Rest Pitch</button>
+        <button class="btn chip">View Topo</button>
+      </div>
+      <p style="margin-top: 1.5rem; font-family: 'Geist Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em; color: var(--ink-soft); line-height: 1.6;">
+        // Primary actions take the form of grippy, dimensional holds.<br>
+        // Secondary actions read as flat tape "chips" — utility, not adventure.
+      </p>
+    </div>
+
+    <!-- Live route card -->
+    <div class="comp-card route-card reveal">
+      <div class="route-card-tape">Active Route</div>
+      <div class="route-card-inner">
+        <div class="route-card-head">
+          <div>
+            <h3>The <em>Slow Burn</em></h3>
+            <div class="meta">East face · 5.11c · trad · 14 bolts</div>
+          </div>
+          <div class="grade-hold">V5</div>
+        </div>
+        <div class="route-card-body">
+          <p class="desc">
+            Fourteen bolts up the back wall — crimping the entire way, then
+            <em>one big committing reach at the crux</em>. Bring a #2 cam.
+            Yesterday's chalk is still on the good hold.
+          </p>
+          <div class="stats">
+            <div class="stat stamina">
+              <span class="lbl">Stamina</span>
+              <div class="bar" style="--w: 67%;"></div>
+              <span class="val">4 / 6</span>
+            </div>
+            <div class="stat chalk">
+              <span class="lbl">Chalk</span>
+              <div class="bar" style="--w: 40%;"></div>
+              <span class="val">2 / 5</span>
+            </div>
+            <div class="stat gear">
+              <span class="lbl">Gear</span>
+              <div class="bar" style="--w: 60%;"></div>
+              <span class="val">3 / 5</span>
+            </div>
+            <div class="stat risk">
+              <span class="lbl">Risk</span>
+              <div class="bar" style="--w: 82%;"></div>
+              <span class="val">HI</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tags -->
+    <div class="comp-card tags-block reveal">
+      <div class="label"><span>— Tags · Route Tape</span><span>tape strips, never pills</span></div>
+      <div class="tags-row">
+        <span class="tape coral">Trad</span>
+        <span class="tape marigold">Crux · Hard</span>
+        <span class="tape lime">Cleared ✓</span>
+        <span class="tape teal">Multi-Pitch</span>
+        <span class="tape cobalt">Multi-Player</span>
+        <span class="tape raspberry">Featured</span>
+        <span class="tape violet">Granite</span>
+        <span class="tape chalk">First Ascent</span>
+      </div>
+      <p style="margin-top: 1.5rem; font-family: 'Geist Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em; color: var(--ink-soft); line-height: 1.6;">
+        // Tags appear as actual tape strips — slightly translucent, slightly off-axis. Each colored tape carries the same meta as its hold counterpart.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     ROUTE TOPO PREVIEW
+     ========================================================= -->
+<section class="topo-section wall">
+  <div class="section-eyebrow">06 · Route View</div>
+  <h2 class="section-title">A route is <em>a sequence of holds.</em></h2>
+  <p style="color: var(--ink-soft); font-size: 1rem; line-height: 1.55; max-width: 60ch;">
+    The board itself is the climbing wall — gritty sandstone with T-nut bolt holes on a regular grid.
+    Holds get bolted on, footchips scattered around, the route is traced by the colored tape.
+  </p>
+
+  <div class="topo-grid">
+    <!-- Topo board -->
+    <div class="topo-board reveal">
+      <svg class="route-line" viewBox="0 0 300 400" preserveAspectRatio="none">
+        <!-- dashed route line -->
+        <path d="M 138,388 L 122,338 L 178,310 L 188,232 L 132,170 L 96,118 L 152,72"
+              stroke="rgba(216,52,125,0.7)"
+              stroke-width="3"
+              stroke-dasharray="6 4"
+              fill="none"
+              stroke-linecap="round"/>
+      </svg>
+      <!-- route holds with a colored tape, all in raspberry (this route's color) -->
+      <div class="hold raspberry h-base"></div>
+      <div class="hold raspberry h-1"></div>
+      <div class="hold raspberry h-2"></div>
+      <div class="hold raspberry h-crux" style="border-radius: 60% 60% 30% 30% / 70% 70% 25% 25%;"></div>
+      <div class="hold raspberry h-3"></div>
+      <div class="hold raspberry h-4"></div>
+      <div class="hold raspberry h-top"></div>
+      <!-- foot chips in lime (the foot color) -->
+      <div class="hold lime chip h-c1"></div>
+      <div class="hold lime chip h-c2"></div>
+      <div class="hold lime chip h-c3"></div>
+      <div class="hold lime chip h-c4"></div>
+    </div>
+
+    <!-- Topo info -->
+    <div class="topo-info reveal">
+      <h3>The <em>Slow Burn</em></h3>
+      <div class="grade-line">5.11c · V5 · East Face</div>
+      <p>
+        Seven raspberry holds bolted top-to-bottom on the east wall. The crux is the third hold up —
+        a small crimp, easy to misread. Lime foot-chips scattered around the line; you can use any of
+        them, but they're free for everyone.
+      </p>
+      <div class="topo-legend">
+        <div class="topo-legend-row">
+          <span class="swatch raspberry"></span>
+          <b>Raspberry</b> · route holds
+          <span class="meta">7 placed</span>
+        </div>
+        <div class="topo-legend-row">
+          <span class="swatch raspberry"></span>
+          <b>Crimp shape</b> · the crux
+          <span class="meta">hold #4</span>
+        </div>
+        <div class="topo-legend-row">
+          <span class="swatch lime"></span>
+          <b>Lime chips</b> · feet (free)
+          <span class="meta">4 placed</span>
+        </div>
+        <div class="topo-legend-row">
+          <span class="swatch chalk"></span>
+          <b>Tape line</b> · route trace
+          <span class="meta">dashed</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     MOTION & MICRO
+     ========================================================= -->
+<section class="motion">
+  <div class="section-eyebrow">07 · Motion</div>
+  <h2 class="section-title">Every hold has <em>weight.</em></h2>
+  <p style="color: rgba(244,237,224,0.7); font-size: 1rem; line-height: 1.55; max-width: 60ch;">
+    Animations should feel like you can feel them through the screen. Tactile, weighted,
+    a little resistant. Nothing floats. Nothing pops. Things press, settle, dust.
+  </p>
+
+  <div class="motion-grid">
+    <div class="motion-card reveal">
+      <div class="icon"><div class="hold coral" style="--size: 48px;"></div></div>
+      <div class="meta">— grab + press</div>
+      <h4>Hold Press</h4>
+      <p>Tap a hold → it shifts down 2px and the inset shadow deepens for 80ms, then settles. Like pressing flesh into rubber. No bounce.</p>
+    </div>
+    <div class="motion-card reveal">
+      <div class="icon"><div class="hold chalk" style="--size: 48px;"></div></div>
+      <div class="meta">— particles</div>
+      <h4>Chalk Burst</h4>
+      <p>On a successful send, the touched hold puffs 8–12 small chalk particles upward, drifting and fading over 1.4s. Cheap fluid simulation, not a confetti pop.</p>
+    </div>
+    <div class="motion-card reveal">
+      <div class="icon"><div class="hold raspberry" style="--size: 48px;"></div></div>
+      <div class="meta">— route reveal</div>
+      <h4>Tape Trace</h4>
+      <p>Route lines reveal stroke-by-stroke from base to top, ~900ms ease-out, with a subtle dash crawl. Like watching a setter mark a problem.</p>
+    </div>
+    <div class="motion-card reveal">
+      <div class="icon"><div class="hold marigold" style="--size: 48px;"></div></div>
+      <div class="meta">— hover</div>
+      <h4>Bolt Wiggle</h4>
+      <p>Hover any hold → it rotates −3° and lifts 3px in 250ms. Settles back on leave. Subtle but full of life — holds aren't decorative.</p>
+    </div>
+    <div class="motion-card reveal">
+      <div class="icon"><div class="hold teal" style="--size: 48px;"></div></div>
+      <div class="meta">— failure</div>
+      <h4>Whip Fall</h4>
+      <p>A failed crux roll: the active card shakes laterally for 200ms then drops 60px with gravity easing. Recovers with a faint dust-rise on the wall behind it.</p>
+    </div>
+    <div class="motion-card reveal">
+      <div class="icon"><div class="hold violet" style="--size: 48px;"></div></div>
+      <div class="meta">— ambient</div>
+      <h4>Wall Breathing</h4>
+      <p>The wall texture has a 6-second ambient ripple — barely visible, just enough to feel the room is alive. The grit shifts 1px on a slow sine.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     OUTRO
+     ========================================================= -->
+<section class="outro wall">
+  <div class="section-eyebrow" style="text-align: center;">— end of spec</div>
+  <h2>One bag of chalk.<br><em>Eight saturated holds.</em><br>One sandstone wall.</h2>
+  <p>
+    Every surface in this system carries grit, weight, and a fingerprint of use. Color is meta,
+    shape is gameplay, texture is feeling. The wall is warm. The holds are loud. The chalk is real.
+  </p>
+
+  <div class="holds-row">
+    <div class="hold coral" style="--size: 56px;"></div>
+    <div class="hold marigold" style="--size: 56px;"></div>
+    <div class="hold lime" style="--size: 56px;"></div>
+    <div class="hold teal" style="--size: 56px;"></div>
+    <div class="hold cobalt" style="--size: 56px;"></div>
+    <div class="hold raspberry" style="--size: 56px;"></div>
+    <div class="hold violet" style="--size: 56px;"></div>
+    <div class="hold chalk" style="--size: 56px;"></div>
+  </div>
+</section>
+
+<script>
+  // reveal-on-scroll
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+
+</body>
+</html>
