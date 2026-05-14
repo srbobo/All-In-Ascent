@@ -202,14 +202,16 @@
       <input id="room" placeholder="e.g. friday-night">
       <label for="password">Room password</label>
       <input id="password" type="password" placeholder="set by the host on first join">
-      <label for="host">Backend host (PartyKit URL)</label>
-      <input id="host" placeholder="all-in-ascent.YOUR-USER.partykit.dev">
+      <!-- Backend host is auto-detected from window.location; hidden from users.
+           Override during testing via ?host=<hostname> in the URL. -->
+      <input id="host" type="hidden">
       <div class="row" style="margin-top: 12px;">
         <button id="joinBtn">Join / Create Room</button>
         <button class="ghost" onclick="window.location='index.html'">Local Play Instead</button>
       </div>
       <div class="sub" style="text-align: left; margin-top: 12px; text-transform: none; letter-spacing: 0; font-size: 13px;">
         First person to join a fresh room is the host and sets the password.
+        Share the room ID + password with friends so they can join.
       </div>
     </div>
   </div>
@@ -265,6 +267,23 @@
 
 </div>
 
+<!-- Surface any unhandled JS error so a broken module load doesn't fail silently
+     (a silent ESM import failure was the cause of "click does nothing" once
+     already — see online/client.js comment). -->
+<script>
+  window.addEventListener('error', (e) => {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = 'Client error: ' + (e.message || 'see DevTools console');
+    t.classList.remove('hidden');
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = 'Client error: ' + (e.reason?.message || e.reason || 'see DevTools console');
+    t.classList.remove('hidden');
+  });
+</script>
 <script type="module" src="./online/client.js"></script>
 </body>
 </html>

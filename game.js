@@ -596,7 +596,11 @@ function renderMilestonePanel() {
 
  const route = milestone.route;
  const area = milestone.area;
- const areaIcon = area === 'bouldering' ? '': (area === 'topRope' ? '': '');
+ const areaLabel = area === 'bouldering' ? 'Bouldering'
+                  : area === 'topRope'    ? 'Top Rope'
+                                          : 'Lead Climbing';
+ const areaColors = { bouldering: '#ff6845', topRope: '#1fb8a6', leadClimbing: '#d8347d' };
+ const areaColor = areaColors[area] || '#6c757d';
  const milestoneRouteTypeColors = { Slab: '#17a2b8', Vertical: '#28a745', Overhang: '#fd7e14', Traverse: '#6f42c1' };
  const milestoneRouteTypeColor = milestoneRouteTypeColors[route.routeType] || '#6c757d';
 
@@ -605,8 +609,11 @@ function renderMilestonePanel() {
  <div style="font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">
  ${icons[difficulty]} ${difficulty.toUpperCase()}
  </div>
+ <div style="margin-bottom: 6px;">
+ <span style="display: inline-block; background: ${areaColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase;">${areaLabel}</span>
+ </div>
  <div style="font-size: 1.1em; font-weight: bold; color: #667eea; margin-bottom: 5px;">
- ${areaIcon} ${route.name}
+ ${route.name}
  </div>
  <div style="margin-bottom: 6px;">
  <span style="display: inline-block; background: ${milestoneRouteTypeColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold;">${route.routeType || 'Unknown'}</span>
@@ -790,6 +797,13 @@ function startGame() {
  renderGameBoard();
  addLog("Game started! Round 1 begins.");
  addLog(" Milestone routes have been set! First player to complete all 3 wins the game!");
+
+ // EFFECTS: opening round transition + first turn log.
+ if (window.Effects) {
+ const first = gameState.players[0];
+ if (first) window.Effects.beginTurn(first.playerNum, first.character.name);
+ window.Effects.roundTransition(1);
+ }
 }
 
 function initializeRoutes() {
@@ -879,12 +893,112 @@ function renderLog() {
 function renderGameBoard() {
  renderMilestonePanel();
  renderGameInfo();
+ renderPlayerStrip();
  renderPlayers();
  renderRoutes();
  renderTraining();
  renderStore();
  renderRestArea();
  updateTurnIndicator();
+}
+
+function renderPlayerStrip() {
+ // Compact at-a-glance card per player, pinned to the top of the viewport.
+ // Click a card to reveal the full player panels and scroll to that player.
+ const strip = document.getElementById('playerStrip');
+ if (!strip) return;
+ strip.innerHTML = '';
+
+ // Collapse (×) button anchored to the strip itself.
+ const collapseBtn = document.createElement('button');
+ collapseBtn.className = 'strip-collapse';
+ collapseBtn.setAttribute('aria-label', 'Hide player strip');
+ collapseBtn.title = 'Hide player strip';
+ collapseBtn.innerHTML = '&times;';
+ collapseBtn.onclick = (e) => { e.stopPropagation(); toggleStrip(); };
+ strip.appendChild(collapseBtn);
+
+ gameState.players.forEach((player, idx) => {
+  const char = player.character;
+  if (!char.gearBonuses) char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
+
+  const isCurrent = idx === gameState.currentPlayerIndex;
+  const exhausted = char.timeRemaining <= 0;
+  const endPct = (char.currentEndurance / char.maxEndurance) * 100;
+  const xpForLevel = XP_TABLE[char.level - 1];
+  const xpPct = char.level < 15 ? ((char.xp - xpForLevel.cumulative) / xpForLevel.needed) * 100 : 100;
+  const msComplete = ['beginner', 'intermediate', 'expert'].map(tier => char.milestonesCompleted[tier]);
+
+  const card = document.createElement('div');
+  card.className = 'strip-card' + (isCurrent ? ' active' : '') + (exhausted ? ' exhausted' : '');
+  card.setAttribute('data-strip-player', player.playerNum);
+  card.onclick = () => expandPlayerDetails(player.playerNum);
+
+  card.innerHTML = `
+   <div class="strip-name">
+    <span>P${player.playerNum} · ${char.name}</span>
+    <span class="char">L${char.level}</span>
+   </div>
+   <div class="strip-bars">
+    <div class="strip-bar endurance">
+     <div class="fill" style="width: ${endPct}%;"></div>
+     <div class="label">END ${char.currentEndurance}/${char.maxEndurance}</div>
+    </div>
+    <div class="strip-bar xp">
+     <div class="fill" style="width: ${xpPct}%;"></div>
+     <div class="label">${char.level < 15 ? `XP ${char.xp - xpForLevel.cumulative}/${xpForLevel.needed}` : 'MAX'}</div>
+    </div>
+   </div>
+   <div class="strip-meta">
+    <span class="pip">Time ${char.timeRemaining}</span>
+    <span class="pip">XP-sp ${getSpendableXP(char)}</span>
+    <span class="pip dots">
+     <span class="dot ${msComplete[0] ? 'filled beg' : ''}" title="Beginner"></span>
+     <span class="dot ${msComplete[1] ? 'filled int' : ''}" title="Intermediate"></span>
+     <span class="dot ${msComplete[2] ? 'filled exp' : ''}" title="Expert"></span>
+    </span>
+   </div>
+   <div class="strip-location">${formatLocationName(char.location)}</div>
+  `;
+  strip.appendChild(card);
+ });
+}
+
+function expandPlayerDetails(playerNum) {
+ // Reveal the full-detail panels (if hidden) and scroll to the clicked player.
+ const container = document.getElementById('playersContainer');
+ const toggle = document.getElementById('toggleFullPanels');
+ if (container && container.classList.contains('collapsed')) {
+  container.classList.remove('collapsed');
+  if (toggle) toggle.innerHTML = 'Hide full player details ▴';
+ }
+ // Scroll the requested player's panel into view (accounts for sticky strip height).
+ requestAnimationFrame(() => {
+  const target = document.getElementById(`player-${playerNum}-panel`);
+  if (target) {
+   const stripHeight = document.getElementById('playerStrip')?.offsetHeight || 0;
+   const rect = target.getBoundingClientRect();
+   window.scrollTo({ top: window.scrollY + rect.top - stripHeight - 20, behavior: 'smooth' });
+  }
+ });
+}
+
+function toggleFullPlayerPanels() {
+ const container = document.getElementById('playersContainer');
+ const toggle = document.getElementById('toggleFullPanels');
+ if (!container || !toggle) return;
+ const collapsed = container.classList.toggle('collapsed');
+ toggle.innerHTML = collapsed ? 'Show full player details ▾' : 'Hide full player details ▴';
+}
+
+function toggleStrip() {
+ // Hide/show the sticky player strip. When hidden, surface a fixed
+ // top-right pill so the user can re-open it without hunting through a menu.
+ const strip = document.getElementById('playerStrip');
+ const reopen = document.getElementById('stripReopen');
+ if (!strip || !reopen) return;
+ const nowHidden = strip.classList.toggle('hidden');
+ reopen.classList.toggle('hidden', !nowHidden);
 }
 
 function renderRestArea() {
@@ -963,6 +1077,8 @@ function renderPlayers() {
  const panel = document.createElement('div');
  const timeExhausted = char.timeRemaining <= 0;
  panel.className = 'player-panel' + (isCurrentPlayer ? ' player-turn': '') + (timeExhausted ? ' time-exhausted': '');
+ panel.setAttribute('data-player', player.playerNum);
+ panel.id = `player-${player.playerNum}-panel`;
 
  const endurancePercent = (char.currentEndurance / char.maxEndurance) * 100;
  const xpForLevel = XP_TABLE[char.level - 1];
@@ -1033,7 +1149,7 @@ function renderPlayers() {
  <div>
  <strong>Endurance:</strong> ${char.currentEndurance} / ${char.maxEndurance}
  <div class="endurance-bar">
- <div class="endurance-fill" style="width: ${endurancePercent}%">
+ <div class="endurance-fill" data-endurance-bar="${player.playerNum}" id="endurance-bar-${player.playerNum}" style="width: ${endurancePercent}%">
  ${Math.round(endurancePercent)}%
  </div>
  </div>
@@ -1042,7 +1158,7 @@ function renderPlayers() {
  <div>
  <strong>XP Progress to Level ${char.level < 15 ? char.level + 1: 15}:</strong>
  <div class="xp-bar">
- <div class="xp-fill" style="width: ${xpProgress}%">
+ <div class="xp-fill" data-xp-bar="${player.playerNum}" id="xp-bar-${player.playerNum}" style="width: ${xpProgress}%">
  ${char.level < 15 ? `${xpForLevel.needed - xpToGo} / ${xpForLevel.needed}`: 'MAX'}
  </div>
  </div>
@@ -1061,10 +1177,10 @@ function renderPlayers() {
  </div>
 
  ${char.equipment.length > 0 ? `
- <div class="equipment-list">
+ <div class="equipment-list" data-inventory="${player.playerNum}" id="inventory-${player.playerNum}">
  ${char.equipment.map(e => `<div class="equipment-badge">${e}</div>`).join('')}
  </div>
- `: ''}
+ `: '<div class="equipment-list" data-inventory="' + player.playerNum + '" id="inventory-' + player.playerNum + '" style="min-height:1px;"></div>'}
 
  <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
  ${(() => {
@@ -1423,10 +1539,17 @@ function renderStore() {
  const hasGearBag = char.equipment.includes('Gear Bag');
  const canVisitStore = hasGearBag || char.timeRemaining >= 1;
 
- // ===== SECTION 1: ESSENTIAL ACCESS GEAR (Always visible) =====
+ // Two-column wrapper: essential gear on the left, rotating gear on the right.
+ const columnsWrapper = document.createElement('div');
+ columnsWrapper.className = 'gear-shop-columns';
+
+ // ===== LEFT COLUMN: ESSENTIAL ACCESS GEAR =====
  const accessGearSection = document.createElement('div');
- accessGearSection.style.cssText = 'background: #fff9e6; border: 2px solid #ffc107; border-radius: 10px; padding: 15px; margin-bottom: 20px;';
- accessGearSection.innerHTML = '<h3 style="margin: 0 0 10px 0; color: #856404; font-size: 1.1em;"> Essential Access Gear (Required for Areas)</h3>';
+ accessGearSection.className = 'essential-col';
+ accessGearSection.innerHTML = `
+   <h3 class="column-header">Required Equipment</h3>
+   <div class="column-subhead">Gates access to Top Rope and Lead Climbing</div>
+ `;
 
  // Define the 4 essential access cards
  const accessCardNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
@@ -1455,6 +1578,7 @@ function renderStore() {
 
  const card = document.createElement('div');
  card.className = 'gear-card access-gear-card' + (owned ? ' owned': '') + (!prerequisitesMet ? ' locked': '');
+ card.setAttribute('data-gear-slot', gear.name);
  if (!owned && (!canAfford || !prerequisitesMet)) card.style.opacity = '0.5';
 
  card.onclick = () => !owned && canAfford && prerequisitesMet && purchaseGear(gear);
@@ -1476,11 +1600,15 @@ function renderStore() {
  accessGearSection.appendChild(card);
  });
 
- container.appendChild(accessGearSection);
+ columnsWrapper.appendChild(accessGearSection);
 
- // ===== SECTION 2: AVAILABLE GEAR (Rotating selection) =====
+ // ===== RIGHT COLUMN: AVAILABLE GEAR (Rotating selection) =====
  const availableGearSection = document.createElement('div');
- availableGearSection.innerHTML = '<h3 style="margin: 0 0 10px 0; color: #333; font-size: 1.1em;"> Available Gear</h3>';
+ availableGearSection.className = 'available-col';
+ availableGearSection.innerHTML = `
+   <h3 class="column-header">Available Gear</h3>
+   <div class="column-subhead">Rotating selection — refills when purchased</div>
+ `;
 
  gameState.availableGear.forEach(gear => {
  const owned = char.equipment.includes(gear.name);
@@ -1505,6 +1633,7 @@ function renderStore() {
 
  const card = document.createElement('div');
  card.className = 'gear-card' + (owned ? ' owned': '') + (!prerequisitesMet ? ' locked': '');
+ card.setAttribute('data-gear-slot', gear.name);
  if (!owned && (!canAfford || !prerequisitesMet)) card.style.opacity = '0.5';
 
  card.onclick = () => !owned && canAfford && prerequisitesMet && purchaseGear(gear);
@@ -1526,7 +1655,8 @@ function renderStore() {
  availableGearSection.appendChild(card);
  });
 
- container.appendChild(availableGearSection);
+ columnsWrapper.appendChild(availableGearSection);
+ container.appendChild(columnsWrapper);
 }
 
 // ===== CHARACTER ABILITY SYSTEM =====
@@ -1830,12 +1960,38 @@ function attemptClimb(route, area) {
  // Check for level up
  checkLevelUp(char);
 
- // Show result modal — turn advance happens when modal is closed via closeClimbModal()
- showClimbResult(route, rolls, diceToUse, totalStats, effectiveRequirements, diceEffects, success, xpGained, activatedAbility);
+ // EFFECTS: floating numbers + chalk puff + dice anticipation + turn log.
+ const fxPlayer = currentPlayer.playerNum;
+ if (window.Effects) {
+ const enduranceBar = window.Effects.locateEnduranceBar(fxPlayer);
+ const xpBar = window.Effects.locateXpBar(fxPlayer);
+ if (enduranceBar) {
+ window.Effects.chalkPuff(enduranceBar, 'coral');
+ window.Effects.floatNumber(enduranceBar, `−${route.endurance} END`, 'endurance-loss');
+ }
+ if (xpBar && xpGained > 0) {
+ setTimeout(() => window.Effects.floatNumber(xpBar, `+${xpGained} XP`, 'xp'), 220);
+ }
+ window.Effects.recordTurnAction({
+ kind: success ? 'climb✓' : 'climb✗',
+ desc: `${route.name} (${route.grade})`,
+ delta: `${xpGained > 0 ? '+' : ''}${xpGained} XP`,
+ });
+ }
 
  // Add log with ability notation
  const abilityLog = activatedAbility ? ` (${activatedAbility})`: '';
  addLog(`Player ${currentPlayer.playerNum} ${success ? 'completed': 'failed'} ${route.name} (${route.grade})${abilityLog} - ${xpGained} XP gained`);
+
+ // Show result modal — turn advance happens when modal is closed via closeClimbModal().
+ // Brief anticipation pause so the dice "settle" before reveal.
+ if (window.Effects && typeof window.Effects.diceAnticipation === 'function') {
+ window.Effects.diceAnticipation(420).then(() => {
+ showClimbResult(route, rolls, diceToUse, totalStats, effectiveRequirements, diceEffects, success, xpGained, activatedAbility);
+ });
+ } else {
+ showClimbResult(route, rolls, diceToUse, totalStats, effectiveRequirements, diceEffects, success, xpGained, activatedAbility);
+ }
 }
 
 function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, activatedAbility) {
@@ -1964,6 +2120,23 @@ function trainAction(area) {
  const newTotal = char.trainingBonuses[area.stat];
  addLog(`Player ${currentPlayer.playerNum} trained at ${area.name} - gained +${area.bonus} ${statIcons[area.stat]} ${area.stat} (total training bonus: +${newTotal})`);
 
+ // EFFECTS: stat boost + endurance puff + turn log.
+ if (window.Effects) {
+ const fxPlayer = currentPlayer.playerNum;
+ const panel = window.Effects.locatePlayerPanel(fxPlayer);
+ const enduranceBar = window.Effects.locateEnduranceBar(fxPlayer);
+ if (panel) window.Effects.floatNumber(panel, `+${area.bonus} ${area.stat.slice(0, 3).toUpperCase()}`, 'stat');
+ if (enduranceBar && area.endurance > 0) {
+ window.Effects.chalkPuff(enduranceBar, 'cobalt');
+ setTimeout(() => window.Effects.floatNumber(enduranceBar, `−${area.endurance} END`, 'endurance-loss'), 180);
+ }
+ window.Effects.recordTurnAction({
+ kind: 'train',
+ desc: `${area.name} (+${area.bonus} ${area.stat})`,
+ delta: area.endurance > 0 ? `−${area.endurance} END` : null,
+ });
+ }
+
  checkTurnEnd();
  renderGameBoard();
 }
@@ -2012,6 +2185,21 @@ function restAction() {
  if (char.key === 'routeReader') {
  char.betaBoostActive = true;
  addLog(`Player ${currentPlayer.playerNum}: Beta Boost active — +3 to all stats on next climb!`);
+ }
+
+ // EFFECTS: endurance gain (positive chalk) + turn log.
+ if (window.Effects) {
+ const fxPlayer = currentPlayer.playerNum;
+ const enduranceBar = window.Effects.locateEnduranceBar(fxPlayer);
+ if (enduranceBar) {
+ window.Effects.chalkPuff(enduranceBar, 'lime');
+ window.Effects.floatNumber(enduranceBar, `+${recovery + restBonus} END`, 'endurance-gain');
+ }
+ window.Effects.recordTurnAction({
+ kind: 'rest',
+ desc: `Rested${restBonus > 0 ? ` (+${restBonus} gear)` : ''}`,
+ delta: `+${recovery + restBonus} END`,
+ });
  }
 
  checkTurnEnd();
@@ -2225,18 +2413,50 @@ function attemptClimbWithMilestone(route, area, difficulty) {
  checkLevelUp(char);
 
  // If successful, mark milestone complete
+ const areaLogLabel = area === 'bouldering' ? 'Bouldering'
+                     : area === 'topRope'    ? 'Top Rope'
+                                             : 'Lead Climbing';
  if (success) {
  char.milestonesCompleted[difficulty] = true;
- addLog(` Player ${currentPlayer.playerNum} completed the ${difficulty.toUpperCase()} milestone: ${route.name}!`);
+ addLog(` Player ${currentPlayer.playerNum} completed the ${difficulty.toUpperCase()} milestone: ${route.name} (${areaLogLabel})!`);
 
  // Check for victory
  checkVictory(currentPlayer);
  } else {
- addLog(`Player ${currentPlayer.playerNum} attempted ${difficulty} milestone "${route.name}" but failed. Gained ${xpGained} XP.`);
+ addLog(`Player ${currentPlayer.playerNum} attempted ${difficulty} milestone "${route.name}" (${areaLogLabel}) but failed. Gained ${xpGained} XP.`);
  }
 
- // Show result modal — turn advance happens when modal is closed via closeClimbModal()
+ // EFFECTS: floating numbers, chalk puff, dice anticipation, turn log.
+ const fxPlayer = currentPlayer.playerNum;
+ if (window.Effects) {
+ const enduranceBar = window.Effects.locateEnduranceBar(fxPlayer);
+ const xpBar = window.Effects.locateXpBar(fxPlayer);
+ const panel = window.Effects.locatePlayerPanel(fxPlayer);
+ if (enduranceBar) {
+ window.Effects.chalkPuff(enduranceBar, 'coral');
+ window.Effects.floatNumber(enduranceBar, `−${route.endurance} END`, 'endurance-loss');
+ }
+ if (xpBar && xpGained > 0) {
+ setTimeout(() => window.Effects.floatNumber(xpBar, `+${xpGained} XP`, 'xp'), 220);
+ }
+ if (success && panel) {
+ setTimeout(() => window.Effects.floatNumber(panel, `MILESTONE ${difficulty.toUpperCase()}!`, 'stat'), 480);
+ }
+ window.Effects.recordTurnAction({
+ kind: success ? 'milestone✓' : 'milestone✗',
+ desc: `${difficulty} — ${route.name}`,
+ delta: `${xpGained > 0 ? '+' : ''}${xpGained} XP`,
+ });
+ }
+
+ // Show result modal — turn advance happens when modal is closed via closeClimbModal().
+ if (window.Effects && typeof window.Effects.diceAnticipation === 'function') {
+ window.Effects.diceAnticipation(540).then(() => {
  showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, null);
+ });
+ } else {
+ showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, null);
+ }
 }
 
 function checkVictory(player) {
@@ -2361,6 +2581,13 @@ function purchaseGear(gear) {
  const hasGearBag = char.equipment.includes('Gear Bag');
  const timeCost = hasGearBag ? 0: 1;
 
+ // EFFECTS: capture the source card position BEFORE the re-render destroys it.
+ const fxSrcCard = document.querySelector(`[data-gear-slot="${gear.name.replace(/"/g, '\\"')}"]`);
+ const fxSrcRect = fxSrcCard && fxSrcCard.getBoundingClientRect();
+ const fxSrcGhost = fxSrcRect ? { left: fxSrcRect.left + fxSrcRect.width / 2, top: fxSrcRect.top + fxSrcRect.height / 2 } : null;
+ const fxPlayerNum = currentPlayer.playerNum;
+ const fxNewlyReplacedSlot = !['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'].includes(gear.name) ? gear.name : null;
+
  char.timeRemaining -= timeCost;
  char.xp -= effectiveCost;
 
@@ -2399,8 +2626,48 @@ function purchaseGear(gear) {
  // Replace purchased gear with new one
  replaceGearInShop(gear.name);
 
+ // EFFECTS: record the purchase for the turn summary.
+ if (window.Effects) {
+ window.Effects.recordTurnAction({
+ kind: 'gear',
+ desc: `Bought ${gear.name}`,
+ delta: `−${effectiveCost} XP`,
+ });
+ }
+
  checkTurnEnd();
  renderGameBoard();
+
+ // EFFECTS: post-render — fly the gear from shop to inventory, flip the
+ // replacement card in the shop, and chalk-puff the player's XP bar.
+ if (window.Effects) {
+ requestAnimationFrame(() => {
+ const destInv = document.getElementById(`inventory-${fxPlayerNum}`);
+ // Use the original captured source center so the animation flows from
+ // where the shop card USED to be, before the re-render moved it.
+ const srcStub = fxSrcGhost ? { getBoundingClientRect: () => ({ left: fxSrcGhost.left - 60, top: fxSrcGhost.top - 16, width: 120, height: 32, right: 0, bottom: 0 }) } : null;
+ if (srcStub && destInv) window.Effects.flyToInventory(srcStub, destInv, gear.name);
+ const xpBar = window.Effects.locateXpBar(fxPlayerNum);
+ if (xpBar) window.Effects.floatNumber(xpBar, `−${effectiveCost} XP`, 'xp');
+ // Flip the newly drawn replacement card in the shop, if any.
+ if (fxNewlyReplacedSlot) {
+ // After replaceGearInShop, the new card occupies the slot. Find the
+ // newest gear card that wasn't previously rendered. Simplest: flip
+ // any card whose data-gear-slot matches the newly available pool.
+ const allShop = document.querySelectorAll('.gear-card');
+ allShop.forEach(c => {
+ const slot = c.getAttribute('data-gear-slot');
+ if (slot && slot !== gear.name && gameState.availableGear.find(g => g.name === slot)) {
+ // No surgical way to distinguish "new" from "still there"; flip
+ // them all briefly is cheaper and reads as "shop refreshed".
+ }
+ });
+ // Cheap honest version: flip every card in the rotating-gear section.
+ const rotating = Array.from(document.querySelectorAll('.gear-card:not(.access-gear-card)'));
+ rotating.forEach((c, i) => setTimeout(() => window.Effects.cardFlip(c), i * 60));
+ }
+ });
+ }
 }
 
 function checkLevelUp(char) {
@@ -2501,6 +2768,12 @@ function determineNextPlayer() {
 
  // Set the current player to the one with the most time
  if (nextPlayerIndex !== -1 && nextPlayerIndex !== gameState.currentPlayerIndex) {
+ // EFFECTS: show the prior player's turn-end summary, then reset for the new player.
+ if (window.Effects) {
+ window.Effects.turnSummaryCard();
+ const nextPlayer = gameState.players[nextPlayerIndex];
+ window.Effects.beginTurn(nextPlayer.playerNum, nextPlayer.character.name);
+ }
  gameState.currentPlayerIndex = nextPlayerIndex;
  addLog(`Turn passes to Player ${gameState.players[nextPlayerIndex].playerNum} (${maxTime} time remaining)`);
  renderGameBoard();
@@ -2547,6 +2820,16 @@ function endRound() {
  gameState.currentPlayerIndex = 0;
 
  addLog(`Round ${gameState.round} begins!`);
+
+ // EFFECTS: round transition wipe + turn log reset for new player.
+ if (window.Effects) {
+ // Flush whatever turn log was pending for the previous player.
+ window.Effects.turnSummaryCard();
+ window.Effects.roundTransition(gameState.round);
+ const firstPlayer = gameState.players[gameState.currentPlayerIndex];
+ if (firstPlayer) window.Effects.beginTurn(firstPlayer.playerNum, firstPlayer.character.name);
+ }
+
  renderGameBoard();
 }
 
@@ -2674,6 +2957,9 @@ window.closeClimbModal = closeClimbModal;
 window.closeLevelUpModal = closeLevelUpModal;
 window.restAction = restAction;
 window.attemptMilestoneRoute = attemptMilestoneRoute;
+window.toggleFullPlayerPanels = toggleFullPlayerPanels;
+window.expandPlayerDetails = expandPlayerDetails;
+window.toggleStrip = toggleStrip;
 
 // Initialize on page load
 window.onload = function() {

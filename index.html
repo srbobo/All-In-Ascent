@@ -101,7 +101,10 @@
  0 12px 32px rgba(40,20,10,0.32),
  0 24px 48px rgba(40,20,10,0.16),
  inset 0 1px 0 rgba(255,255,255,0.5);
- overflow: hidden;
+ /* `clip` not `hidden`: still clips rounded corners but does NOT become
+    the containing block for position:sticky descendants (the player strip
+    needs to be sticky against the viewport, not against .container). */
+ overflow: clip;
  }
  .container::before {
  content: "";
@@ -1024,6 +1027,247 @@
  .info-box:last-child { border-bottom: none; }
  }
 
+
+ /* ============================================================
+    Sticky player strip — compact at-a-glance state for all players.
+    Pinned to top of viewport during play.
+    ============================================================ */
+ .player-strip {
+   position: sticky;
+   top: 0;
+   z-index: 100;
+   background: linear-gradient(180deg, rgba(42,29,18,0.96) 0%, rgba(60,42,25,0.96) 100%);
+   border-bottom: 3px solid var(--coral);
+   /* extra right padding so the absolute-positioned × has its own gutter */
+   padding: 10px 40px 10px 16px;
+   margin: 0 -24px 16px;
+   box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+   display: grid;
+   gap: 10px;
+   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+ }
+ .player-strip.hidden { display: none; }
+ .player-strip .strip-collapse {
+   position: absolute;
+   top: 6px;
+   right: 8px;
+   background: rgba(244,237,224,0.18);
+   color: var(--chalk);
+   border: 1px solid rgba(244,237,224,0.4);
+   border-radius: 50%;
+   width: 22px; height: 22px;
+   font-family: 'Geist Mono', monospace;
+   font-size: 14px;
+   line-height: 1;
+   cursor: pointer;
+   padding: 0;
+   display: flex; align-items: center; justify-content: center;
+   transition: background 0.15s, transform 0.1s;
+ }
+ .player-strip .strip-collapse:hover {
+   background: var(--coral);
+   color: white;
+   transform: scale(1.1);
+ }
+
+ /* Fixed reopen pill — surfaces in top-right when the strip is hidden. */
+ .strip-reopen {
+   position: fixed;
+   top: 12px;
+   right: 16px;
+   z-index: 110;
+   background: var(--ink);
+   color: var(--chalk);
+   border: 2px solid var(--coral);
+   padding: 6px 14px;
+   border-radius: 100px;
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 700;
+   font-size: 0.78em;
+   letter-spacing: 0.04em;
+   text-transform: uppercase;
+   cursor: pointer;
+   box-shadow: 2px 3px 0 var(--coral), 3px 5px 12px rgba(0,0,0,0.35);
+   transition: transform 0.12s, box-shadow 0.12s;
+ }
+ .strip-reopen:hover {
+   transform: translate(-1px, -1px);
+   box-shadow: 3px 4px 0 var(--coral), 4px 6px 14px rgba(0,0,0,0.4);
+ }
+ .strip-reopen.hidden { display: none; }
+ .player-strip .strip-card {
+   background: var(--chalk);
+   border: 2px solid var(--ink);
+   border-radius: 6px;
+   padding: 8px 10px;
+   font-family: 'Hanken Grotesk', sans-serif;
+   font-size: 12px;
+   color: var(--ink);
+   box-shadow: 2px 2px 0 rgba(0,0,0,0.25);
+   cursor: pointer;
+   transition: transform 0.12s, box-shadow 0.12s;
+   position: relative;
+ }
+ .player-strip .strip-card:hover {
+   transform: translate(-1px, -1px);
+   box-shadow: 3px 3px 0 rgba(0,0,0,0.3);
+ }
+ .player-strip .strip-card.active {
+   background: var(--marigold);
+   border-color: var(--coral);
+   box-shadow: 3px 3px 0 var(--coral);
+ }
+ .player-strip .strip-card.active::after {
+   content: '⭐';
+   position: absolute;
+   top: -10px;
+   right: -8px;
+   background: var(--coral);
+   color: white;
+   width: 22px; height: 22px;
+   border-radius: 50%;
+   border: 2px solid var(--ink);
+   display: flex; align-items: center; justify-content: center;
+   font-size: 11px;
+   line-height: 1;
+ }
+ .player-strip .strip-card.exhausted { opacity: 0.55; }
+ .strip-name {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 800;
+   font-size: 13px;
+   margin-bottom: 4px;
+   display: flex; justify-content: space-between; align-items: baseline;
+ }
+ .strip-name .char {
+   font-weight: 500;
+   font-family: 'Hanken Grotesk', sans-serif;
+   font-size: 11px;
+   color: var(--ink-soft);
+ }
+ .strip-bars { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; }
+ .strip-bar {
+   height: 8px;
+   background: rgba(42,29,18,0.18);
+   border-radius: 4px;
+   overflow: hidden;
+   position: relative;
+ }
+ .strip-bar .fill {
+   height: 100%;
+   transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+   border-radius: 4px;
+ }
+ .strip-bar.endurance .fill { background: linear-gradient(90deg, var(--marigold), var(--coral)); }
+ .strip-bar.xp .fill        { background: linear-gradient(90deg, var(--cobalt), var(--violet)); }
+ .strip-bar .label {
+   position: absolute; inset: 0;
+   font-family: 'Geist Mono', monospace; font-size: 9px; font-weight: 700;
+   color: var(--ink);
+   display: flex; align-items: center; justify-content: flex-end;
+   padding-right: 4px;
+   text-shadow: 0 0 4px var(--chalk);
+ }
+ .strip-meta {
+   display: flex; gap: 8px; flex-wrap: wrap;
+   font-family: 'Geist Mono', monospace;
+   font-size: 10px;
+   color: var(--ink-soft);
+   margin-top: 4px;
+ }
+ .strip-meta .pip {
+   display: inline-flex; align-items: center; gap: 2px;
+ }
+ .strip-meta .dots {
+   display: inline-flex; gap: 2px;
+ }
+ .strip-meta .dot {
+   width: 7px; height: 7px; border-radius: 50%;
+   background: rgba(42,29,18,0.2);
+   border: 1px solid var(--ink);
+ }
+ .strip-meta .dot.filled.beg { background: var(--lime); }
+ .strip-meta .dot.filled.int { background: var(--marigold); }
+ .strip-meta .dot.filled.exp { background: var(--coral); }
+ .strip-location {
+   font-family: 'Geist Mono', monospace;
+   font-size: 10px;
+   color: var(--ink-soft);
+   margin-top: 3px;
+   text-transform: uppercase;
+   letter-spacing: 0.04em;
+ }
+
+ /* Full-detail panels toggle */
+ .full-details-toggle {
+   margin: 8px 0 16px;
+   text-align: center;
+ }
+ .full-details-toggle button {
+   background: var(--chalk);
+   border: 2px solid var(--ink);
+   color: var(--ink);
+   padding: 6px 16px;
+   border-radius: 100px;
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 700;
+   font-size: 0.85em;
+   letter-spacing: 0.04em;
+   cursor: pointer;
+   box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+   transition: transform 0.12s, box-shadow 0.12s;
+ }
+ .full-details-toggle button:hover {
+   transform: translate(-1px, -1px);
+   box-shadow: 3px 3px 0 rgba(0,0,0,0.35);
+ }
+ #playersContainer.collapsed { display: none; }
+
+ /* ============================================================
+    Gear shop two-column layout (essential | available).
+    No responsive fallback — keeps side-by-side at all widths
+    per design decision (desktop-only experience).
+    ============================================================ */
+ /* Gear Shop gets a wider footprint than other panels so its two
+    inner columns have breathing room. */
+ .area-panel.store-panel {
+   grid-column: span 2;
+ }
+ #gearShop .gear-shop-columns {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 18px;
+   margin-top: 12px;
+ }
+ #gearShop .gear-shop-columns .column-header {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 800;
+   font-size: 1.05em;
+   letter-spacing: 0.02em;
+   margin: 0 0 6px 0;
+   color: var(--ink);
+ }
+ #gearShop .gear-shop-columns .column-subhead {
+   font-family: 'Hanken Grotesk', sans-serif;
+   font-size: 0.78em;
+   color: var(--ink-soft);
+   margin-bottom: 10px;
+   font-style: italic;
+ }
+ #gearShop .gear-shop-columns .essential-col {
+   background: #fff9e6;
+   border: 2px solid #d9a407;
+   border-radius: 10px;
+   padding: 14px;
+ }
+ #gearShop .gear-shop-columns .essential-col .column-header { color: #856404; }
+ #gearShop .gear-shop-columns .available-col {
+   background: rgba(244,237,224,0.5);
+   border: 2px solid var(--ink-soft);
+   border-radius: 10px;
+   padding: 14px;
+ }
+
  </style>
 </head>
 <body>
@@ -1062,6 +1306,11 @@
  </div>
 
  <div class="game-board" id="gameBoard">
+ <!-- Sticky compact player strip — hidden by default; user opts in via the pill -->
+ <div id="playerStrip" class="player-strip hidden"></div>
+ <!-- Reopen pill — visible by default since the strip starts hidden -->
+ <button id="stripReopen" class="strip-reopen" onclick="toggleStrip()">Show player strip ▾</button>
+
  <div id="turnBanner" class="turn-banner"></div>
  <div class="turn-indicator" id="turnIndicator"></div>
 
@@ -1070,7 +1319,10 @@
 
  <div class="game-info" id="gameInfo"></div>
 
- <div id="playersContainer"></div>
+ <div class="full-details-toggle">
+   <button id="toggleFullPanels" onclick="toggleFullPlayerPanels()">Show full player details ▾</button>
+ </div>
+ <div id="playersContainer" class="collapsed"></div>
 
  <div class="game-areas">
  <div class="area-panel">
@@ -1139,6 +1391,7 @@
  </div>
  </div>
 
+ <script src="effects.js"></script>
  <script src="game.js"></script>
 </body>
 </html>

@@ -7,3 +7,7 @@ results/
 
 # macOS Finder metadata.
 .DS_Store
+
+# PartyKit dev-server local state (Durable Object cache, etc.) — regenerated on
+# every `partykit dev` run, never useful in version control.
+.partykit/
