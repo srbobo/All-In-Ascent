@@ -7,9 +7,15 @@ optional bots) can play in real time. The stack is intentionally tiny:
   Cloudflare Workers + Durable Objects. Free tier covers ~100k requests/day,
   plenty for friend games.
 - **Frontend**: static HTML/JS (`online.html` + `online/client.js`). Can be
-  served by PartyKit itself (free), or by GitHub Pages / Cloudflare Pages.
+  served by PartyKit itself (free), Netlify, GitHub Pages, or Cloudflare Pages.
 - **Logs**: when a game ends, the full JSONL event log is POSTed to a webhook
   you control (defaults to nothing → falls back to DO storage).
+
+> **Config gotcha** — `partykit.json` uses **camelCase keys**, not Cloudflare
+> wrangler's snake_case. The right key is `compatibilityDate`, not
+> `compatibility_date`. PartyKit v0.0.114 also does NOT support `serve.exclude`
+> — if you add it, the dev server refuses to start. Symptom is generic
+> "connection error" toasts on the client because the server never came up.
 
 ## 0. One-time setup
 

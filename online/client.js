@@ -8,7 +8,59 @@
 //   - username + host + room + password are saved to localStorage so reloading
 //     the tab puts you straight back into the room you were in.
 
-import PartySocket from 'https://esm.sh/partysocket@1.0.2';
+// Vendored copy of partysocket (originally from npm — see online/vendor/partysocket/).
+// Vendored to avoid a runtime CDN dependency: a single network blip during the
+// module's import would silently break the entire client.js module (including
+// the Join button's click handler), with no visible error.
+import PartySocket from './vendor/partysocket/index.js';
+
+// =============================================================================
+// BACKEND HOST RESOLUTION
+//
+// Friends who visit https://allinascentboardgame.com should never have to know
+// what a "PartyKit URL" is. We auto-detect the backend host based on where the
+// page itself was served from:
+//
+//   - Local dev (127.0.0.1 / localhost)  → talk to the local partykit dev
+//                                          server on the same port.
+//   - Anything else (Netlify, PartyKit
+//     static-serve, custom domain)       → talk to the deployed PartyKit
+//                                          backend at PRODUCTION_PARTYKIT_HOST.
+//
+// You only need to fill in PRODUCTION_PARTYKIT_HOST below ONCE — after you
+// first run `npm run online:deploy`. The deploy command prints a URL like:
+//
+//     ✓ Deployed to https://all-in-ascent.YOUR-USER.partykit.dev
+//
+// Copy just the hostname part (no `https://`, no trailing slash) into the
+// constant below.
+//
+// Override locally (for testing against a different backend): append
+// `?host=<hostname>` to the URL, e.g.
+//     https://allinascentboardgame.com/online.html?host=127.0.0.1:1999
+// =============================================================================
+
+// TODO: replace with your actual PartyKit deploy URL after running
+//       `npm run online:deploy` for the first time. The placeholder below WILL
+//       NOT WORK — it has to be a real domain that resolves to your DO.
+const PRODUCTION_PARTYKIT_HOST = 'all-in-ascent.srbobo.partykit.dev';
+
+function resolveBackendHost() {
+  // 1. Explicit override via ?host= query param wins (for testing).
+  const params = new URLSearchParams(window.location.search);
+  const override = params.get('host');
+  if (override) return override.trim();
+
+  // 2. Local dev: serve and party are on the same origin.
+  const h = window.location.hostname;
+  if (h === '127.0.0.1' || h === 'localhost' || h === '0.0.0.0') {
+    return window.location.host; // includes port, e.g. "127.0.0.1:1999"
+  }
+
+  // 3. Everywhere else (Netlify, allinascentboardgame.com, *.partykit.dev):
+  //    go to the deployed PartyKit backend.
+  return PRODUCTION_PARTYKIT_HOST;
+}
 
 // ----- DOM refs -----
 const $ = (id) => document.getElementById(id);
@@ -30,7 +82,10 @@ const prefs = loadPrefs();
 $('username').value = prefs.username || '';
 $('room').value = prefs.room || '';
 $('password').value = prefs.password || '';
-$('host').value = prefs.host || '';
+// The host field is no longer user-facing — backend is auto-detected from
+// the page's location. Pre-fill for transparency / debugging if exposed.
+const detectedHost = resolveBackendHost();
+$('host').value = detectedHost;
 
 // ----- Connection state -----
 let socket = null;
@@ -70,10 +125,13 @@ $('joinBtn').addEventListener('click', () => {
   const username = $('username').value.trim();
   const room = $('room').value.trim() || 'default';
   const password = $('password').value;
-  const host = $('host').value.trim();
+  const host = ($('host').value.trim()) || resolveBackendHost();
   if (!username) { toast('Enter a name'); return; }
-  if (!host) { toast('Enter the PartyKit host URL'); return; }
-  savePrefs({ username, room, password, host });
+  if (!host || host.includes('YOUR-PARTYKIT-USERNAME')) {
+    toast('Backend not configured — see online/client.js PRODUCTION_PARTYKIT_HOST', 6000);
+    return;
+  }
+  savePrefs({ username, room, password });
   connect({ username, room, password, host });
 });
 
