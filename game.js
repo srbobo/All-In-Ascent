@@ -1,5 +1,4 @@
 // ===== GAME DATA =====
-console.log(' game.js is loading...');
 
 const CHARACTERS = {
  technician: {
@@ -520,8 +519,6 @@ function calculateGearBonuses(route, area) {
 // ===== MILESTONE ROUTES SYSTEM =====
 
 function selectMilestoneRoutes() {
- console.log(' Selecting milestone routes...');
-
  // Define difficulty ranges based on grade
  const beginnerRoutes = [];
  const intermediateRoutes = [];
@@ -567,11 +564,6 @@ function selectMilestoneRoutes() {
  gameState.milestoneRoutes.beginner = beginnerRoutes[beginnerIndex];
  gameState.milestoneRoutes.intermediate = intermediateRoutes[intermediateIndex];
  gameState.milestoneRoutes.expert = expertRoutes[expertIndex];
-
- console.log(' Milestone routes selected:');
- console.log(' Beginner:', gameState.milestoneRoutes.beginner.route.name, `(${gameState.milestoneRoutes.beginner.route.grade})`);
- console.log(' Intermediate:', gameState.milestoneRoutes.intermediate.route.name, `(${gameState.milestoneRoutes.intermediate.route.grade})`);
- console.log(' Expert:', gameState.milestoneRoutes.expert.route.name, `(${gameState.milestoneRoutes.expert.route.grade})`);
 }
 
 function renderMilestonePanel() {
@@ -579,11 +571,11 @@ function renderMilestonePanel() {
  if (!container) return;
 
  let html = `
- <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);">
- <h2 style="margin: 0 0 15px 0; font-size: 1.8em; text-align: center;">
- MILESTONE ROUTES - First to Complete All 3 WINS!
+ <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 14px 12px; border-radius: 12px; margin-bottom: 14px; box-shadow: 0 4px 10px rgba(102, 126, 234, 0.25);">
+ <h2 style="margin: 0 0 8px 0; font-size: 1.05em; text-align: center; letter-spacing: 0.02em;">
+ MILESTONE ROUTES — First to Complete All 3 Wins
  </h2>
- <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+ <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
  `;
 
  const difficulties = ['beginner', 'intermediate', 'expert'];
@@ -605,27 +597,22 @@ function renderMilestonePanel() {
  const milestoneRouteTypeColor = milestoneRouteTypeColors[route.routeType] || '#6c757d';
 
  html += `
- <div style="background: white; color: #2c3e50; padding: 15px; border-radius: 10px; border-left: 5px solid ${colors[difficulty]};">
- <div style="font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">
- ${icons[difficulty]} ${difficulty.toUpperCase()}
+ <div style="background: white; color: #2c3e50; padding: 8px 11px 9px; border-radius: 8px; border-left: 4px solid ${colors[difficulty]};">
+ <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 5px; gap: 4px; flex-wrap: wrap;">
+ <span style="font-weight: bold; font-size: 0.78em; letter-spacing: 0.04em;">${difficulty.toUpperCase()}</span>
+ <span style="display: inline-block; background: ${areaColor}; color: white; padding: 1px 8px; border-radius: 10px; font-size: 0.65em; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase;">${areaLabel}</span>
+ <span style="display: inline-block; background: ${milestoneRouteTypeColor}; color: white; padding: 1px 8px; border-radius: 10px; font-size: 0.65em; font-weight: bold;">${route.routeType || 'Unknown'}</span>
  </div>
- <div style="margin-bottom: 6px;">
- <span style="display: inline-block; background: ${areaColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase;">${areaLabel}</span>
- </div>
- <div style="font-size: 1.1em; font-weight: bold; color: #667eea; margin-bottom: 5px;">
+ <div style="font-size: 0.98em; font-weight: bold; color: #667eea; margin-bottom: 3px; line-height: 1.15;">
  ${route.name}
  </div>
- <div style="margin-bottom: 6px;">
- <span style="display: inline-block; background: ${milestoneRouteTypeColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold;">${route.routeType || 'Unknown'}</span>
+ <div style="font-size: 0.78em; color: #666; margin-bottom: 4px; font-family: 'Geist Mono', monospace;">
+ ${route.grade} · Ti ${route.time} · E ${route.endurance}
  </div>
- <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
- Grade: ${route.grade} | Time: ${route.time} | Endurance: ${route.endurance}
+ <div style="font-size: 0.78em; margin-bottom: 6px; font-family: 'Geist Mono', monospace;">
+ S ${route.strength} · T ${route.technique} · F ${route.focus} · X ${route.flexibility}
  </div>
- <div style="font-size: 0.85em; margin-bottom: 10px;">
- ${route.strength} | ${route.technique} | ${route.focus} | ${route.flexibility}
- </div>
- <div style="border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px;">
- <div style="font-weight: bold; margin-bottom: 5px; font-size: 0.9em;">Player Progress:</div>
+ <div style="border-top: 1px solid #ddd; padding-top: 5px; margin-top: 4px;">
  `;
 
  gameState.players.forEach(player => {
@@ -635,16 +622,16 @@ function renderMilestonePanel() {
  const statusColor = completed ? '#22c55e': '#6b7280';
 
  html += `
- <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 0.85em;">
+ <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 0.74em; font-family: 'Geist Mono', monospace;">
  <span>${player.character.name}</span>
- <span style="color: ${statusColor}; font-weight: bold;">${statusIcon} ${statusText}</span>
+ <span style="color: ${statusColor}; font-weight: bold;">${statusText.toUpperCase()}</span>
  </div>
  `;
  });
 
  html += `
  </div>
- <button class="btn" onclick="attemptMilestoneRoute('${difficulty}')" style="width: 100%; margin-top: 10px; font-size: 0.9em; padding: 10px;">
+ <button class="btn" onclick="attemptMilestoneRoute('${difficulty}')" style="width: 100%; margin-top: 6px; font-size: 0.78em; padding: 6px 10px;">
  Attempt ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Route
  </button>
  </div>
@@ -662,15 +649,10 @@ function renderMilestonePanel() {
 // ===== GAME INITIALIZATION =====
 
 function startCharacterSelect() {
- console.log(' startCharacterSelect() called');
  const numPlayersInput = document.getElementById('numPlayers');
- if (!numPlayersInput) {
- console.error(' numPlayers input not found');
- return;
- }
+ if (!numPlayersInput) return;
 
  const numPlayers = parseInt(numPlayersInput.value);
- console.log('Number of players:', numPlayers);
  if (numPlayers < 1 || numPlayers > 4 || isNaN(numPlayers)) {
  alert('Please select 1-4 players');
  return;
@@ -682,25 +664,31 @@ function startCharacterSelect() {
  }
 
  const charSelectionDiv = document.getElementById('characterSelection');
- if (!charSelectionDiv) {
- console.error(' characterSelection div not found');
- return;
- }
+ if (!charSelectionDiv) return;
+
+ // Lock the Continue button + player-count input so we can't re-trigger this
+ // flow mid-selection. Re-running this function with characters already
+ // chosen would reset gameState.players to empty while leaving the Start
+ // Game button enabled — that's how bug #3 ("start without character") used
+ // to fire. Both controls re-enable themselves only after the game ends
+ // (via the page reload that happens on "New Game" / win screen close).
+ const continueBtn = document.getElementById('continueBtn');
+ if (continueBtn) continueBtn.disabled = true;
+ numPlayersInput.disabled = true;
 
  charSelectionDiv.style.display = 'block';
- console.log(' Character selection shown');
  renderCharacterSelect();
 }
 
 function renderCharacterSelect() {
- console.log(' renderCharacterSelect() called');
  const container = document.getElementById('characterSelect');
- if (!container) {
- console.error(' characterSelect container not found');
- return;
- }
+ if (!container) return;
  container.innerHTML = '';
- console.log(' Container cleared, rendering characters...');
+ // Defense in depth: any re-entry into this render path must NOT inherit a
+ // previously-enabled Start Game button. The button only re-enables once
+ // every player slot has a character (see selectCharacter()).
+ const startBtn = document.getElementById('startGameBtn');
+ if (startBtn) startBtn.disabled = true;
 
  Object.keys(CHARACTERS).forEach(charKey => {
  const char = CHARACTERS[charKey];
@@ -783,8 +771,22 @@ function selectCharacter(charKey) {
 }
 
 function startGame() {
+ // Defense in depth: if the Start Game button somehow gets clicked while a
+ // player slot is still missing a character (bug #3 escape hatch), bail out
+ // loudly instead of crashing on .character.name later.
+ if (!Array.isArray(gameState.players) || gameState.players.length === 0
+     || gameState.players.some(p => !p || !p.character)) {
+  alert('Each player must select a character before starting the game.');
+  return;
+ }
+
  document.getElementById('gameSetup').style.display = 'none';
  document.getElementById('gameBoard').style.display = 'block';
+
+ // Flag for the CSS compact-density rules — the hero header collapses, the
+ // game-board sections tighten padding/font/gaps. Setup screen retains its
+ // original hero treatment.
+ document.body.classList.add('playing');
 
  // Initialize attempted routes tracking
  gameState.attemptedRoutes = {};
@@ -893,113 +895,17 @@ function renderLog() {
 function renderGameBoard() {
  renderMilestonePanel();
  renderGameInfo();
- renderPlayerStrip();
  renderPlayers();
  renderRoutes();
  renderTraining();
  renderStore();
- renderRestArea();
+ renderSectionStatusPills();
  updateTurnIndicator();
 }
 
-function renderPlayerStrip() {
- // Compact at-a-glance card per player, pinned to the top of the viewport.
- // Click a card to reveal the full player panels and scroll to that player.
- const strip = document.getElementById('playerStrip');
- if (!strip) return;
- strip.innerHTML = '';
-
- // Collapse (×) button anchored to the strip itself.
- const collapseBtn = document.createElement('button');
- collapseBtn.className = 'strip-collapse';
- collapseBtn.setAttribute('aria-label', 'Hide player strip');
- collapseBtn.title = 'Hide player strip';
- collapseBtn.innerHTML = '&times;';
- collapseBtn.onclick = (e) => { e.stopPropagation(); toggleStrip(); };
- strip.appendChild(collapseBtn);
-
- gameState.players.forEach((player, idx) => {
-  const char = player.character;
-  if (!char.gearBonuses) char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
-
-  const isCurrent = idx === gameState.currentPlayerIndex;
-  const exhausted = char.timeRemaining <= 0;
-  const endPct = (char.currentEndurance / char.maxEndurance) * 100;
-  const xpForLevel = XP_TABLE[char.level - 1];
-  const xpPct = char.level < 15 ? ((char.xp - xpForLevel.cumulative) / xpForLevel.needed) * 100 : 100;
-  const msComplete = ['beginner', 'intermediate', 'expert'].map(tier => char.milestonesCompleted[tier]);
-
-  const card = document.createElement('div');
-  card.className = 'strip-card' + (isCurrent ? ' active' : '') + (exhausted ? ' exhausted' : '');
-  card.setAttribute('data-strip-player', player.playerNum);
-  card.onclick = () => expandPlayerDetails(player.playerNum);
-
-  card.innerHTML = `
-   <div class="strip-name">
-    <span>P${player.playerNum} · ${char.name}</span>
-    <span class="char">L${char.level}</span>
-   </div>
-   <div class="strip-bars">
-    <div class="strip-bar endurance">
-     <div class="fill" style="width: ${endPct}%;"></div>
-     <div class="label">END ${char.currentEndurance}/${char.maxEndurance}</div>
-    </div>
-    <div class="strip-bar xp">
-     <div class="fill" style="width: ${xpPct}%;"></div>
-     <div class="label">${char.level < 15 ? `XP ${char.xp - xpForLevel.cumulative}/${xpForLevel.needed}` : 'MAX'}</div>
-    </div>
-   </div>
-   <div class="strip-meta">
-    <span class="pip">Time ${char.timeRemaining}</span>
-    <span class="pip">XP-sp ${getSpendableXP(char)}</span>
-    <span class="pip dots">
-     <span class="dot ${msComplete[0] ? 'filled beg' : ''}" title="Beginner"></span>
-     <span class="dot ${msComplete[1] ? 'filled int' : ''}" title="Intermediate"></span>
-     <span class="dot ${msComplete[2] ? 'filled exp' : ''}" title="Expert"></span>
-    </span>
-   </div>
-   <div class="strip-location">${formatLocationName(char.location)}</div>
-  `;
-  strip.appendChild(card);
- });
-}
-
-function expandPlayerDetails(playerNum) {
- // Reveal the full-detail panels (if hidden) and scroll to the clicked player.
- const container = document.getElementById('playersContainer');
- const toggle = document.getElementById('toggleFullPanels');
- if (container && container.classList.contains('collapsed')) {
-  container.classList.remove('collapsed');
-  if (toggle) toggle.innerHTML = 'Hide full player details ▴';
- }
- // Scroll the requested player's panel into view (accounts for sticky strip height).
- requestAnimationFrame(() => {
-  const target = document.getElementById(`player-${playerNum}-panel`);
-  if (target) {
-   const stripHeight = document.getElementById('playerStrip')?.offsetHeight || 0;
-   const rect = target.getBoundingClientRect();
-   window.scrollTo({ top: window.scrollY + rect.top - stripHeight - 20, behavior: 'smooth' });
-  }
- });
-}
-
-function toggleFullPlayerPanels() {
- const container = document.getElementById('playersContainer');
- const toggle = document.getElementById('toggleFullPanels');
- if (!container || !toggle) return;
- const collapsed = container.classList.toggle('collapsed');
- toggle.innerHTML = collapsed ? 'Show full player details ▾' : 'Hide full player details ▴';
-}
-
-function toggleStrip() {
- // Hide/show the sticky player strip. When hidden, surface a fixed
- // top-right pill so the user can re-open it without hunting through a menu.
- const strip = document.getElementById('playerStrip');
- const reopen = document.getElementById('stripReopen');
- if (!strip || !reopen) return;
- const nowHidden = strip.classList.toggle('hidden');
- reopen.classList.toggle('hidden', !nowHidden);
-}
+// Player state is rendered into #playersContainer by renderPlayers().
+// The sticky strip / collapse toggle / show-full-details pill were removed
+// during a UI cleanup pass; full panels are now always visible.
 
 function renderRestArea() {
  const container = document.getElementById('restAreaInfo');
@@ -1015,32 +921,67 @@ function renderRestArea() {
 
 function renderGameInfo() {
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const routeClearingPositions = [
- { name: 'Bouldering ↔ Lead', next: 'Lead Climbing' },
- { name: 'Lead ↔ Top Rope', next: 'Top Rope' },
- { name: 'Top Rope ↔ Bouldering', next: 'Bouldering' }
- ];
- const currentPosition = routeClearingPositions[gameState.routeClearingPosition];
+
+ // B2: dropped the redundant "Current Player" info-box.
+ // B3: belayers info-box only renders when > 1.
+ // C3: Rest is an inline button here, not its own panel.
+ // The route-clearing token is now rendered as a pill on the area-title
+ // of the climbing area that will be cleared next (see renderSectionStatusPills).
+ const char = currentPlayer.character;
+ const canRest = !gameState.gameEnded && char.timeRemaining >= 1;
+ const restBtn = `<button class="info-rest-btn" onclick="restAction()" ${canRest ? '' : 'disabled'}>Rest (Ti 1)</button>`;
 
  document.getElementById('gameInfo').innerHTML = `
  <div class="info-box">
  <div class="info-label">Round</div>
  <div class="info-value">${gameState.round}</div>
  </div>
+ ${gameState.belayersUnlocked > 1 ? `
  <div class="info-box">
- <div class="info-label">Current Player</div>
- <div class="info-value">Player ${currentPlayer.playerNum}</div>
- </div>
- <div class="info-box">
- <div class="info-label">Belayers Available</div>
+ <div class="info-label">Belayers</div>
  <div class="info-value">${gameState.belayersUnlocked}</div>
  </div>
- <div class="info-box">
- <div class="info-label"> Route Clearing Token</div>
- <div class="info-value" style="font-size: 1.1em;">${currentPosition.name}</div>
- <div style="font-size: 0.8em; color: #666; margin-top: 5px;">Next: ${currentPosition.next}</div>
- </div>
+ ` : ''}
+ <div class="info-rest-wrap">${restBtn}</div>
  `;
+}
+
+// Update the area-title pills: occupancy chip + (where applicable) "Clearing
+// Next" chip. Called from renderGameBoard after the info row renders.
+function renderSectionStatusPills() {
+ // Route clearing — which area gets cleared at end of round.
+ // Mapping is identical to clearRoutes() in game flow.
+ const clearingNextArea = ['leadClimbing', 'topRope', 'bouldering'][gameState.routeClearingPosition];
+
+ const sections = ['bouldering', 'topRope', 'leadClimbing', 'gearShop'];
+ sections.forEach(section => {
+  const host = document.getElementById(`pills-${section}`);
+  if (!host) return;
+  host.innerHTML = '';
+
+  // Occupancy pill — current section occupants / capacity.
+  const occupants = getPlayersInSection(section);
+  const capacity = getSectionCapacity(section);
+  const occPill = document.createElement('span');
+  occPill.className = 'at-pill occupancy';
+  if (occupants.length >= capacity) occPill.classList.add('full');
+  const occLabel = occupants.length === 0
+   ? `${occupants.length}/${capacity}`
+   : `${occupants.length}/${capacity} · ${occupants.map(p => `P${p.playerNum}`).join(' ')}`;
+  occPill.textContent = occLabel;
+  occPill.title = occupants.length > 0
+   ? `Occupants: ${occupants.map(p => 'P' + p.playerNum + ' ' + p.character.name).join(', ')}`
+   : `Capacity ${capacity}`;
+  host.appendChild(occPill);
+
+  // Clearing-next pill — only for the climbing area scheduled to clear.
+  if (section === clearingNextArea) {
+   const clrPill = document.createElement('span');
+   clrPill.className = 'at-pill clearing';
+   clrPill.textContent = 'Clearing Next';
+   host.appendChild(clrPill);
+  }
+ });
 }
 
 function updateTurnIndicator() {
@@ -1060,142 +1001,152 @@ function updateTurnIndicator() {
  `;
 }
 
+// CLIMBER TOKEN renderer — design #1: one horizontal row per player.
+// Compact at-a-glance state; click anywhere on a row to expand the detail
+// drawer with equipment, ability, archetype, training bonuses.
+//
+// Keeps the same data hooks (data-player, data-endurance-bar, data-xp-bar,
+// data-inventory) so effects.js's chalk puffs / floating numbers / inventory
+// fly-in animations all still anchor correctly.
 function renderPlayers() {
  const container = document.getElementById('playersContainer');
+ if (!container) return;
  container.innerHTML = '';
 
  gameState.players.forEach((player, idx) => {
- const char = player.character;
+  const char = player.character;
+  if (!char.gearBonuses) char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
 
- // Ensure gearBonuses exists (for backward compatibility)
- if (!char.gearBonuses) {
- char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
- }
+  const isCurrent = idx === gameState.currentPlayerIndex;
+  const exhausted = char.timeRemaining <= 0;
+  const lowTime = char.timeRemaining === 1;
+  const endPct = Math.max(0, Math.min(100, (char.currentEndurance / char.maxEndurance) * 100));
+  const xpForLevel = XP_TABLE[char.level - 1];
+  const xpPct = char.level < 15
+   ? Math.max(0, Math.min(100, ((char.xp - xpForLevel.cumulative) / xpForLevel.needed) * 100))
+   : 100;
+  const spendableXP = getSpendableXP(char);
+  const xpToGo = getXPToNextLevel(char);
 
- const isCurrentPlayer = idx === gameState.currentPlayerIndex;
+  const trBonus = (s) => (char.trainingBonuses[s] || 0) + (char.gearBonuses[s] || 0);
+  const statCell = (key, glyph) => {
+   const bonus = trBonus(key);
+   const beta  = char.betaBoostActive ? 3 : 0;
+   const extra = bonus + beta;
+   return `<span class="tok-stat ${key}">
+            <span class="glyph">${glyph}</span>&nbsp;<b>${char.stats[key]}</b>${extra > 0 ? `<span class="bonus">+${extra}</span>` : ''}
+           </span>`;
+  };
 
- const panel = document.createElement('div');
- const timeExhausted = char.timeRemaining <= 0;
- panel.className = 'player-panel' + (isCurrentPlayer ? ' player-turn': '') + (timeExhausted ? ' time-exhausted': '');
- panel.setAttribute('data-player', player.playerNum);
- panel.id = `player-${player.playerNum}-panel`;
+  const ms = char.milestonesCompleted;
+  const milestoneDots = `
+   <span class="dot ${ms.beginner    ? 'filled beg' : ''}" title="Beginner"></span>
+   <span class="dot ${ms.intermediate? 'filled int' : ''}" title="Intermediate"></span>
+   <span class="dot ${ms.expert      ? 'filled exp' : ''}" title="Expert"></span>`;
 
- const endurancePercent = (char.currentEndurance / char.maxEndurance) * 100;
- const xpForLevel = XP_TABLE[char.level - 1];
- const xpProgress = char.level < 15 ? ((char.xp - xpForLevel.cumulative) / xpForLevel.needed) * 100: 100;
+  // State indicator — a colored dot (no glyph) communicates ability/turn state.
+  // Hover title carries the meaning for accessibility.
+  const stateClass = exhausted ? 'out'
+                   : char.betaBoostActive ? 'beta'
+                   : char.abilityUsed ? 'used'
+                   : 'ready';
+  const stateTitle = exhausted ? 'Out of time'
+                   : char.betaBoostActive ? 'Beta Boost active'
+                   : char.abilityUsed ? 'Ability used'
+                   : 'Ability available';
+  const stateIcon = `<span class="tok-state ${stateClass}" title="${stateTitle}"></span>`;
 
- const totalStats = {
- strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength,
- technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique,
- focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus,
- flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility
- };
+  const token = document.createElement('div');
+  token.className = 'climber-token' + (isCurrent ? ' active' : '') + (exhausted ? ' exhausted' : '') + (lowTime ? ' low-time' : '');
+  token.setAttribute('data-player', player.playerNum);
+  token.id = `player-${player.playerNum}-panel`;
 
- const spendableXP = getSpendableXP(char);
- const xpToGo = getXPToNextLevel(char);
+  token.innerHTML = `
+   <div class="tok-id">
+    <div class="num">P${player.playerNum}</div>
+    <div class="name">${char.name}</div>
+    <div class="level">L${char.level}</div>
+   </div>
+   <div class="tok-stats">
+    ${statCell('strength','S')}
+    ${statCell('technique','T')}
+    ${statCell('focus','F')}
+    ${statCell('flexibility','X')}
+   </div>
+   <div class="tok-end">
+    <span class="label">END</span>
+    <div class="bar">
+     <div class="fill" data-endurance-bar="${player.playerNum}" id="endurance-bar-${player.playerNum}" style="width: ${endPct}%;"></div>
+    </div>
+    <span class="nums">${char.currentEndurance}/${char.maxEndurance}</span>
+   </div>
+   <div class="tok-xp">
+    <span class="label">XP</span>
+    <div class="bar">
+     <div class="fill" data-xp-bar="${player.playerNum}" id="xp-bar-${player.playerNum}" style="width: ${xpPct}%;"></div>
+    </div>
+    <span class="nums">${spendableXP}</span>
+   </div>
+   <div class="tok-time">Ti&nbsp;<b>${char.timeRemaining}</b></div>
+   <div class="tok-ms">${milestoneDots}</div>
+   <div class="tok-loc">${formatLocationName(char.location)}</div>
+   ${stateIcon}
+   <button class="tok-expand" aria-label="Expand details" title="Show full details">+</button>
+   <!-- Hidden anchor for inventory animation destination -->
+   <div class="equipment-list" data-inventory="${player.playerNum}" id="inventory-${player.playerNum}" style="display:none;"></div>
+  `;
 
- // Calculate milestone progress
- const milestonesCompleted = Object.values(char.milestonesCompleted).filter(Boolean).length;
- const milestoneIcons = [
- char.milestonesCompleted.beginner ? '': '',
- char.milestonesCompleted.intermediate ? '': '',
- char.milestonesCompleted.expert ? '': ''
- ];
+  // Detail drawer — hidden by default, opens on click.
+  const drawer = document.createElement('div');
+  drawer.className = 'climber-drawer';
+  drawer.id = `player-${player.playerNum}-drawer`;
+  drawer.innerHTML = `
+   <div class="drawer-grid">
+    <div class="drawer-section">
+     <h5>${char.archetype}</h5>
+     <div class="drawer-line">
+      <strong>${char.specialAbility.name}</strong>
+      <span class="ability-status ${char.abilityUsed ? 'used' : 'avail'}">${char.abilityUsed ? 'Used' : 'Available'}</span>
+     </div>
+     <div class="drawer-desc">${char.specialAbility.description}</div>
+     ${char.betaBoostActive ? `<div class="beta-note">Beta Boost active — +3 to all stats on next climb</div>` : ''}
+    </div>
+    <div class="drawer-section">
+     <h5>Bonuses</h5>
+     <div class="drawer-bonuses">
+      ${['strength','technique','focus','flexibility'].map(s => {
+       const tr = char.trainingBonuses[s] || 0;
+       const gr = char.gearBonuses[s] || 0;
+       if (tr === 0 && gr === 0) return '';
+       return `<div class="bonus-row"><span>${s}</span><span>${tr > 0 ? `+${tr} train` : ''}${tr > 0 && gr > 0 ? ' · ' : ''}${gr > 0 ? `+${gr} gear` : ''}</span></div>`;
+      }).join('') || '<div class="muted">No training or gear bonuses yet.</div>'}
+     </div>
+     <div class="drawer-line muted">Total XP ${char.xp} · ${char.level < 15 ? `${xpToGo} to L${char.level+1}` : 'MAX'}</div>
+    </div>
+    <div class="drawer-section">
+     <h5>Equipment <span class="muted">(${char.equipment.length})</span></h5>
+     <div class="drawer-equipment">
+      ${char.equipment.length ? char.equipment.map(e => `<span class="badge">${e}</span>`).join('') : '<span class="muted">None yet.</span>'}
+     </div>
+    </div>
+   </div>
+  `;
+  drawer.style.display = 'none';
 
- panel.innerHTML = `
- <div class="player-header">
- <div>
- <h3>Player ${player.playerNum}: ${char.name}</h3>
- <div style="color: #667eea; font-weight: bold;">${char.archetype}</div>
- <div style="margin-top: 8px; padding: 8px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 8px; font-weight: bold; font-size: 0.95em;">
- Milestones: ${milestonesCompleted}/3 ${milestoneIcons.join(' ')}
- </div>
- </div>
- <div style="text-align: right;">
- <div style="font-size: 1.8em; font-weight: bold;">Level ${char.level}</div>
- <div style="color: #666;">Total XP: ${char.xp}</div>
- <div style="color: #28a745; font-weight: bold; font-size: 0.95em;"> Spendable: ${spendableXP} XP</div>
- ${char.level < 15 ? `<div style="color: #ff9800; font-size: 0.9em;"> ${xpToGo} XP to Level ${char.level + 1}</div>`: ''}
- </div>
- </div>
+  // Click anywhere on the row toggles the drawer. Update the expand-button
+  // glyph to `+` (collapsed) / `−` (expanded) so the affordance is obvious
+  // without relying on a chevron Unicode that reads as an emoji to some
+  // browsers.
+  token.addEventListener('click', () => {
+   const isOpen = drawer.style.display !== 'none';
+   drawer.style.display = isOpen ? 'none' : 'block';
+   token.classList.toggle('expanded', !isOpen);
+   const expandBtn = token.querySelector('.tok-expand');
+   if (expandBtn) expandBtn.textContent = isOpen ? '+' : '−'; // − minus sign
+  });
 
- <div class="player-stats">
- <div class="stat-box">
- <div class="stat-label">Strength</div>
- <div class="stat-value">
- ${char.stats.strength}${char.trainingBonuses.strength > 0 || char.gearBonuses.strength > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.strength + char.gearBonuses.strength})</span>`: ''}${char.betaBoostActive ? ' <span style="color: #9c27b0; font-weight: bold;">(+3)</span>': ''}
- </div>
- </div>
- <div class="stat-box">
- <div class="stat-label">Technique</div>
- <div class="stat-value">
- ${char.stats.technique}${char.trainingBonuses.technique > 0 || char.gearBonuses.technique > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.technique + char.gearBonuses.technique})</span>`: ''}${char.betaBoostActive ? ' <span style="color: #9c27b0; font-weight: bold;">(+3)</span>': ''}
- </div>
- </div>
- <div class="stat-box">
- <div class="stat-label">Focus</div>
- <div class="stat-value">
- ${char.stats.focus}${char.trainingBonuses.focus > 0 || char.gearBonuses.focus > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.focus + char.gearBonuses.focus})</span>`: ''}${char.betaBoostActive ? ' <span style="color: #9c27b0; font-weight: bold;">(+3)</span>': ''}
- </div>
- </div>
- <div class="stat-box">
- <div class="stat-label">Flexibility</div>
- <div class="stat-value">
- ${char.stats.flexibility}${char.trainingBonuses.flexibility > 0 || char.gearBonuses.flexibility > 0 ? ` <span style="color: #28a745;">(+${char.trainingBonuses.flexibility + char.gearBonuses.flexibility})</span>`: ''}${char.betaBoostActive ? ' <span style="color: #9c27b0; font-weight: bold;">(+3)</span>': ''}
- </div>
- </div>
- </div>
-
- <div>
- <strong>Endurance:</strong> ${char.currentEndurance} / ${char.maxEndurance}
- <div class="endurance-bar">
- <div class="endurance-fill" data-endurance-bar="${player.playerNum}" id="endurance-bar-${player.playerNum}" style="width: ${endurancePercent}%">
- ${Math.round(endurancePercent)}%
- </div>
- </div>
- </div>
-
- <div>
- <strong>XP Progress to Level ${char.level < 15 ? char.level + 1: 15}:</strong>
- <div class="xp-bar">
- <div class="xp-fill" data-xp-bar="${player.playerNum}" id="xp-bar-${player.playerNum}" style="width: ${xpProgress}%">
- ${char.level < 15 ? `${xpForLevel.needed - xpToGo} / ${xpForLevel.needed}`: 'MAX'}
- </div>
- </div>
- ${char.level < 15 ? `<div style="font-size: 0.85em; color: #666; margin-top: 5px;">
- Earned in this level: ${spendableXP} XP | Need ${xpToGo} more XP
- </div>`: ''}
- </div>
-
- <div style="margin-top: 15px;">
- <strong> ${char.specialAbility.name}</strong>
- <span style="padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; ${char.abilityUsed ? 'background: #dc3545; color: white;': 'background: #28a745; color: white;'}">
- ${char.abilityUsed ? ' Used': ' Available'}
- </span>
- <div style="font-size: 0.9em; color: #666; margin-top: 5px;">${char.specialAbility.description}</div>
- ${char.betaBoostActive ? `<div style="margin-top: 8px; padding: 8px 12px; background: linear-gradient(135deg, #7b1fa2, #ce93d8); color: white; border-radius: 8px; font-weight: bold; text-align: center; font-size: 0.95em;"> Beta Boost Active — +3 to all stats on next climb!</div>`: ''}
- </div>
-
- ${char.equipment.length > 0 ? `
- <div class="equipment-list" data-inventory="${player.playerNum}" id="inventory-${player.playerNum}">
- ${char.equipment.map(e => `<div class="equipment-badge">${e}</div>`).join('')}
- </div>
- `: '<div class="equipment-list" data-inventory="' + player.playerNum + '" id="inventory-' + player.playerNum + '" style="min-height:1px;"></div>'}
-
- <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
- ${(() => {
- if (char.timeRemaining <= 0) return `<strong class="time-out"> Time Remaining: 0 units <span class="time-exhausted-badge">OUT OF TIME</span></strong>`;
- if (char.timeRemaining === 1) return `<strong class="time-warning"> Time Remaining: 1 unit — Last action!</strong>`;
- return `<strong> Time Remaining: ${char.timeRemaining} units</strong>`;
- })()}
- </div>
-
- <div style="margin-top: 10px; padding: 10px; background: #e8f4f8; border-radius: 5px; border-left: 4px solid #007bff;">
- <strong> Location: ${formatLocationName(char.location)}</strong>
- </div>
- `;
-
- container.appendChild(panel);
+  container.appendChild(token);
+  container.appendChild(drawer);
  });
 }
 
@@ -1208,23 +1159,8 @@ function renderRoutes() {
 function renderBoulderingRoutes() {
  const container = document.getElementById('boulderingRoutes');
  container.innerHTML = '';
-
- // Add capacity indicator
- const playersHere = getPlayersInSection('bouldering');
- const capacity = getSectionCapacity('bouldering');
- const capacityDiv = document.createElement('div');
- capacityDiv.style.cssText = 'background: #e8f4f8; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid #007bff;';
- capacityDiv.innerHTML = `<strong> Occupancy: ${playersHere.length}/${capacity}</strong>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>`: ''}`;
- container.appendChild(capacityDiv);
-
- // Add route clearing indicator if this area will be cleared next
- if (gameState.routeClearingPosition === 2) {
- const indicator = document.createElement('div');
- indicator.className = 'route-clearing-indicator';
- indicator.innerHTML = ' This area will be cleared at end of round';
- container.appendChild(indicator);
- }
-
+ // Occupancy and "clearing next" are surfaced as pills on the area title
+ // by renderSectionStatusPills() — no inline duplicate.
  gameState.availableRoutes.bouldering.forEach((route, idx) => {
  container.appendChild(createRouteCard(route, 'bouldering', idx));
  });
@@ -1243,35 +1179,15 @@ function renderTopRopeRoutes() {
  const accessCheck = checkAreaAccess('topRope');
 
  if (!accessCheck.hasAccess) {
- // Show locked message but still display routes
+ // Show locked message but still display routes (this stays — it's not
+ // redundant with the title pills; it tells the player exactly what gear
+ // to buy to unlock the area).
  const lockedDiv = document.createElement('div');
- lockedDiv.style.cssText = 'padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; margin-bottom: 15px;';
- lockedDiv.innerHTML = `
- <h4 style="color: #856404; margin-top: 0;"> Area Locked</h4>
- <p style="color: #856404; margin-bottom: 10px;">Required gear to access:</p>
- <ul style="list-style: none; padding-left: 0; color: #856404; font-weight: bold;">
- ${accessCheck.missingItems.map(item => `<li> ${item}</li>`).join('')}
- </ul>
- `;
+ lockedDiv.className = 'area-locked-banner';
+ lockedDiv.innerHTML = `<strong>Area Locked.</strong> Required gear: ${accessCheck.missingItems.join(', ')}`;
  container.appendChild(lockedDiv);
- } else {
- // Add capacity indicator only if unlocked
- const playersHere = getPlayersInSection('topRope');
- const capacity = getSectionCapacity('topRope');
- const isFull = playersHere.length >= capacity;
- const capacityDiv = document.createElement('div');
- capacityDiv.style.cssText = `background: ${isFull ? '#ffe8e8': '#e8f4f8'}; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid ${isFull ? '#dc3545': '#007bff'};`;
- capacityDiv.innerHTML = `<strong> Occupancy: ${playersHere.length}/${capacity}</strong> <span style="color: #666;">(${gameState.belayersUnlocked} belayer${gameState.belayersUnlocked > 1 ? 's': ''})</span>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>`: ''}${isFull ? `<br><span style="color: #dc3545; font-weight: bold;"> FULL - No space available</span>`: ''}`;
- container.appendChild(capacityDiv);
  }
-
- // Add route clearing indicator if this area will be cleared next
- if (gameState.routeClearingPosition === 1) {
- const indicator = document.createElement('div');
- indicator.className = 'route-clearing-indicator';
- indicator.innerHTML = ' This area will be cleared at end of round';
- container.appendChild(indicator);
- }
+ // Occupancy + "clearing next" surfaced as title pills — no inline duplicate.
 
  // Always show routes, but disable if locked
  const isLocked = !accessCheck.hasAccess;
@@ -1294,35 +1210,12 @@ function renderLeadClimbingRoutes() {
  const accessCheck = checkAreaAccess('leadClimbing');
 
  if (!accessCheck.hasAccess) {
- // Show locked message but still display routes
  const lockedDiv = document.createElement('div');
- lockedDiv.style.cssText = 'padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; margin-bottom: 15px;';
- lockedDiv.innerHTML = `
- <h4 style="color: #856404; margin-top: 0;"> Area Locked</h4>
- <p style="color: #856404; margin-bottom: 10px;">Required gear to access:</p>
- <ul style="list-style: none; padding-left: 0; color: #856404; font-weight: bold;">
- ${accessCheck.missingItems.map(item => `<li> ${item}</li>`).join('')}
- </ul>
- `;
+ lockedDiv.className = 'area-locked-banner';
+ lockedDiv.innerHTML = `<strong>Area Locked.</strong> Required gear: ${accessCheck.missingItems.join(', ')}`;
  container.appendChild(lockedDiv);
- } else {
- // Add capacity indicator only if unlocked
- const playersHere = getPlayersInSection('leadClimbing');
- const capacity = getSectionCapacity('leadClimbing');
- const isFull = playersHere.length >= capacity;
- const capacityDiv = document.createElement('div');
- capacityDiv.style.cssText = `background: ${isFull ? '#ffe8e8': '#e8f4f8'}; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid ${isFull ? '#dc3545': '#007bff'};`;
- capacityDiv.innerHTML = `<strong> Occupancy: ${playersHere.length}/${capacity}</strong> <span style="color: #666;">(${gameState.belayersUnlocked} belayer${gameState.belayersUnlocked > 1 ? 's': ''})</span>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>`: ''}${isFull ? `<br><span style="color: #dc3545; font-weight: bold;"> FULL - No space available</span>`: ''}`;
- container.appendChild(capacityDiv);
  }
-
- // Add route clearing indicator if this area will be cleared next
- if (gameState.routeClearingPosition === 0) {
- const indicator = document.createElement('div');
- indicator.className = 'route-clearing-indicator';
- indicator.innerHTML = ' This area will be cleared at end of round';
- container.appendChild(indicator);
- }
+ // Occupancy + "clearing next" surfaced as title pills — no inline duplicate.
 
  // Always show routes, but disable if locked
  const isLocked = !accessCheck.hasAccess;
@@ -1384,76 +1277,59 @@ function createRouteCard(route, area, idx) {
  const routeTypeColors = { Slab: '#17a2b8', Vertical: '#28a745', Overhang: '#fd7e14', Traverse: '#6f42c1' };
  const routeTypeColor = routeTypeColors[route.routeType] || '#6c757d';
 
+ // Compact 2-row card layout (B1).
+ // Row 1: name + grade + type + cost(Ti/E) + (optional) gear-bonus chip
+ // Row 2: 4 requirement chips + XP outcomes
+ // Mini line: dice-effects breakdown, if present (full info, not collapsed)
  let diceEffectsHTML = '';
  if (route.rollEffect && route.rollEffect.length > 0) {
- diceEffectsHTML = `
- <div style="margin-top: 8px; padding: 8px; background: #f0f8ff; border-radius: 5px; border-left: 4px solid #667eea;">
- <div style="font-weight: bold; font-size: 0.85em; margin-bottom: 5px; color: #667eea;"> Dice Roll Effects:</div>
- <div style="display: flex; flex-direction: column; gap: 3px;">
- ${route.rollEffect.map((effect, index) => {
- const icon = statIcons[effect.stat];
- const statName = statNames[effect.stat];
- const isBuff = effect.modifier === -1;
- const color = isBuff ? '#28a745': '#dc3545';
- const label = isBuff ? '↓ Easier': '↑ Harder';
- const sign = isBuff ? '-': '+';
- return `<div style="font-size: 0.8em; color: ${color}; font-weight: bold;">
- Die ${index + 1}: ${sign}1d6 ${icon} ${statName} ${label}
- </div>`;
- }).join('')}
- </div>
- </div>
- `;
+ const parts = route.rollEffect.map((effect, index) => {
+  const statName = statNames[effect.stat];
+  const isBuff = effect.modifier === -1;
+  const sign = isBuff ? '-' : '+';
+  const label = isBuff ? 'easier' : 'harder';
+  const color = isBuff ? '#28a745' : '#dc3545';
+  return `<span style="color:${color};font-weight:700;">d${index + 1}: ${sign}1d6 ${statName} ${label}</span>`;
+ }).join('  •  ');
+ diceEffectsHTML = `<div class="rc-dice">Dice: ${parts}</div>`;
  }
 
  const card = document.createElement('div');
  card.className = 'route-card';
+ card.style.position = 'relative';
  if (!canAttempt) card.style.opacity = '0.5';
  if (alreadyAttempted) {
- card.style.border = '3px solid #ffc107';
+ card.style.border = '2px solid #ffc107';
  card.style.background = '#fff3cd';
  }
 
  card.onclick = () => canAttempt && attemptClimb(route, area);
 
+ const gearBonusChip = playerHasGear.length > 0
+  ? `<span class="rc-gearbonus" title="Gear bonus: ${playerHasGear.join(', ')}">+GEAR</span>`
+  : '';
+
+ const attemptedBadge = alreadyAttempted ? `<span class="rc-attempted-badge">Attempted</span>` : '';
+
  card.innerHTML = `
- ${alreadyAttempted ? `
- <div style="background: #ffc107; color: #856404; padding: 5px 10px; border-radius: 5px;
- margin-bottom: 8px; font-size: 0.85em; font-weight: bold; text-align: center;">
- Already Attempted This Round
- </div>
- `: ''}
- <div class="route-name">${route.name}</div>
- <div class="route-grade">${route.grade}</div>
- <div style="display: inline-block; background: ${routeTypeColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: bold; margin-bottom: 5px;">${route.routeType || 'Unknown'}</div>
- ${playerHasGear.length > 0 ? `
- <div style="background: #d4edda; border: 2px solid #28a745; padding: 5px; border-radius: 5px; margin: 5px 0; font-size: 0.85em; font-weight: bold; color: #155724;">
- Gear Bonus: ${playerHasGear.join(', ')}
- </div>
- `: ''}
- ${diceEffectsHTML}
- <div class="route-requirements">
- <div class="requirement ${totalStats.strength >= route.strength ? 'met': 'unmet'}">
- Str: ${route.strength}
- </div>
- <div class="requirement ${totalStats.technique >= route.technique ? 'met': 'unmet'}">
- Tech: ${route.technique}
- </div>
- <div class="requirement ${totalStats.focus >= route.focus ? 'met': 'unmet'}">
- Focus: ${route.focus}
- </div>
- <div class="requirement ${totalStats.flexibility >= route.flexibility ? 'met': 'unmet'}">
- Flex: ${route.flexibility}
- </div>
- </div>
- <div class="route-costs">
- <span> ${route.time} time</span>
- <span> ${route.endurance} endurance</span>
- </div>
- <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd; font-size: 0.9em;">
- <div style="color: #28a745; font-weight: bold;"> Success: ${route.xpSuccess} XP</div>
- <div style="color: #dc3545; font-weight: bold;"> Fail: ${route.xpFail} XP</div>
- </div>
+  ${attemptedBadge}
+  <div class="rc-row-top">
+   <span class="route-name">${route.name}</span>
+   <span class="route-grade">${route.grade}</span>
+   <span class="rc-type" style="background:${routeTypeColor};">${route.routeType || 'Unknown'}</span>
+   <span class="rc-cost">Ti ${route.time} · E ${route.endurance}</span>
+   ${gearBonusChip}
+  </div>
+  <div class="rc-row-bottom">
+   <div class="route-requirements">
+    <div class="requirement ${totalStats.strength    >= route.strength    ? 'met': 'unmet'}">S ${route.strength}</div>
+    <div class="requirement ${totalStats.technique   >= route.technique   ? 'met': 'unmet'}">T ${route.technique}</div>
+    <div class="requirement ${totalStats.focus       >= route.focus       ? 'met': 'unmet'}">F ${route.focus}</div>
+    <div class="requirement ${totalStats.flexibility >= route.flexibility ? 'met': 'unmet'}">X ${route.flexibility}</div>
+   </div>
+   <div class="rc-xp"><span class="succ">+${route.xpSuccess}</span><span class="fail">/${route.xpFail}</span></div>
+  </div>
+  ${diceEffectsHTML}
  `;
 
  return card;
@@ -1463,57 +1339,85 @@ function renderTraining() {
  const container = document.getElementById('trainingAreas');
  container.innerHTML = '';
 
- const statIcons = {
- strength: '',
- technique: '',
- focus: '',
- flexibility: ''
+ // Stat -> chip color, mirroring the climber-token stat-pill palette.
+ const statChipColor = {
+  strength:    '#ff6845', // coral
+  technique:   '#1fb8a6', // teal
+  focus:       '#8857d4', // violet
+  flexibility: '#b6d62d', // lime
+ };
+ const statShort = {
+  strength: 'STR', technique: 'TEC', focus: 'FOC', flexibility: 'FLX',
  };
 
  TRAINING_AREAS.forEach(area => {
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
+  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+  const char = currentPlayer.character;
+  const playersHere = getPlayersInSection(area.name);
+  const isOccupied = playersHere.length > 0;
+  const occupyingPlayer = isOccupied ? playersHere[0] : null;
+  const isMine = isOccupied && occupyingPlayer.playerNum === currentPlayer.playerNum;
+  const canTrain = char.timeRemaining >= area.time
+                && char.currentEndurance >= area.endurance
+                && (!isOccupied || isMine);
 
- // Check if this equipment is occupied
- const playersHere = getPlayersInSection(area.name);
- const isOccupied = playersHere.length > 0;
- const occupyingPlayer = isOccupied ? playersHere[0]: null;
+  const card = document.createElement('div');
+  card.className = 'training-area compact-card';
+  if (!canTrain) card.style.opacity = '0.5';
+  if (isOccupied && !isMine) card.classList.add('locked-station');
 
- // Can train if: have resources AND (equipment is free OR current player is already using it)
- const canTrain = char.timeRemaining >= area.time &&
- char.currentEndurance >= area.endurance &&
- (!isOccupied || char.location === area.name);
+  card.onclick = () => canTrain && trainAction(area);
 
- const div = document.createElement('div');
- div.style.marginBottom = '15px';
- div.style.padding = '15px';
- div.style.background = canTrain ? 'white': '#f0f0f0';
- div.style.borderRadius = '8px';
- div.style.cursor = canTrain ? 'pointer': 'not-allowed';
- div.style.border = isOccupied && occupyingPlayer.playerNum !== currentPlayer.playerNum ? '2px solid #dc3545': '2px solid #ddd';
- div.style.opacity = !canTrain ? '0.6': '1';
+  const occChip = isMine
+   ? `<span class="rc-gearbonus" style="background:#28a745;">YOU</span>`
+   : (isOccupied
+      ? `<span class="rc-type" style="background:#dc3545;">P${occupyingPlayer.playerNum}</span>`
+      : '');
 
- div.onclick = () => canTrain && trainAction(area);
+  const bonusChip = `<span class="rc-type" style="background:${statChipColor[area.stat] || '#6c757d'};">+${area.bonus} ${statShort[area.stat] || area.stat.toUpperCase()}</span>`;
 
- div.innerHTML = `
- <div style="font-weight: bold; margin-bottom: 5px;">${area.name}</div>
- ${isOccupied ? `
- <div style="background: ${occupyingPlayer.playerNum === currentPlayer.playerNum ? '#d4edda': '#ffe8e8'}; padding: 6px; border-radius: 5px; margin-bottom: 8px; font-size: 0.85em; font-weight: bold; color: ${occupyingPlayer.playerNum === currentPlayer.playerNum ? '#155724': '#721c24'};">
- ${occupyingPlayer.playerNum === currentPlayer.playerNum ? ' You are here': ` Occupied by Player ${occupyingPlayer.playerNum}`}
- </div>
- `: `
- <div style="background: #d4edda; padding: 6px; border-radius: 5px; margin-bottom: 8px; font-size: 0.85em; font-weight: bold; color: #155724;">
- Available
- </div>
- `}
- <div class="training-bonus">${statIcons[area.stat]} ${area.description}</div>
- <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
- ${area.time} time | ${area.endurance} endurance
- </div>
- `;
+  card.innerHTML = `
+    <div class="rc-row-top">
+     <span class="route-name">${area.name}</span>
+     ${bonusChip}
+     <span class="rc-cost">Ti ${area.time} · E ${area.endurance}</span>
+     ${occChip}
+    </div>
+    ${area.description ? `<div class="rc-row-bottom training-desc">${area.description}</div>` : ''}
+  `;
 
- container.appendChild(div);
+  container.appendChild(card);
  });
+}
+
+// Compact gear-card template — same row-pattern as the climbing route cards
+// and training stations. Preserves all info: name, cost, category, effect,
+// description, access-grant (when applicable), and prerequisite hints.
+function buildCompactGearCardHTML(gear, owned, prerequisiteText) {
+ const ownedTag = owned
+  ? `<span class="rc-gearbonus" style="background:#28a745;">OWNED</span>`
+  : '';
+ const costChip = `<span class="rc-cost">${gear.cost} XP</span>`;
+ const categoryChip = gear.category
+  ? `<span class="rc-type" style="background:#5a4530;">${gear.category}</span>`
+  : '';
+ const accessChip = gear.accessRequirement
+  ? `<span class="rc-gearbonus" style="background:#155724;">+${gear.accessRequirement} ACCESS</span>`
+  : '';
+ return `
+  <div class="rc-row-top">
+   <span class="route-name">${gear.name}</span>
+   ${categoryChip}
+   ${costChip}
+   ${accessChip}
+   ${ownedTag}
+  </div>
+  <div class="rc-row-bottom gear-detail-row">
+   <div class="gear-effect-line">${gear.effectDisplay}</div>
+   <div class="gear-desc-line">${gear.description}</div>
+   ${prerequisiteText}
+  </div>
+ `;
 }
 
 function renderStore() {
@@ -1523,17 +1427,14 @@ function renderStore() {
  const spendableXP = getSpendableXP(char);
  const xpToGo = getXPToNextLevel(char);
 
- // Add capacity indicator
- const playersHere = getPlayersInSection('gearShop');
- const capacity = getSectionCapacity('gearShop');
- const capacityHTML = `<div style="background: #e8f4f8; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid #007bff;">
- <strong> Occupancy: ${playersHere.length}/${capacity}</strong>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>`: ''}
- </div>`;
+ // Affordability badge on the area-title (no longer collapses the panel).
+ syncShopCollapseState(char, spendableXP);
 
- container.innerHTML = capacityHTML + `<p style="margin-bottom: 10px; color: #666;">
- Purchase items with XP earned in your current level<br>
- <strong style="color: #28a745;"> Spendable: ${spendableXP} XP</strong> |
- <strong style="color: #ff9800;"> ${xpToGo} XP to next level</strong>
+ // Occupancy is on the area-title pill — no inline duplicate. Header line
+ // keeps the spendable / XP-to-next info that drives buy decisions.
+ container.innerHTML = `<p class="store-xp-info">
+ <strong style="color: #28a745;">Spendable: ${spendableXP} XP</strong> ·
+ <strong style="color: #ff9800;">${xpToGo} XP to next level</strong>
  </p>`;
 
  const hasGearBag = char.equipment.includes('Gear Bag');
@@ -1583,19 +1484,8 @@ function renderStore() {
 
  card.onclick = () => !owned && canAfford && prerequisitesMet && purchaseGear(gear);
 
- card.innerHTML = `
- <div class="gear-name">${gear.name} ${owned ? '': ''}</div>
- <div class="gear-category" style="font-size: 0.8em; color: #6c757d; margin-bottom: 5px;">${gear.category}</div>
- <div class="gear-cost">${gear.cost} XP</div>
- ${prerequisiteText}
- <div style="background: #f0f8ff; padding: 8px; border-radius: 5px; margin: 8px 0; font-weight: bold; color: #007bff; font-size: 0.9em;">
- ${gear.effectDisplay}
- </div>
- <div class="gear-effect" style="font-size: 0.85em; color: #666; font-style: italic;">
- ${gear.description}
- </div>
- ${gear.accessRequirement ? `<div style="background: #d4edda; padding: 6px; border-radius: 4px; margin-top: 8px; font-size: 0.85em; color: #155724; font-weight: bold;"> Unlocks ${gear.accessRequirement} Access</div>`: ''}
- `;
+ card.classList.add('compact-card');
+ card.innerHTML = buildCompactGearCardHTML(gear, owned, prerequisiteText);
 
  accessGearSection.appendChild(card);
  });
@@ -1638,19 +1528,8 @@ function renderStore() {
 
  card.onclick = () => !owned && canAfford && prerequisitesMet && purchaseGear(gear);
 
- card.innerHTML = `
- <div class="gear-name">${gear.name} ${owned ? '': ''}</div>
- <div class="gear-category" style="font-size: 0.8em; color: #6c757d; margin-bottom: 5px;">${gear.category}</div>
- <div class="gear-cost">${gear.cost} XP</div>
- ${prerequisiteText}
- <div style="background: #f0f8ff; padding: 8px; border-radius: 5px; margin: 8px 0; font-weight: bold; color: #007bff; font-size: 0.9em;">
- ${gear.effectDisplay}
- </div>
- <div class="gear-effect" style="font-size: 0.85em; color: #666; font-style: italic;">
- ${gear.description}
- </div>
- ${gear.accessRequirement ? `<div style="background: #d4edda; padding: 6px; border-radius: 4px; margin-top: 8px; font-size: 0.85em; color: #155724; font-weight: bold;"> Unlocks ${gear.accessRequirement} Access</div>`: ''}
- `;
+ card.classList.add('compact-card');
+ card.innerHTML = buildCompactGearCardHTML(gear, owned, prerequisiteText);
 
  availableGearSection.appendChild(card);
  });
@@ -2777,7 +2656,6 @@ function determineNextPlayer() {
  gameState.currentPlayerIndex = nextPlayerIndex;
  addLog(`Turn passes to Player ${gameState.players[nextPlayerIndex].playerNum} (${maxTime} time remaining)`);
  renderGameBoard();
- showTurnBanner();
  return;
  }
 
@@ -2938,15 +2816,56 @@ function closeLevelUpModal() {
  advanceTurn();
 }
 
-function showTurnBanner() {
- if (gameState.gameEnded) return;
- const player = gameState.players[gameState.currentPlayerIndex];
- const char = player.character;
- const banner = document.getElementById('turnBanner');
- banner.innerHTML = `Player ${player.playerNum}'s Turn<br><span style="font-size:0.85em;opacity:0.9;">${char.name} &nbsp;·&nbsp; ${char.timeRemaining} time remaining</span>`;
- banner.classList.remove('active');
- banner.offsetHeight; // force reflow to restart animation
- banner.classList.add('active');
+// ---------------------------------------------------------------------------
+// Collapsible panels (Stack 2 — A3 log, C1 gear shop with auto-open).
+// ---------------------------------------------------------------------------
+
+function toggleLogPanel() {
+ const panel = document.getElementById('gameLog');
+ if (!panel) return;
+ const collapsed = panel.classList.toggle('collapsed');
+ const btn = panel.querySelector('.log-toggle-btn');
+ if (btn) btn.textContent = collapsed ? '+' : '−';
+}
+
+// The shop is always-visible per the latest design pass — the previous
+// toggle / auto-open behavior was removed. We keep the affordability badge
+// as a passive signal on the title row, but never collapse the panel.
+function syncShopCollapseState(char, spendableXP) {
+ const panel = document.querySelector('.store-panel');
+ if (!panel) return;
+ panel.classList.remove('collapsed');
+
+ // Lazily create the affordable-hint badge inside the gear-shop area-title.
+ const title = panel.querySelector('.area-title .at-pills') || panel.querySelector('.area-title');
+ if (!title) return;
+ let hint = panel.querySelector('.shop-affordable-hint');
+ if (!hint) {
+  hint = document.createElement('span');
+  hint.className = 'shop-affordable-hint';
+  title.appendChild(hint);
+ }
+
+ // Compute affordability across BOTH access cards and the rotating selection.
+ const owned = new Set(char.equipment);
+ const hasGearBag = owned.has('Gear Bag');
+ const canVisit = hasGearBag || char.timeRemaining >= 1;
+ const accessNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+ const candidates = [
+  ...GEAR_SHOP.filter(g => accessNames.includes(g.name)),
+  ...gameState.availableGear,
+ ];
+ const affordable = candidates.some(gear => {
+  if (owned.has(gear.name)) return false;
+  if (!canVisit) return false;
+  if (gear.cost > spendableXP) return false;
+  if (gear.prerequisiteLevel && char.level < gear.prerequisiteLevel) return false;
+  if (gear.prerequisiteItems && gear.prerequisiteItems.some(i => !owned.has(i))) return false;
+  return true;
+ });
+
+ hint.textContent = 'AFFORDABLE';
+ hint.style.display = affordable ? 'inline-block' : 'none';
 }
 
 // Make sure functions are globally accessible
@@ -2957,14 +2876,4 @@ window.closeClimbModal = closeClimbModal;
 window.closeLevelUpModal = closeLevelUpModal;
 window.restAction = restAction;
 window.attemptMilestoneRoute = attemptMilestoneRoute;
-window.toggleFullPlayerPanels = toggleFullPlayerPanels;
-window.expandPlayerDetails = expandPlayerDetails;
-window.toggleStrip = toggleStrip;
-
-// Initialize on page load
-window.onload = function() {
- console.log(' game.js fully loaded and initialized');
- console.log('startCharacterSelect function exists:', typeof startCharacterSelect !== 'undefined');
- console.log('window.startCharacterSelect function exists:', typeof window.startCharacterSelect !== 'undefined');
- // Game is ready to start
-};
+window.toggleLogPanel = toggleLogPanel;
