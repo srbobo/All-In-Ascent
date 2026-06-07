@@ -951,30 +951,6 @@
  display: flex; gap: 12px; flex-wrap: wrap;
  margin-top: 18px;
  }
- .turn-banner {
- position: fixed;
- top: 30px; left: 50%;
- transform: translateX(-50%) rotate(-2deg);
- padding: 18px 36px;
- background: var(--marigold);
- color: var(--ink);
- border: 2px solid var(--ink);
- border-radius: 14px;
- font-family: 'Bricolage Grotesque', sans-serif;
- font-weight: 800;
- font-size: 1.6rem;
- letter-spacing: -0.02em;
- box-shadow:
- 4px 6px 0 var(--ink),
- 0 12px 28px rgba(40,20,10,0.4);
- z-index: 999;
- pointer-events: none;
- animation: turnBannerPop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
- }
- @keyframes turnBannerPop {
- 0% { transform: translateX(-50%) rotate(-2deg) scale(0.7); opacity: 0; }
- 100% { transform: translateX(-50%) rotate(-2deg) scale(1); opacity: 1; }
- }
  .log-panel {
  background: var(--ink);
  color: var(--chalk);
@@ -1029,199 +1005,624 @@
 
 
  /* ============================================================
-    Sticky player strip — compact at-a-glance state for all players.
-    Pinned to top of viewport during play.
+    CLIMBER TOKEN — compact horizontal row per player.
+    Replaces the bulky multi-section panel. One row ≈ 56-64px tall.
+    Click anywhere on the row to toggle the detail drawer below.
     ============================================================ */
- .player-strip {
-   position: sticky;
-   top: 0;
-   z-index: 100;
-   background: linear-gradient(180deg, rgba(42,29,18,0.96) 0%, rgba(60,42,25,0.96) 100%);
-   border-bottom: 3px solid var(--coral);
-   /* extra right padding so the absolute-positioned × has its own gutter */
-   padding: 10px 40px 10px 16px;
-   margin: 0 -24px 16px;
-   box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+ #playersContainer { display: flex; flex-direction: column; gap: 6px; margin-bottom: 24px; }
+
+ .climber-token {
    display: grid;
-   gap: 10px;
-   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+   grid-template-columns:
+     minmax(160px, 1.1fr) /* id        */
+     minmax(220px, 1.3fr) /* stats     */
+     minmax(190px, 1.5fr) /* endurance */
+     minmax(140px, 1fr)   /* xp        */
+     54px              /* time       */
+     58px              /* milestones */
+     minmax(110px, 0.9fr) /* location  */
+     14px              /* state dot  */
+     22px;             /* expand     */
+   gap: 12px;
+   align-items: center;
+   padding: 10px 14px 10px 18px;
+   background: var(--chalk);
+   border: 2px solid var(--ink);
+   border-radius: 10px;
+   box-shadow: 3px 4px 0 var(--ink);
+   font-family: 'Hanken Grotesk', sans-serif;
+   color: var(--ink);
+   cursor: pointer;
+   transition: transform 0.12s, box-shadow 0.12s, background 0.15s;
+   position: relative;
  }
- .player-strip.hidden { display: none; }
- .player-strip .strip-collapse {
+ /* Coral accent rail on the active row — replaces the emoji star marker. */
+ .climber-token.active::before {
+   content: "";
    position: absolute;
-   top: 6px;
-   right: 8px;
-   background: rgba(244,237,224,0.18);
-   color: var(--chalk);
-   border: 1px solid rgba(244,237,224,0.4);
+   left: -2px; top: -2px; bottom: -2px;
+   width: 6px;
+   background: var(--coral);
+   border-radius: 10px 0 0 10px;
+ }
+ .climber-token:hover { transform: translate(-1px, -1px); box-shadow: 4px 5px 0 var(--ink); }
+ .climber-token.active {
+   background: var(--marigold);
+   border-color: var(--coral);
+   box-shadow: 3px 4px 0 var(--coral), 0 0 0 1px var(--coral) inset;
+ }
+ .climber-token.exhausted { opacity: 0.55; }
+ .climber-token.low-time .tok-time b { color: var(--coral); }
+ .climber-token.expanded { border-radius: 10px 10px 0 0; box-shadow: 3px 0 0 var(--ink); }
+
+ .tok-id { display: flex; gap: 6px; align-items: baseline; min-width: 0; overflow: hidden; }
+ .tok-id .num    { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+ .tok-id .name   { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ .tok-id .level  { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--ink-soft); padding: 1px 6px; background: rgba(42,29,18,0.08); border-radius: 4px; }
+
+ .tok-stats { display: flex; gap: 6px; flex-wrap: nowrap; }
+ .tok-stat {
+   display: inline-flex; align-items: baseline; gap: 2px;
+   font-family: 'Geist Mono', monospace; font-size: 12px;
+   padding: 3px 8px; border-radius: 100px;
+   background: rgba(42,29,18,0.06);
+   border: 1px solid rgba(42,29,18,0.15);
+ }
+ .tok-stat .glyph { font-weight: 800; opacity: 0.7; }
+ .tok-stat b      { font-size: 13px; }
+ .tok-stat .bonus { color: var(--lime); font-weight: 700; font-size: 10px; margin-left: 2px; filter: drop-shadow(0 0 1px var(--ink)); }
+ .tok-stat.strength    { box-shadow: inset 3px 0 0 var(--coral); }
+ .tok-stat.technique   { box-shadow: inset 3px 0 0 var(--teal); }
+ .tok-stat.focus       { box-shadow: inset 3px 0 0 var(--violet); }
+ .tok-stat.flexibility { box-shadow: inset 3px 0 0 var(--lime); }
+
+ .tok-end, .tok-xp { display: flex; align-items: center; gap: 6px; }
+ .tok-end .label, .tok-xp .label {
+   font-family: 'Geist Mono', monospace; font-size: 10px; color: var(--ink-soft); font-weight: 700;
+ }
+ .tok-end .bar, .tok-xp .bar {
+   flex: 1; height: 10px;
+   background: rgba(42,29,18,0.18);
+   border: 1px solid var(--ink);
+   border-radius: 100px;
+   overflow: hidden;
+   min-width: 50px;
+ }
+ .tok-end .fill { height: 100%; background: linear-gradient(90deg, var(--marigold), var(--coral)); transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+ .tok-xp .fill  { height: 100%; background: linear-gradient(90deg, var(--cobalt), var(--violet)); transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+ .tok-end .nums, .tok-xp .nums { font-family: 'Geist Mono', monospace; font-size: 11px; font-weight: 700; min-width: 38px; text-align: right; }
+
+ .tok-time   { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--ink-soft); text-align: center; }
+ .tok-time b { font-family: 'Geist Mono', monospace; font-size: 14px; color: var(--ink); margin-left: 4px; }
+
+ .tok-ms { display: inline-flex; gap: 4px; justify-content: center; }
+ .tok-ms .dot {
+   width: 12px; height: 12px; border-radius: 50%;
+   background: rgba(42,29,18,0.12);
+   border: 1.5px solid var(--ink);
+ }
+ .tok-ms .dot.filled.beg { background: var(--lime); }
+ .tok-ms .dot.filled.int { background: var(--marigold); }
+ .tok-ms .dot.filled.exp { background: var(--coral); }
+
+ .tok-loc {
+   font-family: 'Geist Mono', monospace; font-size: 10px;
+   color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em;
+   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+ }
+
+ /* State dot — color-coded indicator (no glyph). Title attribute provides
+    the meaning for hover / accessibility. Pulses faintly when the ability
+    is ready so it remains noticeable in busy panels. */
+ .tok-state {
+   width: 12px; height: 12px;
    border-radius: 50%;
+   border: 1.5px solid var(--ink);
+   display: inline-block;
+   background: rgba(42,29,18,0.18);
+ }
+ .tok-state.ready { background: var(--lime);   animation: tok-pulse 2s ease-in-out infinite; }
+ .tok-state.used  { background: rgba(42,29,18,0.18); }
+ .tok-state.beta  { background: var(--violet); animation: tok-pulse 1.4s ease-in-out infinite; }
+ .tok-state.out   { background: var(--coral); }
+ @keyframes tok-pulse {
+   0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.0); }
+   50%      { box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
+ }
+
+ .tok-expand {
+   background: transparent;
+   border: 1px solid rgba(42,29,18,0.3);
+   color: var(--ink-soft);
    width: 22px; height: 22px;
-   font-family: 'Geist Mono', monospace;
-   font-size: 14px;
-   line-height: 1;
+   border-radius: 50%;
+   font-family: 'Geist Mono', monospace; font-size: 14px; line-height: 1; font-weight: 700;
    cursor: pointer;
    padding: 0;
    display: flex; align-items: center; justify-content: center;
-   transition: background 0.15s, transform 0.1s;
+   transition: background 0.15s, color 0.15s;
  }
- .player-strip .strip-collapse:hover {
-   background: var(--coral);
-   color: white;
-   transform: scale(1.1);
- }
+ .climber-token.expanded .tok-expand { background: var(--ink); color: var(--chalk); border-color: var(--ink); }
+ .climber-token:hover .tok-expand { background: rgba(42,29,18,0.08); }
 
- /* Fixed reopen pill — surfaces in top-right when the strip is hidden. */
- .strip-reopen {
-   position: fixed;
-   top: 12px;
-   right: 16px;
-   z-index: 110;
-   background: var(--ink);
-   color: var(--chalk);
-   border: 2px solid var(--coral);
-   padding: 6px 14px;
-   border-radius: 100px;
-   font-family: 'Bricolage Grotesque', sans-serif;
-   font-weight: 700;
-   font-size: 0.78em;
-   letter-spacing: 0.04em;
-   text-transform: uppercase;
-   cursor: pointer;
-   box-shadow: 2px 3px 0 var(--coral), 3px 5px 12px rgba(0,0,0,0.35);
-   transition: transform 0.12s, box-shadow 0.12s;
- }
- .strip-reopen:hover {
-   transform: translate(-1px, -1px);
-   box-shadow: 3px 4px 0 var(--coral), 4px 6px 14px rgba(0,0,0,0.4);
- }
- .strip-reopen.hidden { display: none; }
- .player-strip .strip-card {
-   background: var(--chalk);
+ /* Drawer — slides open below the token row. */
+ .climber-drawer {
+   background: white;
    border: 2px solid var(--ink);
-   border-radius: 6px;
-   padding: 8px 10px;
-   font-family: 'Hanken Grotesk', sans-serif;
-   font-size: 12px;
-   color: var(--ink);
-   box-shadow: 2px 2px 0 rgba(0,0,0,0.25);
-   cursor: pointer;
-   transition: transform 0.12s, box-shadow 0.12s;
-   position: relative;
+   border-top: none;
+   border-radius: 0 0 10px 10px;
+   margin-top: -6px;        /* sit flush against the token's bottom */
+   padding: 14px 18px 16px;
+   box-shadow: 3px 4px 0 var(--ink);
  }
- .player-strip .strip-card:hover {
-   transform: translate(-1px, -1px);
-   box-shadow: 3px 3px 0 rgba(0,0,0,0.3);
+ .climber-drawer .drawer-grid {
+   display: grid;
+   grid-template-columns: 1fr 1fr 1.3fr;
+   gap: 18px;
  }
- .player-strip .strip-card.active {
-   background: var(--marigold);
-   border-color: var(--coral);
-   box-shadow: 3px 3px 0 var(--coral);
- }
- .player-strip .strip-card.active::after {
-   content: '⭐';
-   position: absolute;
-   top: -10px;
-   right: -8px;
-   background: var(--coral);
-   color: white;
-   width: 22px; height: 22px;
-   border-radius: 50%;
-   border: 2px solid var(--ink);
-   display: flex; align-items: center; justify-content: center;
-   font-size: 11px;
-   line-height: 1;
- }
- .player-strip .strip-card.exhausted { opacity: 0.55; }
- .strip-name {
+ .climber-drawer .drawer-section h5 {
    font-family: 'Bricolage Grotesque', sans-serif;
    font-weight: 800;
+   font-size: 11px;
+   text-transform: uppercase;
+   letter-spacing: 0.06em;
+   color: var(--ink-soft);
+   margin: 0 0 8px;
+ }
+ .climber-drawer .drawer-line {
+   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
    font-size: 13px;
    margin-bottom: 4px;
-   display: flex; justify-content: space-between; align-items: baseline;
  }
- .strip-name .char {
-   font-weight: 500;
-   font-family: 'Hanken Grotesk', sans-serif;
-   font-size: 11px;
-   color: var(--ink-soft);
- }
- .strip-bars { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; }
- .strip-bar {
-   height: 8px;
-   background: rgba(42,29,18,0.18);
-   border-radius: 4px;
-   overflow: hidden;
-   position: relative;
- }
- .strip-bar .fill {
-   height: 100%;
-   transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-   border-radius: 4px;
- }
- .strip-bar.endurance .fill { background: linear-gradient(90deg, var(--marigold), var(--coral)); }
- .strip-bar.xp .fill        { background: linear-gradient(90deg, var(--cobalt), var(--violet)); }
- .strip-bar .label {
-   position: absolute; inset: 0;
-   font-family: 'Geist Mono', monospace; font-size: 9px; font-weight: 700;
-   color: var(--ink);
-   display: flex; align-items: center; justify-content: flex-end;
-   padding-right: 4px;
-   text-shadow: 0 0 4px var(--chalk);
- }
- .strip-meta {
-   display: flex; gap: 8px; flex-wrap: wrap;
-   font-family: 'Geist Mono', monospace;
-   font-size: 10px;
-   color: var(--ink-soft);
+ .climber-drawer .drawer-desc {
+   font-size: 12.5px; color: var(--ink-soft);
+   font-style: italic; line-height: 1.45;
    margin-top: 4px;
  }
- .strip-meta .pip {
-   display: inline-flex; align-items: center; gap: 2px;
+ .climber-drawer .ability-status {
+   font-family: 'Geist Mono', monospace; font-size: 10px;
+   padding: 2px 8px; border-radius: 100px;
+   text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
  }
- .strip-meta .dots {
-   display: inline-flex; gap: 2px;
- }
- .strip-meta .dot {
-   width: 7px; height: 7px; border-radius: 50%;
-   background: rgba(42,29,18,0.2);
-   border: 1px solid var(--ink);
- }
- .strip-meta .dot.filled.beg { background: var(--lime); }
- .strip-meta .dot.filled.int { background: var(--marigold); }
- .strip-meta .dot.filled.exp { background: var(--coral); }
- .strip-location {
-   font-family: 'Geist Mono', monospace;
-   font-size: 10px;
-   color: var(--ink-soft);
-   margin-top: 3px;
-   text-transform: uppercase;
-   letter-spacing: 0.04em;
- }
-
- /* Full-detail panels toggle */
- .full-details-toggle {
-   margin: 8px 0 16px;
+ .climber-drawer .ability-status.avail { background: var(--lime); color: var(--ink); }
+ .climber-drawer .ability-status.used  { background: rgba(42,29,18,0.18); color: var(--ink-soft); }
+ .climber-drawer .beta-note {
+   margin-top: 8px; padding: 6px 10px;
+   background: var(--violet); color: white;
+   border-radius: 6px; font-size: 12px; font-weight: 700;
    text-align: center;
  }
- .full-details-toggle button {
-   background: var(--chalk);
-   border: 2px solid var(--ink);
-   color: var(--ink);
-   padding: 6px 16px;
-   border-radius: 100px;
-   font-family: 'Bricolage Grotesque', sans-serif;
+ .climber-drawer .drawer-bonuses { font-family: 'Geist Mono', monospace; font-size: 12px; }
+ .climber-drawer .drawer-bonuses .bonus-row {
+   display: flex; justify-content: space-between;
+   padding: 3px 0;
+   border-bottom: 1px dotted rgba(42,29,18,0.15);
+ }
+ .climber-drawer .drawer-bonuses .bonus-row:last-child { border-bottom: none; }
+ .climber-drawer .drawer-equipment {
+   display: flex; flex-wrap: wrap; gap: 6px;
+ }
+ .climber-drawer .drawer-equipment .badge {
+   font-size: 11px; padding: 3px 9px;
+   background: var(--marigold); color: var(--ink);
+   border: 1.5px solid var(--ink); border-radius: 100px;
+   font-weight: 600;
+ }
+ .climber-drawer .muted { color: var(--ink-soft); font-style: italic; font-size: 12px; }
+
+ /* ============================================================
+    COMPACT GAME-ACTIVE DENSITY
+    Tightens padding / font sizes / gaps throughout the game board.
+    Goal: less scrolling to see all available choices, while preserving
+    every detail on every climbing-route card and gear card. Nothing is
+    hidden — only padding and gutters shrink.
+    ============================================================ */
+
+ /* When the game is running, the hero header collapses to a thin top
+    chrome — the decorative tape strips and subtitle would otherwise eat
+    250+px of vertical real estate during play. */
+ body.playing header {
+   padding: 10px 5vw 8px;
+ }
+ body.playing header h1 {
+   font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+   margin-bottom: 0;
+   line-height: 1.05;
+ }
+ body.playing header .subtitle { display: none; }
+ body.playing header .hero-tape-row { display: none; }
+ body.playing header .rulebook-link {
+   padding: 3px 12px;
+   margin-top: 6px;
+   font-size: 0.74em;
+ }
+
+ /* Game-board frame */
+ body.playing .game-board {
+   padding: 16px 3vw 32px;
+ }
+
+ /* Top info strip — round / current player / belayers / clearing token */
+ body.playing .game-info {
+   padding: 8px 14px;
+   margin-bottom: 12px;
+   gap: 0.4rem;
+ }
+ body.playing .info-box { padding: 2px 12px; }
+ body.playing .info-label { font-size: 0.58rem; margin-bottom: 0; }
+ body.playing .info-value { font-size: 1.05rem; }
+ body.playing .turn-indicator { font-size: 1.0rem; padding: 6px 14px; }
+
+ /* Area panel grid — tighter gap, smaller panel padding */
+ body.playing .game-areas { gap: 12px; margin-bottom: 14px; }
+ body.playing .area-panel { padding: 12px 14px; }
+ body.playing .area-title {
+   font-size: 1.1rem;
+   padding-bottom: 6px;
+   margin-bottom: 4px;
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   flex-wrap: wrap;
+ }
+ body.playing .area-title .at-name { white-space: nowrap; }
+ body.playing .area-title .at-pills {
+   display: inline-flex;
+   gap: 4px;
+   flex-wrap: wrap;
+   align-items: center;
+ }
+ body.playing .area-title .at-pill {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.62rem;
    font-weight: 700;
-   font-size: 0.85em;
    letter-spacing: 0.04em;
+   text-transform: uppercase;
+   padding: 2px 8px;
+   border-radius: 100px;
+   border: 1.5px solid var(--ink);
+ }
+ body.playing .area-title .at-pill.occupancy {
+   background: var(--chalk);
+   color: var(--ink);
+ }
+ body.playing .area-title .at-pill.occupancy.full {
+   background: var(--coral);
+   color: white;
+   border-color: var(--ink);
+ }
+ body.playing .area-title .at-pill.clearing {
+   background: var(--marigold);
+   color: var(--ink);
+ }
+
+ /* A2: Game-areas grid locked to 3 columns in play mode (was auto-fit
+    with min 300px which produced 1-4 columns inconsistently). With the
+    Rest panel removed and Gear Shop spanning 2 cols, this gives a clean
+    2-row layout: row 1 = Bouldering / Top Rope / Lead, row 2 = Training
+    + Gear Shop (spans 2). */
+ body.playing .game-areas {
+   grid-template-columns: repeat(3, minmax(0, 1fr));
+ }
+
+ /* A1: Route cards arranged in 2 columns inside each climbing area
+    panel — halves the panel height compared to a 5-card stack. */
+ body.playing #boulderingRoutes,
+ body.playing #topRopeRoutes,
+ body.playing #leadClimbingRoutes {
+   display: grid;
+   grid-template-columns: repeat(2, minmax(0, 1fr));
+   gap: 6px;
+ }
+
+ /* B1: Compact card pattern shared by climbing-route, training-area, and
+    gear-card. Same outer rhythm, same chip styles, same row-flow:
+      Row 1: name + colored type/grade/access chips + cost chip + status chip
+      Row 2: stat checks / requirements / details
+    All info preserved — only padding/font/gap tighten. */
+ body.playing .route-card,
+ body.playing .training-area,
+ body.playing .gear-card {
+   padding: 6px 9px;
+   margin: 0;
+   font-size: 0.78rem;
+   border-radius: 7px;
+   position: relative;
+ }
+ body.playing .route-card .rc-row-top,
+ body.playing .training-area .rc-row-top,
+ body.playing .gear-card .rc-row-top {
+   display: flex;
+   align-items: center;
+   gap: 6px;
+   flex-wrap: wrap;
+   margin-bottom: 4px;
+ }
+ body.playing .route-card .route-name,
+ body.playing .training-area .route-name,
+ body.playing .gear-card .route-name {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 800;
+   color: var(--ink);
+   font-size: 0.9rem;
+   line-height: 1.05;
+   flex: 1 1 auto;
+   min-width: 0;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+ }
+ body.playing .route-card .route-grade {
+   margin-left: 0;
+   padding: 1px 7px;
+   font-size: 0.6rem;
+ }
+ body.playing .route-card .rc-type,
+ body.playing .training-area .rc-type,
+ body.playing .gear-card .rc-type {
+   display: inline-block;
+   padding: 1px 7px;
+   font-size: 0.6rem;
+   color: white;
+   border-radius: 100px;
+   font-weight: 700;
+   white-space: nowrap;
+ }
+ body.playing .route-card .rc-cost,
+ body.playing .training-area .rc-cost,
+ body.playing .gear-card .rc-cost {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.66rem;
+   color: var(--ink-soft);
+   padding: 1px 7px;
+   background: rgba(42,29,18,0.06);
+   border-radius: 100px;
+   border: 1px solid rgba(42,29,18,0.18);
+   white-space: nowrap;
+ }
+ body.playing .route-card .rc-gearbonus,
+ body.playing .training-area .rc-gearbonus,
+ body.playing .gear-card .rc-gearbonus {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.6rem;
+   color: white;
+   background: #28a745;
+   padding: 1px 6px;
+   border-radius: 100px;
+   font-weight: 700;
+   white-space: nowrap;
+ }
+ body.playing .route-card .rc-row-bottom,
+ body.playing .training-area .rc-row-bottom,
+ body.playing .gear-card .rc-row-bottom {
+   display: flex;
+   align-items: stretch;
+   gap: 6px;
+ }
+ body.playing .route-card .route-requirements {
+   display: grid;
+   grid-template-columns: repeat(4, minmax(0, 1fr));
+   gap: 3px;
+   margin: 0;
+   flex: 1 1 auto;
+ }
+ body.playing .route-card .requirement {
+   padding: 2px 4px;
+   font-size: 0.6rem;
+   text-align: center;
+ }
+ body.playing .route-card .rc-xp {
+   display: inline-flex;
+   gap: 4px;
+   align-items: center;
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.64rem;
+   font-weight: 700;
+   white-space: nowrap;
+ }
+ body.playing .route-card .rc-xp .succ { color: #28a745; }
+ body.playing .route-card .rc-xp .fail { color: #dc3545; }
+ body.playing .route-card .rc-dice {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.6rem;
+   color: var(--ink-soft);
+   margin-top: 4px;
+   padding-top: 4px;
+   border-top: 1px dashed rgba(42,29,18,0.18);
+   line-height: 1.3;
+ }
+ body.playing .route-card .rc-attempted-badge {
+   position: absolute;
+   top: 4px;
+   right: 4px;
+   background: #ffc107;
+   color: #856404;
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.55rem;
+   font-weight: 700;
+   padding: 1px 5px;
+   border-radius: 100px;
+   text-transform: uppercase;
+   letter-spacing: 0.05em;
+ }
+
+ /* Training-card specific tweaks */
+ body.playing .training-area {
+   background: var(--tape-cream);
+   border: 1.5px solid var(--ink);
+   border-left: 6px solid var(--coral);
+   box-shadow: 2px 3px 0 var(--ink);
+ }
+ body.playing .training-area.locked-station {
+   border-left-color: #dc3545;
+   background: rgba(220,53,69,0.06);
+ }
+ body.playing .training-area .training-desc {
+   font-size: 0.7rem;
+   color: var(--ink-soft);
+   font-style: italic;
+   line-height: 1.3;
+ }
+ /* Reset the original .training-bonus pop-tag (unused in new layout) */
+ body.playing .training-bonus { display: none; }
+
+ /* Gear card detail row — effect (blue) on top, description (grey italic)
+    underneath, optional prerequisite warning. Keeps all original info. */
+ body.playing .gear-card .gear-detail-row {
+   flex-direction: column;
+   gap: 2px;
+ }
+ body.playing .gear-card .gear-effect-line {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.7rem;
+   color: #2c66cf;
+   font-weight: 700;
+   line-height: 1.25;
+ }
+ body.playing .gear-card .gear-desc-line {
+   font-size: 0.7rem;
+   color: var(--ink-soft);
+   font-style: italic;
+   line-height: 1.3;
+ }
+ body.playing .gear-card .gear-name,
+ body.playing .gear-card .gear-cost,
+ body.playing .gear-card .gear-category,
+ body.playing .gear-card .gear-effect { display: none; }
+
+ /* Store-panel intro line + locked banner */
+ body.playing .store-xp-info {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.7rem;
+   margin: 0 0 6px 0;
+ }
+ body.playing .area-locked-banner {
+   background: #fff3cd;
+   border: 1.5px solid #ffc107;
+   color: #856404;
+   font-size: 0.72rem;
+   padding: 5px 9px;
+   border-radius: 6px;
+   margin-bottom: 6px;
+   line-height: 1.3;
+ }
+
+ /* Training stations */
+ body.playing .training-area { padding: 8px 12px; margin: 4px 0; }
+
+ /* Gear shop — cards lose padding, store frame loses outer padding,
+    columns get a tighter gutter. */
+ body.playing .store-panel { padding: 12px 14px; margin-bottom: 14px; }
+ body.playing #gearShop .gear-shop-columns { gap: 12px; margin-top: 8px; }
+ body.playing #gearShop .gear-shop-columns .essential-col,
+ body.playing #gearShop .gear-shop-columns .available-col {
+   padding: 10px;
+ }
+ body.playing #gearShop .column-subhead { margin-bottom: 6px; }
+ body.playing .gear-card { padding: 7px 11px; margin: 4px 0; }
+ body.playing .gear-name { font-size: 0.92rem; }
+ body.playing .gear-effect { font-size: 0.8rem; margin-top: 2px; line-height: 1.35; }
+ /* The effect-callout box inside each gear-card has heavy inline padding;
+    rein it in without touching the JS template. */
+ body.playing .gear-card div[style*="background: #f0f8ff"] {
+   padding: 5px 8px !important;
+   margin: 5px 0 !important;
+   font-size: 0.82em !important;
+ }
+
+ /* Log panel — collapsible (A3). Default state in play: collapsed. */
+ body.playing .log-panel {
+   padding: 6px 14px 8px;
+   max-height: 200px;
+   margin-top: 12px;
+   transition: max-height 0.25s ease-out, padding 0.2s ease-out;
+ }
+ body.playing .log-panel.collapsed {
+   max-height: 36px;
+   padding: 4px 14px;
+   overflow: hidden;
+ }
+ body.playing .log-panel.collapsed #logEntries { display: none; }
+ .log-panel .log-header {
+   display: flex; justify-content: space-between; align-items: center;
+   cursor: pointer; user-select: none;
+   padding: 2px 0;
+ }
+ .log-panel .log-header h3 {
+   margin: 0;
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-size: 0.9rem;
+   font-weight: 800;
+   color: var(--chalk);
+   letter-spacing: 0.04em;
+   text-transform: uppercase;
+ }
+ .log-toggle-btn {
+   background: transparent;
+   border: 1px solid var(--chalk);
+   color: var(--chalk);
+   width: 22px; height: 22px;
+   border-radius: 50%;
+   font-family: 'Geist Mono', monospace; font-size: 14px; line-height: 1; font-weight: 700;
    cursor: pointer;
-   box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+   padding: 0;
+   display: flex; align-items: center; justify-content: center;
+   transition: background 0.15s;
+ }
+ .log-toggle-btn:hover { background: rgba(244,237,224,0.18); }
+ body.playing .action-buttons { margin-top: 12px; }
+
+ /* Game-info row — B6: lock to one line, compress route-clearing-token,
+    style the inline Rest button (C3). */
+ body.playing .game-info {
+   flex-wrap: nowrap;
+   overflow-x: auto;
+ }
+ body.playing .info-box-clearing .info-value { font-size: 0.85rem; line-height: 1.15; }
+ body.playing .info-box-clearing .info-sub {
+   font-size: 0.62rem; color: var(--ink-soft); margin-top: 1px;
+ }
+ body.playing .info-rest-wrap { margin-left: auto; padding-left: 12px; }
+ body.playing .info-rest-btn {
+   background: var(--lime); color: var(--ink);
+   border: 2px solid var(--ink);
+   font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800;
+   font-size: 0.78rem; letter-spacing: 0.04em;
+   padding: 6px 14px; border-radius: 100px;
+   box-shadow: 2px 3px 0 var(--ink);
+   cursor: pointer;
    transition: transform 0.12s, box-shadow 0.12s;
  }
- .full-details-toggle button:hover {
+ body.playing .info-rest-btn:hover:not(:disabled) {
    transform: translate(-1px, -1px);
-   box-shadow: 3px 3px 0 rgba(0,0,0,0.35);
+   box-shadow: 3px 4px 0 var(--ink);
  }
- #playersContainer.collapsed { display: none; }
+ body.playing .info-rest-btn:disabled {
+   background: rgba(42,29,18,0.12); color: var(--ink-soft);
+   cursor: not-allowed; box-shadow: 1px 2px 0 rgba(42,29,18,0.4);
+ }
+
+ /* Gear shop affordable-hint pill — appears next to the Gear Shop title
+    when the active player can afford something they don't yet own. */
+ body.playing .store-panel .shop-affordable-hint {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.62rem;
+   font-weight: 700;
+   letter-spacing: 0.04em;
+   text-transform: uppercase;
+   padding: 2px 8px;
+   border-radius: 100px;
+   border: 1.5px solid var(--ink);
+   background: var(--marigold);
+   color: var(--ink);
+ }
+
+ /* Milestone panel — the JS-rendered inline-styled card. The outer
+    .game-board scope cannot reach the inline padding on its children
+    via class, but we can squeeze the milestone wrapper by tightening
+    its margin. Detail tightening of the inline styles is done in
+    game.js renderMilestonePanel(). */
+ body.playing #milestonePanel { margin-bottom: 14px; }
 
  /* ============================================================
     Gear shop two-column layout (essential | available).
@@ -1296,7 +1697,7 @@
  <label for="numPlayers">Players:</label>
  <input type="number" id="numPlayers" min="1" max="4" value="1">
  </div>
- <button class="btn" onclick="startCharacterSelect()">Continue to Character Selection</button>
+ <button class="btn" id="continueBtn" onclick="startCharacterSelect()">Continue to Character Selection</button>
 
  <div id="characterSelection" style="display: none; margin-top: 30px;">
  <h2>Select Your Character</h2>
@@ -1305,13 +1706,7 @@
  </div>
  </div>
 
- <div class="game-board" id="gameBoard">
- <!-- Sticky compact player strip — hidden by default; user opts in via the pill -->
- <div id="playerStrip" class="player-strip hidden"></div>
- <!-- Reopen pill — visible by default since the strip starts hidden -->
- <button id="stripReopen" class="strip-reopen" onclick="toggleStrip()">Show player strip ▾</button>
-
- <div id="turnBanner" class="turn-banner"></div>
+ <div class="game-board" id="gameBoard" style="display: none;">
  <div class="turn-indicator" id="turnIndicator"></div>
 
  <!-- Milestone Routes Panel -->
@@ -1319,24 +1714,22 @@
 
  <div class="game-info" id="gameInfo"></div>
 
- <div class="full-details-toggle">
-   <button id="toggleFullPanels" onclick="toggleFullPlayerPanels()">Show full player details ▾</button>
- </div>
- <div id="playersContainer" class="collapsed"></div>
+ <!-- Full player panels (always visible — primary state surface) -->
+ <div id="playersContainer"></div>
 
  <div class="game-areas">
  <div class="area-panel">
- <div class="area-title"> Bouldering Wall</div>
+ <div class="area-title" id="title-bouldering"><span class="at-name">Bouldering Wall</span><span class="at-pills" id="pills-bouldering"></span></div>
  <div id="boulderingRoutes"></div>
  </div>
 
  <div class="area-panel">
- <div class="area-title"> Top Rope</div>
+ <div class="area-title" id="title-topRope"><span class="at-name">Top Rope</span><span class="at-pills" id="pills-topRope"></span></div>
  <div id="topRopeRoutes"></div>
  </div>
 
  <div class="area-panel">
- <div class="area-title"> Lead Climbing</div>
+ <div class="area-title" id="title-leadClimbing"><span class="at-name">Lead Climbing</span><span class="at-pills" id="pills-leadClimbing"></span></div>
  <div id="leadClimbingRoutes"></div>
  </div>
 
@@ -1347,20 +1740,17 @@
  </div>
 
  <div class="area-panel store-panel">
- <div class="area-title"> Gear Shop</div>
+ <div class="area-title" id="title-gearShop"><span class="at-name">Gear Shop</span><span class="at-pills" id="pills-gearShop"></span></div>
  <div id="gearShop"></div>
  </div>
 
- <div class="area-panel">
- <div class="area-title"> Rest Area</div>
- <div id="restAreaInfo"></div>
- <button class="btn btn-success" onclick="restAction()">Rest (Recover Full Endurance)</button>
- <p style="margin-top: 10px; color: #666;">Cost: 1 Time Unit</p>
- </div>
  </div>
 
- <div class="log-panel" id="gameLog">
- <h3>Game Log</h3>
+ <div class="log-panel collapsed" id="gameLog">
+ <div class="log-header" onclick="toggleLogPanel()">
+   <h3>Game Log</h3>
+   <button class="log-toggle-btn" type="button" aria-label="Toggle log panel">+</button>
+ </div>
  <div id="logEntries"></div>
  </div>
  </div>
