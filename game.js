@@ -2895,3 +2895,13 @@ window.closeLevelUpModal = closeLevelUpModal;
 window.restAction = restAction;
 window.attemptMilestoneRoute = attemptMilestoneRoute;
 window.toggleLogPanel = toggleLogPanel;
+
+// External setter for `gameState`. `let gameState = {...}` is module-scoped
+// (regular <script> tags don't put `let` bindings on window) so an outside
+// module like online-mode.js cannot reassign it directly. This helper
+// lets the online client swap in server-driven state per broadcast.
+// Also expose the renderer + a getter so it can drive a full render after
+// each state update.
+window.setGameState = function(s) { gameState = s; };
+window.getGameState = function() { return gameState; };
+window.renderGameBoard = renderGameBoard;
