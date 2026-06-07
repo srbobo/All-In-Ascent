@@ -11,8 +11,6 @@
   :root {
     --wall-base: #c2a07a;
     --wall-shade: #8a6440;
-    --wall-light: #d8bf95;
-    --wall-deep: #5a3f28;
     --coral: #ff6845;
     --marigold: #ffae28;
     --lime: #b6d62d;
@@ -40,250 +38,185 @@
     min-height: 100vh;
     line-height: 1.5;
   }
-  h1, h2, h3 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; letter-spacing: -0.01em; }
-  .mono { font-family: 'Geist Mono', monospace; }
-  .wrap { max-width: 1200px; margin: 0 auto; }
+  .wrap { max-width: 640px; margin: 60px auto; }
   .card {
     background: var(--tape-cream);
     border: 2px solid var(--ink);
-    border-radius: 8px;
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: 4px 4px 0 rgba(0,0,0,0.25);
+    border-radius: 12px;
+    padding: 36px 40px 32px;
+    box-shadow: 6px 8px 0 var(--ink), 0 12px 28px rgba(40,20,10,0.32);
   }
-  .title-card { text-align: center; }
-  .title-card h1 { font-size: 48px; color: var(--ink); }
-  .title-card .sub { color: var(--ink-soft); margin-top: 8px; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; }
-  input, select, button {
+  h1 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-size: clamp(2.4rem, 6vw, 3.2rem);
+    text-align: center;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  h1 em { font-style: italic; font-weight: 500; color: var(--coral); }
+  .sub {
+    text-align: center;
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 30px;
+  }
+  label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--ink-soft);
+    margin-top: 14px;
+    display: block;
+  }
+  input {
+    width: 100%;
+    margin-top: 6px;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 1rem;
     padding: 10px 14px;
     border: 2px solid var(--ink);
     border-radius: 6px;
     background: white;
     color: var(--ink);
   }
-  button {
-    background: var(--coral);
-    color: white;
-    cursor: pointer;
-    font-weight: 700;
-    font-family: 'Bricolage Grotesque', sans-serif;
-    letter-spacing: 0.02em;
-    transition: transform 0.05s;
-  }
-  button:hover { transform: translateY(-1px); }
-  button:active { transform: translateY(1px); }
-  button:disabled { background: #b8a89a; cursor: not-allowed; transform: none; }
-  button.secondary { background: var(--cobalt); }
-  button.ghost { background: transparent; color: var(--ink); border-color: var(--ink-soft); }
-  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-  .col { display: flex; flex-direction: column; gap: 8px; }
-  label { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
-  .seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
-  .seat {
-    border: 2px solid var(--ink);
-    border-radius: 6px;
-    padding: 12px;
-    background: white;
-  }
-  .seat.empty { background: #efe4d2; color: var(--ink-soft); font-style: italic; }
-  .seat.bot { background: #fff3df; }
-  .seat .name { font-weight: 700; }
-  .seat .char { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
-  .badge {
-    display: inline-block;
-    background: var(--ink);
-    color: var(--tape-cream);
-    font-family: 'Geist Mono', monospace;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 3px;
-    margin-left: 6px;
-  }
-  .badge.bot { background: var(--marigold); color: var(--ink); }
-  .badge.host { background: var(--raspberry); color: white; }
-  .badge.you  { background: var(--cobalt); color: white; }
-  .badge.disc { background: #888; }
-  .turn-banner {
-    background: var(--marigold);
-    color: var(--ink);
-    border: 2px solid var(--ink);
-    border-radius: 6px;
-    padding: 12px 16px;
-    font-weight: 700;
-    margin-bottom: 16px;
-  }
-  .turn-banner.yours { background: var(--lime); }
-  .actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-  .action {
-    background: white;
-    border: 2px solid var(--ink);
-    border-radius: 6px;
-    padding: 12px;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    color: var(--ink);
-    font-weight: 500;
-  }
-  .action:hover { background: var(--lime); }
-  .action .kind {
-    font-family: 'Geist Mono', monospace;
-    font-size: 11px;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-    margin-bottom: 4px;
-    letter-spacing: 0.05em;
-  }
-  .action .detail { font-size: 14px; }
-  .state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 880px) { .state-grid { grid-template-columns: 1fr; } }
-  .panel { background: white; border: 2px solid var(--ink); border-radius: 6px; padding: 12px; }
-  .panel h3 { font-size: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .player-row {
+  input:focus { outline: 2px solid var(--coral); outline-offset: 1px; }
+  .btn-row {
+    margin-top: 28px;
     display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px dotted var(--ink-soft);
-    font-size: 14px;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
   }
-  .player-row:last-child { border-bottom: none; }
-  .player-row.active { background: rgba(255,174,40,0.25); padding-left: 6px; padding-right: 6px; border-radius: 3px; }
-  .stats { font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--ink-soft); }
-  .milestone-tag {
-    display: inline-block;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-family: 'Geist Mono', monospace;
-    margin-right: 4px;
-  }
-  .ms-beg { background: var(--lime); }
-  .ms-int { background: var(--marigold); }
-  .ms-exp { background: var(--coral); color: white; }
-  .toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: var(--ink);
-    color: var(--tape-cream);
-    padding: 12px 16px;
-    border-radius: 6px;
-    z-index: 1000;
-    font-weight: 500;
-    box-shadow: 4px 4px 0 rgba(0,0,0,0.25);
-    max-width: 320px;
-  }
-  .log { font-family: 'Geist Mono', monospace; font-size: 12px; max-height: 240px; overflow-y: auto; background: #1a1208; color: #f4ede0; padding: 12px; border-radius: 6px; white-space: pre-wrap; }
-  .hidden { display: none !important; }
-  .end-banner {
-    background: var(--violet); color: white;
+  button {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    padding: 12px 24px;
+    border-radius: 100px;
+    cursor: pointer;
     border: 2px solid var(--ink);
-    padding: 20px;
-    border-radius: 6px;
-    text-align: center;
-    margin-bottom: 16px;
+    box-shadow: 3px 4px 0 var(--ink);
+    transition: transform 0.12s, box-shadow 0.12s;
   }
-  .end-banner h2 { font-size: 32px; margin-bottom: 8px; }
+  button:hover { transform: translate(-1px, -1px); box-shadow: 4px 5px 0 var(--ink); }
+  button.primary { background: var(--coral); color: white; }
+  button.ghost { background: transparent; color: var(--ink); }
+  .footnote {
+    margin-top: 22px;
+    text-align: center;
+    font-size: 0.86rem;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+  .toast {
+    position: fixed; top: 20px; right: 20px;
+    background: var(--ink); color: var(--chalk);
+    padding: 10px 16px; border-radius: 8px;
+    font-weight: 500;
+    box-shadow: 4px 5px 0 rgba(0,0,0,0.35);
+  }
+  .hidden { display: none; }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <div class="card">
+    <h1>All-In <em>Ascent.</em></h1>
+    <div class="sub">Online play · friend &amp; bot rooms</div>
 
-  <!-- LANDING (room entry) -->
-  <div id="landing" class="card title-card">
-    <h1>All In Ascent</h1>
-    <div class="sub">Online play — two friends + bots</div>
-    <div class="col" style="margin-top: 24px; max-width: 360px; margin-left: auto; margin-right: auto; text-align: left;">
-      <label for="username">Your name</label>
-      <input id="username" maxlength="24" placeholder="climber-handle">
-      <label for="room">Room ID</label>
-      <input id="room" placeholder="e.g. friday-night">
-      <label for="password">Room password</label>
-      <input id="password" type="password" placeholder="set by the host on first join">
-      <!-- Backend host is auto-detected from window.location; hidden from users.
-           Override during testing via ?host=<hostname> in the URL. -->
-      <input id="host" type="hidden">
-      <div class="row" style="margin-top: 12px;">
-        <button id="joinBtn">Join / Create Room</button>
-        <button class="ghost" onclick="window.location='index.html'">Local Play Instead</button>
-      </div>
-      <div class="sub" style="text-align: left; margin-top: 12px; text-transform: none; letter-spacing: 0; font-size: 13px;">
-        First person to join a fresh room is the host and sets the password.
-        Share the room ID + password with friends so they can join.
-      </div>
+    <label for="username">Your name</label>
+    <input id="username" maxlength="24" placeholder="climber-handle" autocomplete="off">
+
+    <label for="room">Room ID</label>
+    <input id="room" placeholder="e.g. friday-night" autocomplete="off">
+
+    <label for="password">Room password</label>
+    <input id="password" type="password" placeholder="set by the host on first join" autocomplete="off">
+
+    <div class="btn-row">
+      <button class="primary" id="joinBtn" type="button">Join / Create Room</button>
+      <button class="ghost" type="button" onclick="window.location='index.html'">Local Play Instead</button>
+    </div>
+    <div class="footnote">
+      First person to join a fresh room is the host. Share the room ID + password with friends.
     </div>
   </div>
-
-  <!-- LOBBY -->
-  <div id="lobby" class="card hidden">
-    <h2>Lobby — <span id="lobbyRoom" class="mono"></span></h2>
-    <div class="sub" style="margin-top: 6px;">Pick a character. Host starts the game when everyone is ready.</div>
-
-    <div class="seats" id="seatList"></div>
-
-    <div style="margin-top: 20px;">
-      <label>Your character</label>
-      <select id="charSelect">
-        <option value="">— pick a character —</option>
-      </select>
-    </div>
-
-    <div class="row" style="margin-top: 16px;">
-      <button id="addBotBtn" class="secondary">Add Bot</button>
-      <button id="startBtn">Start Game</button>
-    </div>
-  </div>
-
-  <!-- GAME -->
-  <div id="game" class="hidden">
-    <div id="endBanner" class="end-banner hidden"></div>
-    <div id="turnBanner" class="turn-banner"></div>
-
-    <div class="state-grid">
-      <div class="panel">
-        <h3>Players</h3>
-        <div id="players"></div>
-      </div>
-      <div class="panel">
-        <h3>Milestones</h3>
-        <div id="milestones"></div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top: 16px;" id="actionPanel">
-      <h3 style="margin-bottom: 12px;">Your Actions</h3>
-      <div class="actions" id="actionList"></div>
-    </div>
-
-    <div class="card">
-      <h3 style="margin-bottom: 8px;">Event log</h3>
-      <div id="eventLog" class="log"></div>
-    </div>
-  </div>
-
-  <div id="toast" class="toast hidden"></div>
-
 </div>
 
-<!-- Surface any unhandled JS error so a broken module load doesn't fail silently
-     (a silent ESM import failure was the cause of "click does nothing" once
-     already — see online/client.js comment). -->
+<div id="toast" class="toast hidden"></div>
+
 <script>
-  window.addEventListener('error', (e) => {
+  // ----- Backend host resolution (same logic as online/client.js) -----
+  const PRODUCTION_PARTYKIT_HOST = 'all-in-ascent.srbobo.partykit.dev';
+
+  function resolveBackendHost() {
+    const params = new URLSearchParams(window.location.search);
+    const override = params.get('host');
+    if (override) return override.trim();
+    const h = window.location.hostname;
+    if (h === '127.0.0.1' || h === 'localhost' || h === '0.0.0.0') {
+      return window.location.host;
+    }
+    return PRODUCTION_PARTYKIT_HOST;
+  }
+
+  // ----- Persistence + form prefill -----
+  const LS_KEY = 'all-in-ascent.online';
+  function loadPrefs() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; }
+  }
+  function savePrefs(p) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch {}
+  }
+  const prefs = loadPrefs();
+  document.getElementById('username').value = prefs.username || '';
+  document.getElementById('room').value = prefs.room || '';
+  document.getElementById('password').value = prefs.password || '';
+
+  function toast(msg, ms = 4000) {
     const t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = 'Client error: ' + (e.message || 'see DevTools console');
+    t.textContent = msg;
     t.classList.remove('hidden');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.add('hidden'), ms);
+  }
+
+  // ----- Join button → redirect to index.html in online mode -----
+  document.getElementById('joinBtn').addEventListener('click', () => {
+    const username = document.getElementById('username').value.trim();
+    const room = document.getElementById('room').value.trim() || 'default';
+    const password = document.getElementById('password').value;
+    if (!username) { toast('Enter a name'); return; }
+    const host = resolveBackendHost();
+    if (!host || host.includes('YOUR-PARTYKIT-USERNAME')) {
+      toast('Backend not configured — see online.html PRODUCTION_PARTYKIT_HOST', 8000);
+      return;
+    }
+    savePrefs({ username, room, password });
+    const qs = new URLSearchParams({
+      online: '1',
+      host,
+      room,
+      user: username,
+      password,
+    });
+    window.location = 'index.html?' + qs.toString();
   });
-  window.addEventListener('unhandledrejection', (e) => {
-    const t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = 'Client error: ' + (e.reason?.message || e.reason || 'see DevTools console');
-    t.classList.remove('hidden');
+
+  // Allow Enter key on any field to submit
+  ['username', 'room', 'password'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('joinBtn').click();
+    });
   });
 </script>
-<script type="module" src="./online/client.js"></script>
 </body>
 </html>
