@@ -1663,6 +1663,12 @@ function applyAbilityToTimeAndXP(char, abilityName, route) {
 // ===== GAME ACTIONS =====
 
 function attemptClimb(route, area) {
+ // Online mode short-circuit: send the matching action to the server
+ // instead of mutating local state. Server broadcasts the new state and
+ // the renderer updates itself.
+ if (window.OnlineMode && window.OnlineMode.active) {
+  return window.OnlineMode.sendAction({ type: 'climb', area, routeName: route.name });
+ }
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
  const char = currentPlayer.character;
 
@@ -1967,6 +1973,9 @@ function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffec
 }
 
 function trainAction(area) {
+ if (window.OnlineMode && window.OnlineMode.active) {
+  return window.OnlineMode.sendAction({ type: 'train', areaName: area.name });
+ }
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
  const char = currentPlayer.character;
 
@@ -2021,6 +2030,9 @@ function trainAction(area) {
 }
 
 function restAction() {
+ if (window.OnlineMode && window.OnlineMode.active) {
+  return window.OnlineMode.sendAction({ type: 'rest' });
+ }
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
  const char = currentPlayer.character;
 
@@ -2088,6 +2100,9 @@ function restAction() {
 // ===== MILESTONE ROUTE ATTEMPTS =====
 
 function attemptMilestoneRoute(difficulty) {
+ if (window.OnlineMode && window.OnlineMode.active) {
+  return window.OnlineMode.sendAction({ type: 'milestone', difficulty });
+ }
  if (gameState.gameEnded) {
  alert('Game has ended!');
  return;
@@ -2409,6 +2424,9 @@ function showVictoryScreen(winner) {
 }
 
 function purchaseGear(gear) {
+ if (window.OnlineMode && window.OnlineMode.active) {
+  return window.OnlineMode.sendAction({ type: 'buyGear', gearName: gear.name });
+ }
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
  const char = currentPlayer.character;
 

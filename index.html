@@ -1211,6 +1211,248 @@
  .climber-drawer .muted { color: var(--ink-soft); font-style: italic; font-size: 12px; }
 
  /* ============================================================
+    Online lobby — server-driven room screen shown before a game
+    starts. Matches Grit & Holds: ink/cream palette, tape strips,
+    Bricolage headings, Geist Mono metadata.
+    ============================================================ */
+ .online-lobby {
+   max-width: 1000px;
+   margin: 40px auto;
+   padding: 32px 5vw 40px;
+ }
+ .online-lobby h3 {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 800;
+   letter-spacing: 0.02em;
+   font-size: 1.2rem;
+   margin: 24px 0 12px;
+   color: var(--ink);
+ }
+ .ol-room {
+   text-align: center;
+   margin-bottom: 28px;
+ }
+ .ol-room-label {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.7rem;
+   color: var(--ink-soft);
+   letter-spacing: 0.2em;
+   text-transform: uppercase;
+   margin-bottom: 4px;
+ }
+ .ol-room-name {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 800;
+   font-size: clamp(2.2rem, 5vw, 3.6rem);
+   color: var(--coral);
+   line-height: 1;
+   letter-spacing: -0.02em;
+ }
+ .ol-you-tag {
+   font-family: 'Hanken Grotesk', sans-serif;
+   font-size: 0.92rem;
+   margin-top: 6px;
+   color: var(--ink-soft);
+ }
+ .ol-you-tag strong { color: var(--ink); }
+ .ol-role {
+   margin-left: 8px;
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.72rem;
+   text-transform: uppercase;
+   letter-spacing: 0.1em;
+   color: var(--coral);
+ }
+ .ol-message {
+   text-align: center;
+   font-family: 'Hanken Grotesk', sans-serif;
+   font-size: 1rem;
+   color: var(--ink);
+   background: var(--tape-cream);
+   border: 2px solid var(--ink);
+   border-radius: 10px;
+   padding: 10px 16px;
+   margin: 0 auto 24px;
+   max-width: 640px;
+   box-shadow: 3px 4px 0 var(--ink);
+ }
+ .ol-seats {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+   gap: 10px;
+   margin-bottom: 12px;
+ }
+ .ol-seat {
+   background: var(--chalk);
+   border: 2px solid var(--ink);
+   border-radius: 8px;
+   padding: 10px 14px;
+   box-shadow: 2px 3px 0 var(--ink);
+   display: flex;
+   flex-direction: column;
+   gap: 4px;
+   font-family: 'Hanken Grotesk', sans-serif;
+   position: relative;
+ }
+ .ol-seat.empty {
+   color: var(--ink-soft);
+   font-style: italic;
+   background: rgba(244,237,224,0.4);
+ }
+ .ol-seat.me { background: var(--marigold); border-color: var(--coral); }
+ .ol-seat.bot { background: rgba(255,232,200,0.7); }
+ .ol-seat-num {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.66rem;
+   text-transform: uppercase;
+   letter-spacing: 0.1em;
+   color: var(--ink-soft);
+ }
+ .ol-seat-name {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 800;
+   font-size: 1rem;
+   color: var(--ink);
+   display: flex;
+   gap: 6px;
+   align-items: center;
+   flex-wrap: wrap;
+ }
+ .ol-seat-char {
+   font-family: 'Hanken Grotesk', sans-serif;
+   font-size: 0.85rem;
+   color: var(--ink-soft);
+ }
+ .ol-tag {
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.58rem;
+   font-weight: 700;
+   letter-spacing: 0.06em;
+   padding: 1px 6px;
+   border-radius: 100px;
+   border: 1px solid var(--ink);
+ }
+ .ol-tag.bot { background: var(--marigold); color: var(--ink); }
+ .ol-tag.you { background: var(--cobalt); color: white; border-color: var(--ink); }
+ .ol-tag.off { background: rgba(40,20,10,0.18); color: var(--ink); }
+ .ol-remove-bot {
+   position: absolute;
+   top: 6px;
+   right: 6px;
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.62rem;
+   font-weight: 700;
+   background: transparent;
+   border: 1px solid var(--ink);
+   color: var(--ink);
+   padding: 2px 8px;
+   border-radius: 100px;
+   cursor: pointer;
+ }
+ .ol-remove-bot:hover { background: var(--coral); color: white; border-color: var(--coral); }
+
+ .ol-character-pick { margin-top: 16px; }
+ .ol-char-grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+   gap: 10px;
+ }
+ .ol-char-card {
+   background: var(--tape-cream);
+   border: 2px solid var(--ink);
+   border-radius: 10px;
+   padding: 12px 14px;
+   cursor: pointer;
+   text-align: left;
+   font-family: inherit;
+   box-shadow: 2px 3px 0 var(--ink);
+   transition: transform 0.15s, box-shadow 0.15s;
+ }
+ .ol-char-card:hover:not(:disabled) {
+   transform: translate(-1px, -2px);
+   box-shadow: 3px 4px 0 var(--ink);
+ }
+ .ol-char-card.mine {
+   background: var(--lime);
+   border-color: var(--ink);
+   box-shadow: 3px 4px 0 var(--coral);
+ }
+ .ol-char-card.taken {
+   background: rgba(40,20,10,0.08);
+   opacity: 0.55;
+   cursor: not-allowed;
+ }
+ .ol-char-name {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 800;
+   font-size: 1rem;
+   color: var(--ink);
+ }
+ .ol-char-passive {
+   font-family: 'Hanken Grotesk', sans-serif;
+   font-size: 0.78rem;
+   color: var(--ink-soft);
+   font-style: italic;
+   margin-top: 2px;
+ }
+ .ol-char-tag {
+   margin-top: 6px;
+   display: inline-block;
+   font-family: 'Geist Mono', monospace;
+   font-size: 0.6rem;
+   font-weight: 700;
+   text-transform: uppercase;
+   letter-spacing: 0.06em;
+   padding: 1px 8px;
+   border-radius: 100px;
+   background: var(--coral);
+   color: white;
+ }
+ .ol-char-tag.taken { background: rgba(40,20,10,0.4); }
+
+ .ol-controls {
+   display: flex;
+   justify-content: center;
+   gap: 12px;
+   margin-top: 24px;
+   flex-wrap: wrap;
+ }
+ .ol-btn {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-weight: 800;
+   font-size: 1rem;
+   letter-spacing: 0.02em;
+   padding: 10px 22px;
+   border: 2px solid var(--ink);
+   border-radius: 100px;
+   cursor: pointer;
+   box-shadow: 3px 4px 0 var(--ink);
+   transition: transform 0.12s, box-shadow 0.12s;
+ }
+ .ol-btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 5px 0 var(--ink); }
+ .ol-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+ .ol-btn-primary { background: var(--coral); color: white; }
+ .ol-btn-secondary { background: var(--marigold); color: var(--ink); }
+
+ /* Toast — server message / disconnect notification */
+ .ol-toast {
+   position: fixed;
+   top: 20px;
+   right: 20px;
+   z-index: 3000;
+   background: var(--ink);
+   color: var(--chalk);
+   font-family: 'Hanken Grotesk', sans-serif;
+   font-weight: 500;
+   font-size: 0.92rem;
+   padding: 10px 16px;
+   border-radius: 8px;
+   max-width: 320px;
+   box-shadow: 4px 5px 0 rgba(0,0,0,0.35);
+ }
+ .ol-toast.hidden { display: none; }
+
+ /* ============================================================
     COMPACT GAME-ACTIVE DENSITY
     Tightens padding / font sizes / gaps throughout the game board.
     Goal: less scrolling to see all available choices, while preserving
@@ -1781,6 +2023,7 @@
  </div>
  </div>
 
+ <script src="online-mode.js"></script>
  <script src="effects.js"></script>
  <script src="game.js"></script>
 </body>
