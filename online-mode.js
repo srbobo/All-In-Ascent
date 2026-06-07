@@ -285,10 +285,20 @@
     if (board) board.style.display = 'block';
     document.body.classList.add('playing');
 
-    // Adapt the state into the local renderer's shape and render.
-    window.gameState = adaptState(serverState);
+    // Adapt server state → local-renderer shape, then push it into game.js
+    // via the exposed setter (gameState is declared with `let` inside game.js
+    // and is NOT a window property, so direct `window.gameState = ...` would
+    // silently no-op for the renderer).
+    const adapted = adaptState(serverState);
+    if (typeof window.setGameState === 'function') {
+      window.setGameState(adapted);
+    } else {
+      console.error('window.setGameState not available — game.js may not have loaded yet');
+      return;
+    }
     try {
-      if (typeof renderGameBoard === 'function') renderGameBoard();
+      if (typeof window.renderGameBoard === 'function') window.renderGameBoard();
+      else if (typeof renderGameBoard === 'function') renderGameBoard();
     } catch (e) {
       console.error('renderGameBoard failed:', e);
     }
