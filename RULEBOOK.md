@@ -86,7 +86,7 @@ Welcome to**All-In Ascent**, where you step into the climbing shoes of an aspiri
 
 **Be the FIRST player to successfully complete all 3 Milestone Routes — and WIN.**
 
-If no player has all three by the end of round 45, the game ends with no winner. Pace your investments accordingly.
+There is no round limit. The game runs until a player completes all three milestones — pace your investments for the long game.
 
 ---
 
@@ -175,7 +175,7 @@ The game proceeds in**rounds**. Within a round:
  - Once-per-round abilities (e.g. Route Reader's stat redistribute) reset
  - Belayer count is**fixed at N − 1**all game — there is no round-based unlock.
 
-The game ends as soon as any one player completes their 3rd milestone, OR at the end of round 45 with no winner.
+The game ends as soon as any one player completes their 3rd milestone. There is no round limit.
 
 ---
 
@@ -425,7 +425,7 @@ Milestone routes:
 - Are tracked individually per player — your milestones complete for YOU only
 - Can be attempted in any order
 
-If round 45 ends with no player having all three milestones, the game ends with no winner.
+There is no round limit — the game continues until a player completes all three milestones.
 
 ### Climbing area requirements still apply
 A milestone in the Top Rope deck needs no gear, but it still requires a **free belayer station** to attempt (you cannot top-rope without a belayer). A milestone in the Lead deck still requires the full Lead system (Belay Device + Locking Carabiner + Lead Rope, or the Free Solo passive) and the single Lead belayer slot.
@@ -483,8 +483,7 @@ A milestone in the Top Rope deck needs no gear, but it still requires a **free b
 | Buy gear | 1 | 0 |
 
 ### Game ends when
-- A player completes 3 milestones, OR
-- Round 45 ends with no winner.
+- A player completes 3 milestones (there is no round limit).
 
 ---
 
