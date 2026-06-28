@@ -179,13 +179,16 @@ class GameSimulation {
             timeRemaining: 10
         };
 
+        // RuleModifications: Top Rope is open and has 2 routes per belayer. This
+        // solo sim models a single climber → 1 belayer → 2 top-rope routes,
+        // available from round 1 (no unlock ramp).
+        this.belayerCount = 1;
         this.availableRoutes = {
             bouldering: this.selectRandomRoutes(ROUTES.bouldering, 3),
-            topRope: [],
+            topRope: this.selectRandomRoutes(ROUTES.topRope, this.belayerCount * 2),
             leadClimbing: this.selectRandomRoutes(ROUTES.leadClimbing, 1)
         };
 
-        this.belayersUnlocked = 1;
         this.routeClearingPosition = 0;
 
         this.log = [];
@@ -501,23 +504,15 @@ class GameSimulation {
         } else if (this.routeClearingPosition === 1) {
             this.availableRoutes.leadClimbing = this.selectRandomRoutes(ROUTES.leadClimbing, 1);
         } else {
-            if (this.belayersUnlocked > 0) {
-                this.availableRoutes.topRope = this.selectRandomRoutes(ROUTES.topRope, this.belayersUnlocked);
-            }
+            // Top Rope refresh: 2 routes per belayer (RuleModifications).
+            this.availableRoutes.topRope = this.selectRandomRoutes(ROUTES.topRope, this.belayerCount * 2);
         }
 
         // Reset
         this.character.timeRemaining = 10;
         this.character.trainingBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
 
-        // Unlock belayers
-        if (this.round === 5) {
-            this.belayersUnlocked = 2;
-            this.logAction('UNLOCK_BELAYER', { total: 2 });
-        } else if (this.round === 12) {
-            this.belayersUnlocked = 3;
-            this.logAction('UNLOCK_BELAYER', { total: 3 });
-        }
+        // RuleModifications: belayer count is fixed — no round 5 / round 12 ramp.
 
         this.round++;
     }

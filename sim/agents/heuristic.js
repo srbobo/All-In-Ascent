@@ -4,9 +4,9 @@
 //   1. Attempt a MILESTONE if one is legal AND we'd pass the base stat
 //      check (ignoring dice). Milestones win the game, so if we can
 //      plausibly beat one, we do.
-//   2. Buy an ESSENTIAL ACCESS CARD we don't yet own (Harness → Belay
-//      Device → Locking Carabiner → Lead Rope). Access cards unlock
-//      whole climbing areas and pay for themselves fast.
+//   2. Buy an ESSENTIAL ACCESS CARD we don't yet own (Belay Device →
+//      Locking Carabiner → Lead Rope). These three unlock Lead Climbing
+//      and pay for themselves fast. (Top Rope needs no gear.)
 //   3. (v0.3.0) Buy a SPECIALTY CARD (Crimp Sequence Decoder, Trick Foot
 //      Manual, Body Tension Belt, Power Tap Belt) if at least one of our
 //      milestones shares its tag and we can afford it. This makes the
@@ -28,7 +28,8 @@ import {
   computeEffectiveStats, getSpendableXp, getEffectiveGearCost,
 } from '../../engine/helpers.js';
 
-const ACCESS_ORDER = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+// RuleModifications: Harness removed; these three gate Lead Climbing only.
+const ACCESS_ORDER = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
 const STATS = ['strength', 'technique', 'focus', 'flexibility'];
 
 export function createHeuristicAgent() {

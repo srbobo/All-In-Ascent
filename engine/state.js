@@ -23,8 +23,26 @@ import { ENGINE_VERSION_STRING } from './version.js';
 
 // Gear items that are NEVER in the random 3-slot shop rotation. They are
 // always available for purchase from a separate "access card" section,
-// gated by prerequisites. Matches game.js:798.
-const ACCESS_CARDS = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+// gated by prerequisites.
+//
+// RuleModifications (2026-06-27): Top Rope no longer requires any gear, so the
+// Harness card was removed. These three cards now gate ONLY Lead Climbing.
+const ACCESS_CARDS = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
+
+// Number of top-rope routes assigned to each belayer station.
+const ROUTES_PER_BELAYER = 2;
+
+// Draw the Top Rope rotation as N belayer stations of ROUTES_PER_BELAYER routes
+// each, where N = belayerCount (number of players − 1). Returns a FLAT array of
+// 2×belayerCount routes, each tagged with a `belayer` index (0-based station).
+// Keeping a flat array (rather than nested arrays) preserves every existing
+// `.find/.forEach/.map` over availableRoutes.topRope; stations are derived from
+// the tag. A 1-player game yields belayerCount 0 → an empty Top Rope.
+export function drawTopRopeStations(rng, belayerCount) {
+  const count = Math.max(0, belayerCount) * ROUTES_PER_BELAYER;
+  const drawn = count > 0 ? rng.pickN(ROUTES.topRope, count) : [];
+  return drawn.map((route, i) => ({ ...route, belayer: Math.floor(i / ROUTES_PER_BELAYER) }));
+}
 
 // ---------- Public API ----------
 
@@ -51,14 +69,19 @@ export function createGame({ seed, characterKeys }) {
   // Build players.
   const players = characterKeys.map((key, i) => makePlayer(i + 1, key));
 
+  // Top Rope belayer stations: N − 1 belayers for N players (RuleModifications
+  // 2026-06-27). Fixed from round 1 — no time-based unlock ramp.
+  const belayerCount = players.length - 1;
+
   // Pick milestone routes FIRST (matches game.js:773 ordering — milestones
-  // are selected before the 5-per-area route rotation is drawn).
+  // are selected before the per-area route rotation is drawn).
   const milestones = pickMilestoneRoutes(rng);
 
-  // Draw 5 routes per area for the opening rotation.
+  // Draw the opening rotation. Bouldering and Lead keep a flat list of 5;
+  // Top Rope is split into belayerCount stations of 2 routes each.
   const availableRoutes = {
     bouldering: rng.pickN(ROUTES.bouldering, 5),
-    topRope: rng.pickN(ROUTES.topRope, 5),
+    topRope: drawTopRopeStations(rng, belayerCount),
     leadClimbing: rng.pickN(ROUTES.leadClimbing, 5),
   };
 
@@ -84,9 +107,11 @@ export function createGame({ seed, characterKeys }) {
     //   2 → next end-of-round clear is Bouldering
     // Rotates 0 → 1 → 2 → 0 at end of each round.
     routeClearingPosition: 0,
-    // Belayer capacity for Top Rope and Lead sections. Starts at 1; round 5
-    // unlocks 2nd belayer; round 12 unlocks 3rd (game.js endRound logic).
-    belayersUnlocked: 1,
+    // Top Rope belayer-station count = number of players − 1 (RuleModifications
+    // 2026-06-27). Fixed for the whole game. Each station holds 2 routes and
+    // admits at most 1 climber. Lead Climbing is separately capped at 1 climber
+    // and is no longer tied to this count.
+    belayerCount,
     attemptedRoutes,
     gameEnded: false,
     winner: null,
@@ -115,6 +140,8 @@ export function createGame({ seed, characterKeys }) {
       specialAbility: p.character.specialAbility.name,
     })),
     milestoneRoutes: serializeMilestones(milestones),
+    // Top Rope belayer-station count for this game (players − 1).
+    belayerCount,
     // Full snapshot of opening rotation so a replay can reconstruct without
     // re-running the PRNG from seed.
     initialAvailableRoutes: summarizeRoutes(availableRoutes),
@@ -164,6 +191,10 @@ function makePlayer(playerNum, characterKey) {
       abilityUsed: false,
       betaBoostActive: false,
       location: 'lobby',
+      // Which Top Rope belayer station (0-based index) this player currently
+      // occupies, or null when not at a station. Set when climbing a top-rope
+      // route; cleared to null on entering any other area and at round end.
+      belayerStation: null,
       milestonesCompleted: { beginner: false, intermediate: false, expert: false },
     },
   };

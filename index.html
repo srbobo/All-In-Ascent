@@ -1557,6 +1557,29 @@
    gap: 6px;
  }
 
+ /* RuleModifications: Top Rope belayer-station headers span the full 2-column
+    grid, labelling the 2 routes that belong to each belayer and showing whether
+    the station is open, yours, or blocked by another climber. */
+ body.playing .belayer-station-header {
+   grid-column: 1 / -1;
+   display: flex;
+   align-items: baseline;
+   justify-content: space-between;
+   gap: 8px;
+   margin: 4px 0 0;
+   padding: 3px 8px;
+   border-left: 3px solid #6f42c1;
+   background: rgba(111, 66, 193, 0.08);
+   border-radius: 4px;
+   font-size: 12px;
+ }
+ body.playing .belayer-station-header .bsh-name { font-weight: 700; color: #6f42c1; }
+ body.playing .belayer-station-header .bsh-status { color: #666; text-transform: uppercase; letter-spacing: .03em; font-size: 11px; }
+ body.playing .belayer-station-header.you { border-left-color: #28a745; background: rgba(40, 167, 69, 0.10); }
+ body.playing .belayer-station-header.you .bsh-name { color: #28a745; }
+ body.playing .belayer-station-header.blocked { border-left-color: #dc3545; background: rgba(220, 53, 69, 0.08); }
+ body.playing .belayer-station-header.blocked .bsh-name { color: #dc3545; }
+
  /* B1: Compact card pattern shared by climbing-route, training-area, and
     gear-card. Same outer rhythm, same chip styles, same row-flow:
       Row 1: name + colored type/grade/access chips + cost chip + status chip

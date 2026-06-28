@@ -26,17 +26,20 @@
 //   - Event log: every applyAction appends to state.events AND returns the
 //     delta. Pipeline writers only need the delta; the UI uses the full
 //     log to render history.
-//   - Safety net: `state.maxRounds` caps game length so agents can't
-//     accidentally run forever. Default 30 (set in createGame).
+//   - No round cap (v0.5.0): the actual game has no maxRounds rule;
+//     the engine no longer imposes one. Sim harnesses keep their own
+//     MAX_STEPS counter to catch runaway agent loops (a programming bug,
+//     not a gameplay condition).
 
 import {
   ROUTES, GEAR_SHOP, CHARACTERS, TRAINING_AREAS,
 } from './data.js';
 import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';
-import { ACCESS_CARDS } from './state.js';
+import { ACCESS_CARDS, drawTopRopeStations } from './state.js';
 import {
   checkAreaAccess, canEnterSection, computeEffectiveStats,
+  canClimbTopRopeRoute, pickFreeBelayerStation,
   getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost,
   getGearPurchaseTimeCost, getEffectiveGearCost,
   getSpendableXp, buildEffectRollArray, rollClimbDice,
@@ -78,11 +81,19 @@ export function getLegalActions(state) {
   for (const area of ['bouldering', 'topRope', 'leadClimbing']) {
     const access = checkAreaAccess(char, area);
     if (!access.hasAccess) continue;
-    const sec = canEnterSection(area, player.playerNum, state);
-    if (!sec.canEnter) continue;
+    // Top Rope occupancy is gated PER belayer station (see below). Bouldering
+    // and Lead use the section-capacity gate (Lead = 1 climber; Bouldering
+    // unlimited).
+    if (area !== 'topRope') {
+      const sec = canEnterSection(area, player.playerNum, state);
+      if (!sec.canEnter) continue;
+    }
     for (const route of state.availableRoutes[area]) {
       const routeKey = `${area}:${route.name}`;
       if (state.attemptedRoutes[player.playerNum][routeKey]) continue;
+      // Top Rope: the route's belayer station must be free for this player
+      // (a station held by another player blocks both of its routes).
+      if (area === 'topRope' && !canClimbTopRopeRoute(state, player.playerNum, route)) continue;
       const timeCost = getEffectiveClimbTimeCost(char, route.time, route);
       const enduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance);
       if (char.timeRemaining < timeCost) continue;
@@ -101,8 +112,14 @@ export function getLegalActions(state) {
     if (!m) continue;
     const access = checkAreaAccess(char, m.area);
     if (!access.hasAccess) continue;
-    const sec = canEnterSection(m.area, player.playerNum, state);
-    if (!sec.canEnter) continue;
+    // Top Rope milestone still needs a belayer: require a free station (or the
+    // one this player already occupies). Other areas use section capacity.
+    if (m.area === 'topRope') {
+      if (pickFreeBelayerStation(state, player.playerNum) === null) continue;
+    } else {
+      const sec = canEnterSection(m.area, player.playerNum, state);
+      if (!sec.canEnter) continue;
+    }
     const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route);
     const enduranceCost = getEffectiveClimbEnduranceCost(char, m.route, m.route.endurance);
     if (char.timeRemaining < timeCost) continue;
@@ -227,11 +244,10 @@ export function isTerminal(state) {
       reason: state.endReason || (state.winner ? 'all_milestones' : 'forfeit'),
     };
   }
-  // Default 45 (engine v0.2.0). Caller-supplied state.maxRounds wins.
-  const maxRounds = state.maxRounds || 45;
-  if (state.round > maxRounds) {
-    return { done: true, winner: null, reason: 'max_rounds' };
-  }
+  // v0.5.0: no maxRounds safety cap. The game has no round limit in the
+  // actual rules — the only terminal condition is "someone completes all 3
+  // milestones." Sim harnesses keep their own MAX_STEPS guard against
+  // runaway loops, but that's a programming bug netting, not gameplay.
   return { done: false, winner: null, reason: null };
 }
 
@@ -246,8 +262,18 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   const player = s.players[s.currentPlayerIndex];
   const char = player.character;
 
-  // 1. Move the player into the section.
+  // 1. Move the player into the section. For Top Rope, occupy the belayer
+  //    station this climb belongs to (route.belayer for a regular climb; a
+  //    free station for a milestone, which carries no station tag). Any other
+  //    area clears the belayer-station assignment.
   char.location = area;
+  if (area === 'topRope') {
+    char.belayerStation = (route.belayer === null || route.belayer === undefined)
+      ? pickFreeBelayerStation(s, player.playerNum)
+      : route.belayer;
+  } else {
+    char.belayerStation = null;
+  }
 
   // 2. Mark the route as attempted this round (only for regular climbs —
   // milestones have no per-round attempt cap per game.js).
@@ -588,19 +614,9 @@ function postActionHousekeeping(s, rng, emitter) {
   // 4. Advance turn, or end round if everyone's out of time.
   advanceTurnOrEndRound(s, rng, emitter);
 
-  // 5. Check maxRounds safety net; if exceeded, mark terminal with no winner.
-  const maxRounds = s.maxRounds || 45;
-  if (s.round > maxRounds) {
-    s.gameEnded = true;
-    s.winner = null;
-    s.endReason = 'max_rounds';
-    emitter.emit('game_end', {
-      winner: null,
-      reason: 'max_rounds',
-      round: s.round,
-      note: `engine safety cap hit (${maxRounds} rounds); no player completed all milestones`,
-    });
-  }
+  // v0.5.0: maxRounds safety cap removed. The only terminal condition is
+  // "all 3 milestones" — set by completeMilestone. Sim harnesses keep their
+  // own MAX_STEPS protection against runaway agent loops.
 }
 
 function advanceTurnOrEndRound(s, rng, emitter) {
@@ -643,7 +659,8 @@ function endRound(s, rng, emitter) {
     s.availableRoutes.leadClimbing = rng.pickN(ROUTES.leadClimbing, 5);
     cleared = 'leadClimbing';
   } else if (s.routeClearingPosition === 1) {
-    s.availableRoutes.topRope = rng.pickN(ROUTES.topRope, 5);
+    // Refresh all belayer stations together (2×belayerCount routes).
+    s.availableRoutes.topRope = drawTopRopeStations(rng, s.belayerCount);
     cleared = 'topRope';
   } else {
     s.availableRoutes.bouldering = rng.pickN(ROUTES.bouldering, 5);
@@ -652,13 +669,16 @@ function endRound(s, rng, emitter) {
   s.routeClearingPosition = (s.routeClearingPosition + 1) % 3;
 
   // Reset per-player per-round state. Training bonuses and gear bonuses
-  // persist across rounds — only time, ability-used flag, and location reset.
+  // persist across rounds — only time, ability-used flag, location, and the
+  // belayer-station assignment reset. The route-clearing rotation moves every
+  // player back to the Lobby automatically (RuleModifications 2026-06-27).
   for (const p of s.players) {
     const c = p.character;
     const approachBonus = c.equipment.includes('Approach Shoes') ? 1 : 0;
     c.timeRemaining = 10 + approachBonus;
     c.abilityUsed = false;
     c.location = 'lobby';
+    c.belayerStation = null;
   }
 
   // Wipe per-round attempted-routes tracker.
@@ -666,15 +686,8 @@ function endRound(s, rng, emitter) {
 
   const newRound = endedRound + 1;
 
-  // Belayer unlocks: round 5 → 2, round 12 → 3.
-  if (newRound >= 5 && s.belayersUnlocked < 2) {
-    s.belayersUnlocked = 2;
-    emitter.emit('belayer_unlocked', { newCount: 2, round: newRound });
-  }
-  if (newRound >= 12 && s.belayersUnlocked < 3) {
-    s.belayersUnlocked = 3;
-    emitter.emit('belayer_unlocked', { newCount: 3, round: newRound });
-  }
+  // RuleModifications (2026-06-27): belayer count is fixed at N − 1 from round 1
+  // — no time-based unlock ramp.
 
   s.round = newRound;
   s.currentPlayerIndex = 0;

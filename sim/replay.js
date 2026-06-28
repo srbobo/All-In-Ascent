@@ -47,7 +47,7 @@ for (const line of lines) {
     console.log(`=== ${obj.kind} ===`);
     console.log(`  characters: ${obj.characters.join(', ')}`);
     console.log(`  agents:     ${obj.agents.join(', ')}`);
-    console.log(`  seed:       ${obj.seed} | policySeed: ${obj.policySeed} | maxRounds: ${obj.maxRounds}`);
+    console.log(`  seed:       ${obj.seed} | policySeed: ${obj.policySeed}`);
     console.log(`  engine:     ${obj.engineVersion}`);
     console.log();
     continue;
@@ -106,8 +106,7 @@ function formatEvent(e) {
       return `${head} P${p.playerNum} bought ${p.gearName} for ${p.cost}xp`;
     case 'end_turn_chosen':
       return `${head} P${p.playerNum} skipped (${p.timeSurrendered}t left)`;
-    case 'belayer_unlocked':
-      return `${head} now ${p.newCount} belayers (round ${p.round})`;
+    // belayer_unlocked retired in RuleModifications (belayers fixed at N-1).
     case 'round_end':
       return `${head} round ${p.round} ended; cleared ${p.routesCleared}; next: ${p.nextRound}`;
     case 'round_start':

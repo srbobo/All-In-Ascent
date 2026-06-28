@@ -218,11 +218,12 @@ const ROUTES = {
 // milestoneDiceBonus — every die on milestone climbs is +`value`
 // negateOneNerfDie — on every climb, treat one nerf die (modifier +1) as 0
 const GEAR_SHOP = [
- // ===== ACCESS CARDS (gate Top Rope / Lead climbing areas) =====
- { name: "Harness", cost: 80, category: "Essential Safety Gear", statEffect: "all", value: -2, routeFilter: ["Top Rope", "Lead"], holdFeatureFilter: [], description: "Essential safety equipment for roped climbing", effectDisplay: "-2 All Stats on rope routes | Unlocks Top Rope", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: "Top Rope", restBonus: 0 },
- { name: "Belay Device", cost: 70, category: "Essential Safety Gear", statEffect: "strength", value: -2, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Managing a heavy rope builds arm strength", effectDisplay: "-2 Strength on Lead routes | Unlocks Top Rope", prerequisiteItems: ["Harness"], prerequisiteLevel: 1, accessRequirement: "Top Rope", restBonus: 0 },
- { name: "Locking Carabiner", cost: 60, category: "Essential Safety Gear", statEffect: "endurance", value: 5, routeFilter: ["Lead"], holdFeatureFilter: [], description: "A secure system builds confidence, reducing mental fatigue", effectDisplay: "+5 Max Endurance | Part of Lead system", prerequisiteItems: ["Harness", "Belay Device"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
- { name: "Lead Rope", cost: 120, category: "Essential Safety Gear", statEffect: "strength", value: -3, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Dynamic rope absorbs fall energy", effectDisplay: "-3 Strength on Lead routes | Unlocks Lead", prerequisiteItems: ["Harness", "Belay Device", "Locking Carabiner"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
+ // ===== ACCESS CARDS (gate Lead climbing area; Top Rope is open to all) =====
+ // RuleModifications (2026-06-27): Harness removed — Top Rope requires no gear,
+ // and Lead Climbing now needs only Belay Device + Locking Carabiner + Lead Rope.
+ { name: "Belay Device", cost: 70, category: "Essential Safety Gear", statEffect: "strength", value: -2, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Managing a heavy rope builds arm strength", effectDisplay: "-2 Strength on Lead routes | Part of Lead system", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
+ { name: "Locking Carabiner", cost: 60, category: "Essential Safety Gear", statEffect: "endurance", value: 5, routeFilter: ["Lead"], holdFeatureFilter: [], description: "A secure system builds confidence, reducing mental fatigue", effectDisplay: "+5 Max Endurance | Part of Lead system", prerequisiteItems: ["Belay Device"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
+ { name: "Lead Rope", cost: 120, category: "Essential Safety Gear", statEffect: "strength", value: -3, routeFilter: ["Lead"], holdFeatureFilter: [], description: "Dynamic rope absorbs fall energy", effectDisplay: "-3 Strength on Lead routes | Unlocks Lead", prerequisiteItems: ["Belay Device", "Locking Carabiner"], prerequisiteLevel: 1, accessRequirement: "Lead", restBonus: 0 },
 
  // ===== SPECIALTY CARDS (S role; one per category, target tagged routes) =====
  { name: "Crimp Sequence Decoder", cost: 130, category: "Strategy Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "rerollOnTag", tagFilter: "Pinch/Crimp", description: "Decode the puzzle of small holds — re-rolls give you a second chance", effectDisplay: "On Pinch/Crimp climbs, re-roll one die of your choice", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
@@ -255,7 +256,10 @@ let gameState = {
  topRope: [],
  leadClimbing: []
  },
- belayersUnlocked: 1,
+ // Top Rope belayer-station count = number of players − 1 (RuleModifications
+ // 2026-06-27). Fixed for the whole game; set in startGame(). Each station
+ // holds 2 routes and admits at most 1 climber.
+ belayerCount: 1,
  gameLog: [],
  availableGear: [], // Randomized gear available in shop
  attemptedRoutes: {}, // Maps playerNum -> Set of route keys ("area:routeName") attempted this round
@@ -290,15 +294,20 @@ function formatLocationName(location) {
  return locationNames[location] || location;
 }
 
+// Number of top-rope routes assigned to each belayer station.
+const ROUTES_PER_BELAYER = 2;
+
 function getSectionCapacity(section) {
  // Returns the maximum number of players allowed in a section
  switch(section) {
  case 'bouldering':
  return 10; // Unlimited for practical purposes
  case 'topRope':
- return gameState.belayersUnlocked; // Limited by belayers (1-3)
+ // Aggregate occupancy = belayer-station count (1 climber per station).
+ // The real gate is per-station (see canClimbTopRopeStation).
+ return Math.max(0, gameState.belayerCount);
  case 'leadClimbing':
- return gameState.belayersUnlocked; // Limited by belayers (1-3)
+ return 1; // A single lead belayer — one climber at a time
  case 'gearShop':
  return 10; // Unlimited for practical purposes
  case 'rest':
@@ -323,6 +332,55 @@ function isTrainingEquipment(location) {
 function getPlayersInSection(section) {
  // Returns array of players currently in a section
  return gameState.players.filter(p => p.character.location === section);
+}
+
+// ===== TOP ROPE BELAYER STATIONS (RuleModifications 2026-06-27) =====
+
+// Draw the Top Rope rotation as belayerCount stations of ROUTES_PER_BELAYER
+// routes each. Returns a FLAT array of 2×belayerCount routes, each tagged with
+// a `belayer` index (0-based station). A 1-player game → 0 stations → empty.
+function drawTopRopeStations() {
+ const count = Math.max(0, gameState.belayerCount) * ROUTES_PER_BELAYER;
+ const pool = [...ROUTES.topRope].sort(() => Math.random() - 0.5);
+ return pool.slice(0, count).map((route, i) => ({
+ ...route, belayer: Math.floor(i / ROUTES_PER_BELAYER),
+ }));
+}
+
+// Belayer stations occupied by players OTHER than playerNum.
+function getOccupiedBelayerStations(playerNum) {
+ const occupied = new Set();
+ gameState.players.forEach(p => {
+ if (p.playerNum === playerNum) return;
+ const c = p.character;
+ if (c.location === 'topRope' && c.belayerStation !== null && c.belayerStation !== undefined) {
+ occupied.add(c.belayerStation);
+ }
+ });
+ return occupied;
+}
+
+// May playerNum occupy belayer station `stationIndex`? Free unless another
+// player holds it (the asking player may already be parked there).
+function canClimbTopRopeStation(stationIndex, playerNum) {
+ if (stationIndex === null || stationIndex === undefined) return true;
+ return !getOccupiedBelayerStations(playerNum).has(stationIndex);
+}
+
+// Pick a belayer station for a player who must occupy one but isn't tied to a
+// specific route's station (e.g. a Top Rope milestone). Reuses their current
+// station, else the lowest free one, else null.
+function pickFreeBelayerStation(playerNum) {
+ const me = gameState.players.find(p => p.playerNum === playerNum);
+ if (me && me.character.location === 'topRope' &&
+ me.character.belayerStation !== null && me.character.belayerStation !== undefined) {
+ return me.character.belayerStation;
+ }
+ const occupied = getOccupiedBelayerStations(playerNum);
+ for (let i = 0; i < gameState.belayerCount; i++) {
+ if (!occupied.has(i)) return i;
+ }
+ return null;
 }
 
 function canEnterSection(section, playerNum) {
@@ -383,41 +441,17 @@ function checkAreaAccess(area) {
  // Free Solo bypasses all equipment requirements
  if (char.key === 'freeSolo') return { hasAccess: true, missingItems: [] };
 
- // Bouldering is always accessible
- if (area === 'bouldering') {
+ // Bouldering and Top Rope are OPEN — no gear required (RuleModifications).
+ if (area === 'bouldering' || area === 'topRope') {
  return { hasAccess: true, missingItems: [] };
  }
 
- // Top Rope requires Harness + Belay Device
- if (area === 'topRope') {
- const hasHarness = char.equipment.includes('Harness');
- const hasBelayDevice = char.equipment.includes('Belay Device');
-
- if (!hasHarness || !hasBelayDevice) {
- const missing = [];
- if (!hasHarness) missing.push('Harness');
- if (!hasBelayDevice) missing.push('Belay Device');
- return { hasAccess: false, missingItems: missing };
- }
- return { hasAccess: true, missingItems: [] };
- }
-
- // Lead Climbing requires Harness + Belay Device + Locking Carabiner + Lead Rope
+ // Lead Climbing requires Belay Device + Locking Carabiner + Lead Rope
+ // (Harness was removed from the game).
  if (area === 'leadClimbing') {
- const hasHarness = char.equipment.includes('Harness');
- const hasBelayDevice = char.equipment.includes('Belay Device');
- const hasCarabiner = char.equipment.includes('Locking Carabiner');
- const hasLeadRope = char.equipment.includes('Lead Rope');
-
- if (!hasHarness || !hasBelayDevice || !hasCarabiner || !hasLeadRope) {
- const missing = [];
- if (!hasHarness) missing.push('Harness');
- if (!hasBelayDevice) missing.push('Belay Device');
- if (!hasCarabiner) missing.push('Locking Carabiner');
- if (!hasLeadRope) missing.push('Lead Rope');
- return { hasAccess: false, missingItems: missing };
- }
- return { hasAccess: true, missingItems: [] };
+ const needs = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
+ const missing = needs.filter(n => !char.equipment.includes(n));
+ return { hasAccess: missing.length === 0, missingItems: missing };
  }
 
  return { hasAccess: true, missingItems: [] };
@@ -752,6 +786,7 @@ function selectCharacter(charKey) {
  abilityUsed: false,
  betaBoostActive: false, // Route Reader: set to true after resting, consumed on next climb
  location: 'lobby', // Track which section of the gym the player is at
+ belayerStation: null, // Which Top Rope belayer station (0-based) the player occupies, or null
  milestonesCompleted: { beginner: false, intermediate: false, expert: false }
  };
 
@@ -791,6 +826,9 @@ function startGame() {
  // Initialize attempted routes tracking
  gameState.attemptedRoutes = {};
 
+ // Top Rope belayer stations: N − 1 for N players, fixed for the whole game.
+ gameState.belayerCount = gameState.players.length - 1;
+
  // Select milestone routes FIRST (before initializing regular routes)
  selectMilestoneRoutes();
 
@@ -817,14 +855,13 @@ function initializeRoutes() {
  const leadPool = [...ROUTES.leadClimbing].sort(() => Math.random() - 0.5);
  gameState.availableRoutes.leadClimbing = leadPool.slice(0, 5);
 
- // Top rope starts with 5 routes
- const topRopePool = [...ROUTES.topRope].sort(() => Math.random() - 0.5);
- gameState.availableRoutes.topRope = topRopePool.slice(0, 5);
+ // Top rope is split into belayerCount stations of 2 routes each.
+ gameState.availableRoutes.topRope = drawTopRopeStations();
 }
 
 function initializeGearShop() {
  // Define access card names that should never be in random rotation
- const accessCardNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+ const accessCardNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
 
  // Filter out access cards from the pool
  const nonAccessGear = GEAR_SHOP.filter(gear => !accessCardNames.includes(gear.name));
@@ -836,7 +873,7 @@ function initializeGearShop() {
 
 function replaceGearInShop(purchasedGearName) {
  // Define access card names
- const accessCardNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+ const accessCardNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
 
  // Access cards should not be replaced - they stay visible
  if (accessCardNames.includes(purchasedGearName)) {
@@ -923,7 +960,7 @@ function renderGameInfo() {
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
 
  // B2: dropped the redundant "Current Player" info-box.
- // B3: belayers info-box only renders when > 1.
+ // B3: belayers info-box shows the fixed Top Rope belayer-station count.
  // C3: Rest is an inline button here, not its own panel.
  // The route-clearing token is now rendered as a pill on the area-title
  // of the climbing area that will be cleared next (see renderSectionStatusPills).
@@ -936,10 +973,10 @@ function renderGameInfo() {
  <div class="info-label">Round</div>
  <div class="info-value">${gameState.round}</div>
  </div>
- ${gameState.belayersUnlocked > 1 ? `
+ ${gameState.belayerCount >= 1 ? `
  <div class="info-box">
  <div class="info-label">Belayers</div>
- <div class="info-value">${gameState.belayersUnlocked}</div>
+ <div class="info-value">${gameState.belayerCount}</div>
  </div>
  ` : ''}
  <div class="info-rest-wrap">${restBtn}</div>
@@ -1170,35 +1207,56 @@ function renderTopRopeRoutes() {
  const container = document.getElementById('topRopeRoutes');
  container.innerHTML = '';
 
- if (gameState.belayersUnlocked === 0) {
- container.innerHTML = '<p style="color: #666;">No belayers available yet. Wait until round 5.</p>';
+ // Top Rope is OPEN (no gear gate). It is split into belayerCount stations of
+ // 2 routes each; each station holds ONE climber. A station an opponent holds
+ // blocks both its routes until routes clear (RuleModifications).
+ if (gameState.belayerCount <= 0) {
+ container.innerHTML = '<p style="color: #666;">Top Rope needs at least 2 players (no belayers in a solo game).</p>';
  return;
  }
 
- // Check if player has access to this area
- const accessCheck = checkAreaAccess('topRope');
+ const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+ const routes = gameState.availableRoutes.topRope;
 
- if (!accessCheck.hasAccess) {
- // Show locked message but still display routes (this stays — it's not
- // redundant with the title pills; it tells the player exactly what gear
- // to buy to unlock the area).
- const lockedDiv = document.createElement('div');
- lockedDiv.className = 'area-locked-banner';
- lockedDiv.innerHTML = `<strong>Area Locked.</strong> Required gear: ${accessCheck.missingItems.join(', ')}`;
- container.appendChild(lockedDiv);
- }
- // Occupancy + "clearing next" surfaced as title pills — no inline duplicate.
+ // Group routes by belayer-station index.
+ const stations = [];
+ routes.forEach((route) => {
+ const b = route.belayer ?? 0;
+ (stations[b] = stations[b] || []).push(route);
+ });
 
- // Always show routes, but disable if locked
- const isLocked = !accessCheck.hasAccess;
- gameState.availableRoutes.topRope.forEach((route, idx) => {
+ const occupied = getOccupiedBelayerStations(currentPlayer.playerNum);
+
+ stations.forEach((stationRoutes, b) => {
+ if (!stationRoutes) return;
+ const holder = gameState.players.find(p =>
+ p.playerNum !== currentPlayer.playerNum &&
+ p.character.location === 'topRope' && p.character.belayerStation === b);
+ const youHere = currentPlayer.character.location === 'topRope' &&
+ currentPlayer.character.belayerStation === b;
+ const blocked = occupied.has(b);
+
+ // Station header spans the full width of the 2-column route grid.
+ const header = document.createElement('div');
+ header.className = 'belayer-station-header'
+ + (blocked ? ' blocked' : '') + (youHere ? ' you' : '');
+ const status = blocked
+ ? `occupied by Player ${holder ? holder.playerNum : '?'}`
+ : (youHere ? 'you are here' : 'open');
+ header.innerHTML = `<span class="bsh-name">Belayer ${b + 1}</span>`
+ + `<span class="bsh-status">${status}</span>`;
+ container.appendChild(header);
+
+ stationRoutes.forEach((route) => {
+ const idx = routes.indexOf(route);
  const card = createRouteCard(route, 'topRope', idx);
- if (isLocked) {
+ if (blocked) {
  card.style.opacity = '0.3';
  card.style.pointerEvents = 'none';
  card.style.filter = 'grayscale(80%)';
  }
  container.appendChild(card);
+ });
  });
 }
 
@@ -1449,11 +1507,11 @@ function renderStore() {
  accessGearSection.className = 'essential-col';
  accessGearSection.innerHTML = `
    <h3 class="column-header">Required Equipment</h3>
-   <div class="column-subhead">Gates access to Top Rope and Lead Climbing</div>
+   <div class="column-subhead">Gates access to Lead Climbing (Top Rope is open)</div>
  `;
 
- // Define the 4 essential access cards
- const accessCardNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+ // Define the 3 essential access cards (Harness removed in RuleModifications)
+ const accessCardNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
  const accessCards = GEAR_SHOP.filter(g => accessCardNames.includes(g.name));
 
  accessCards.forEach(gear => {
@@ -1672,11 +1730,19 @@ function attemptClimb(route, area) {
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
  const char = currentPlayer.character;
 
- // Check if player can enter this section
+ // Check if player can enter this section. Top Rope is gated per belayer
+ // station (1 climber each); other areas use the section-capacity check.
+ if (area === 'topRope') {
+ if (!canClimbTopRopeStation(route.belayer, currentPlayer.playerNum)) {
+ alert(`Belayer ${route.belayer + 1} is occupied by another climber.\n\nWait until routes clear or pick a route at a free belayer.`);
+ return;
+ }
+ } else {
  const locationCheck = canEnterSection(area, currentPlayer.playerNum);
  if (!locationCheck.canEnter) {
  alert(`Cannot climb here!\n\n${locationCheck.reason}`);
  return;
+ }
  }
 
  // Initialize player's attempted routes set if needed
@@ -1706,8 +1772,10 @@ function attemptClimb(route, area) {
  return;
  }
 
- // Move player to this section
+ // Move player to this section and (for Top Rope) occupy the route's belayer
+ // station; any other area clears the belayer-station assignment.
  movePlayerToSection(currentPlayer.playerNum, area);
+ char.belayerStation = (area === 'topRope') ? route.belayer : null;
 
  // Ensure gearBonuses exists
  if (!char.gearBonuses) {
@@ -2126,28 +2194,27 @@ function attemptMilestoneRoute(difficulty) {
  const route = milestone.route;
  const area = milestone.area;
 
- // Check if player can enter this section (includes capacity checks for belayers)
+ // Check if player can enter this section. Top Rope needs a free belayer
+ // station; Lead/others use the section-capacity check.
+ if (area === 'topRope') {
+ if (pickFreeBelayerStation(currentPlayer.playerNum) === null) {
+ alert('All belayers are occupied right now.\n\nWait until routes clear to attempt this milestone.');
+ return;
+ }
+ } else {
  const locationCheck = canEnterSection(area, currentPlayer.playerNum);
  if (!locationCheck.canEnter) {
  alert(`Cannot attempt this milestone route!\n\n${locationCheck.reason}`);
  return;
  }
-
- // Check prerequisites for the route area (Free Solo bypasses equipment requirements)
- if (char.key !== 'freeSolo') {
- if (area === 'topRope' || area === 'leadClimbing') {
- if (!char.equipment.includes('Harness') || !char.equipment.includes('Belay Device')) {
- alert(`You need a Harness and Belay Device to attempt ${area === 'topRope' ? 'Top Rope': 'Lead'} routes!`);
- return;
- }
  }
 
- if (area === 'leadClimbing') {
- if (!char.equipment.includes('Locking Carabiner') || !char.equipment.includes('Lead Rope')) {
- alert('You need a Locking Carabiner and Lead Rope to attempt Lead Climbing routes!');
+ // Check area access (Free Solo bypasses; Top Rope is open; Lead needs the
+ // three access cards).
+ const milestoneAccess = checkAreaAccess(area);
+ if (!milestoneAccess.hasAccess) {
+ alert(`You need ${milestoneAccess.missingItems.join(', ')} to attempt ${area === 'leadClimbing' ? 'Lead Climbing' : 'Top Rope'} routes!`);
  return;
- }
- }
  }
 
  // Calculate effective time cost (passive abilities may modify it)
@@ -2181,8 +2248,10 @@ function attemptMilestoneRoute(difficulty) {
  }
  }
 
- // Move player to this section (important for capacity tracking)
+ // Move player to this section (important for capacity tracking) and, for Top
+ // Rope, occupy a free belayer station.
  movePlayerToSection(currentPlayer.playerNum, area);
+ char.belayerStation = (area === 'topRope') ? pickFreeBelayerStation(currentPlayer.playerNum) : null;
 
  // Use the climb function with milestone tracking
  attemptClimbWithMilestone(route, area, difficulty);
@@ -2483,7 +2552,7 @@ function purchaseGear(gear) {
  const fxSrcRect = fxSrcCard && fxSrcCard.getBoundingClientRect();
  const fxSrcGhost = fxSrcRect ? { left: fxSrcRect.left + fxSrcRect.width / 2, top: fxSrcRect.top + fxSrcRect.height / 2 } : null;
  const fxPlayerNum = currentPlayer.playerNum;
- const fxNewlyReplacedSlot = !['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'].includes(gear.name) ? gear.name : null;
+ const fxNewlyReplacedSlot = !['Belay Device', 'Locking Carabiner', 'Lead Rope'].includes(gear.name) ? gear.name : null;
 
  char.timeRemaining -= timeCost;
  char.xp -= effectiveCost;
@@ -2692,25 +2761,22 @@ function endRound() {
  // Route clearing
  clearRoutes();
 
- // Reset player time, abilities, and locations (training bonuses are permanent and not reset)
+ // Reset player time, abilities, and locations (training bonuses are permanent
+ // and not reset). The route-clearing rotation moves every player back to the
+ // Lobby automatically and frees their belayer station (RuleModifications).
  gameState.players.forEach(player => {
  const hasApproachShoes = player.character.equipment.includes('Approach Shoes');
  player.character.timeRemaining = 10 + (hasApproachShoes ? 1: 0);
  player.character.abilityUsed = false;
  player.character.location = 'lobby'; // Return all players to lobby
+ player.character.belayerStation = null;
  });
 
  // Clear all attempted routes for new round
  gameState.attemptedRoutes = {};
 
- // Check for new belayers
- if (gameState.round === 5) {
- gameState.belayersUnlocked = 2;
- addLog('Second belayer unlocked!');
- } else if (gameState.round === 12) {
- gameState.belayersUnlocked = 3;
- addLog('Third belayer unlocked!');
- }
+ // RuleModifications: belayer count is fixed at N − 1 from round 1 — no
+ // time-based unlock ramp.
 
  gameState.round++;
  gameState.currentPlayerIndex = 0;
@@ -2745,9 +2811,9 @@ function clearRoutes() {
  gameState.availableRoutes.leadClimbing = leadPool.slice(0, 5);
  addLog(' Lead climbing routes refreshed and reset');
  } else if (gameState.routeClearingPosition === 1) {
- // Token between lead and top rope → clear top rope
- const topRopePool = [...ROUTES.topRope].sort(() => Math.random() - 0.5);
- gameState.availableRoutes.topRope = topRopePool.slice(0, 5);
+ // Token between lead and top rope → clear top rope (all belayer stations
+ // refresh together: 2 routes × belayerCount).
+ gameState.availableRoutes.topRope = drawTopRopeStations();
  addLog(' Top rope routes refreshed and reset');
  } else {
  // Token between top rope and bouldering → clear bouldering
@@ -2868,7 +2934,7 @@ function syncShopCollapseState(char, spendableXP) {
  const owned = new Set(char.equipment);
  const hasGearBag = owned.has('Gear Bag');
  const canVisit = hasGearBag || char.timeRemaining >= 1;
- const accessNames = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+ const accessNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
  const candidates = [
   ...GEAR_SHOP.filter(g => accessNames.includes(g.name)),
   ...gameState.availableGear,
