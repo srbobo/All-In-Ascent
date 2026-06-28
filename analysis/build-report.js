@@ -246,19 +246,22 @@ function generateMajorTrends(games, tally, charAgentMetrics, fallbacks, gearFreq
   const trends = [];
   const nGames = games.length;
 
-  // T1: end reason distribution
+  // T1: end-reason distribution
+  // The engine no longer has a round cap (v0.5.0); games either complete
+  // via all_milestones or end via 'forfeit' (an agent ran out of options
+  // for many rounds — a programming-bug signal, not a game-design one).
   const reasons = {};
   for (const g of games) reasons[g.summary.reason] = (reasons[g.summary.reason] || 0) + 1;
-  const maxRoundsPct = ((reasons.max_rounds || 0) / nGames * 100);
-  if (maxRoundsPct >= 50) {
-    trends.push({
-      severity: 'warning',
-      text: `<b>${maxRoundsPct.toFixed(0)}% of games hit max_rounds</b> with no winner. Most matchups can't finish in the round budget — strong signal that the game is too hard for the current agents/balance, OR the round cap is too low for the strategies these agents are using.`,
-    });
-  } else if (maxRoundsPct < 20) {
+  const allMilestonesPct = ((reasons.all_milestones || 0) / nGames * 100);
+  if (allMilestonesPct >= 80) {
     trends.push({
       severity: 'good',
-      text: `<b>${(100 - maxRoundsPct).toFixed(0)}% of games complete via all_milestones</b> — agents are converging on victory paths effectively.`,
+      text: `<b>${allMilestonesPct.toFixed(0)}% of games complete via all_milestones</b> — agents are converging on victory paths effectively.`,
+    });
+  } else if (allMilestonesPct < 50) {
+    trends.push({
+      severity: 'warning',
+      text: `<b>Only ${allMilestonesPct.toFixed(0)}% of games complete via all_milestones</b>. The rest forfeited (agents stuck without legal progress) — strong signal that current balance + agents struggle to converge on a victory path.`,
     });
   }
 
@@ -385,13 +388,15 @@ function generateRecommendedFixes(games, tally, charAgentMetrics, fallbacks, gea
     }
   }
 
-  // R2: max_rounds rate too high — game can't finish in budget
-  const maxR = ((reasons.max_rounds || 0) / nGames);
-  if (maxR > 0.5) {
+  // R2: forfeit rate too high — game can't converge on a winner
+  // (As of v0.5.0, max_rounds no longer exists as an end reason; games
+  // that don't end via all_milestones end via 'forfeit'.)
+  const forfeitR = ((reasons.forfeit || 0) / nGames);
+  if (forfeitR > 0.5) {
     recs.push({
       priority: 'HIGH',
-      title: `Game length: too many max_rounds endings`,
-      text: `${(maxR * 100).toFixed(0)}% of games hit the round cap. Options: (a) raise maxRounds (currently 45); (b) lower expert milestone stat requirements (the typical bottleneck); (c) increase XP gain on intermediate climbs to accelerate level-up; (d) add more easy routes to bootstrap the early game.`,
+      title: `Game progression: too many forfeit endings`,
+      text: `${(forfeitR * 100).toFixed(0)}% of games end without a winner — agents getting stuck. Options: (a) lower expert milestone stat requirements (the typical bottleneck); (b) increase XP gain on intermediate climbs to accelerate level-up; (c) add more easy routes to bootstrap the early game; (d) inspect agent fallback rate to confirm this isn't an LLM-prompt failure.`,
     });
   }
 
@@ -456,6 +461,143 @@ function perGameProgression(games) {
 
 // Fallback rate: per-agent fraction of turns that fell back to the engine
 // heuristic. Anything above 5% means the agent is broken or the timeout is too tight.
+// ---------------- Strategic intent extraction ----------------
+//
+// Pull strategy_initial + strategy_update events emitted by LLM agents (Phase 1+2
+// of the strategy capture layer, sim/agents/ollama.js + sim/run-one-game.js).
+// Build per-game cards so analysts can read what the model planned, when it
+// shifted course, and whether its tactical actions matched its stated plan.
+//
+// Returns one object per game that has at least one strategy_initial event.
+// Games without strategy events (heuristic-only) are skipped — the section
+// renders as "no LLM strategies recorded" so the report stays useful for
+// non-LLM smokes too.
+
+const ACCESS_CARD_NAMES = new Set(['Belay Device', 'Locking Carabiner', 'Lead Rope']);
+const STAT_BY_TRAINING_AREA = {
+  'Campus Board': 'strength',
+  'Continuous MoonBoard': 'technique',
+  'Grip Board': 'focus',
+  'Balance and Core': 'flexibility',
+};
+
+function extractStrategiesPerGame(games) {
+  const out = [];
+  for (const g of games) {
+    const strategiesBySeat = new Map(); // seat -> { initial, updates: [], decisions: [], actions: {} }
+    for (const e of g.events) {
+      const p = e.payload || {};
+      if (e.type === 'strategy_initial') {
+        if (!strategiesBySeat.has(p.seat)) {
+          strategiesBySeat.set(p.seat, {
+            seat: p.seat, agent: p.agent, characterKey: p.characterKey,
+            initial: p, updates: [], decisions: [],
+            training: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
+            accessBuys: 0, totalActions: 0,
+            milestonesCompleted: [],
+            playerNum: p.playerNum,
+          });
+        }
+      } else if (e.type === 'strategy_update') {
+        const rec = strategiesBySeat.get(p.seat);
+        if (rec) rec.updates.push(p);
+      } else if (e.type === 'agent_decision') {
+        const rec = strategiesBySeat.get(p.seat);
+        if (rec) rec.decisions.push({
+          round: p.round, actionType: p.actionType, rationale: p.rationale,
+          activeStrategy: p.activeStrategy, strategyChanged: p.strategyChanged === true,
+        });
+      } else if (e.type === 'action_chosen') {
+        const rec = strategiesBySeat.get(p.playerNum);
+        if (!rec) continue;
+        rec.totalActions++;
+        const a = p.action || {};
+        if (a.type === 'train') {
+          const stat = STAT_BY_TRAINING_AREA[a.areaName];
+          if (stat) rec.training[stat]++;
+        } else if (a.type === 'buyGear' && ACCESS_CARD_NAMES.has(a.gearName)) {
+          rec.accessBuys++;
+        }
+      } else if (e.type === 'milestone_progress') {
+        const rec = strategiesBySeat.get(p.playerNum);
+        if (rec) rec.milestonesCompleted.push({
+          round: e.payload.round || null,
+          tier: p.tier,
+          totalCompleted: p.totalCompleted,
+        });
+      }
+    }
+
+    if (strategiesBySeat.size === 0) continue;
+
+    for (const rec of strategiesBySeat.values()) {
+      const trainTotal = Object.values(rec.training).reduce((a, b) => a + b, 0);
+      const declaredBottleneck = rec.initial?.strategy?.bottleneckStat || null;
+      // Normalize "Str" / "strength" etc.
+      const normalizedDecl = normalizeStat(declaredBottleneck);
+      const actuallyMostTrained = trainTotal > 0
+        ? Object.entries(rec.training).sort((a, b) => b[1] - a[1])[0][0]
+        : null;
+      const planAdhered = normalizedDecl && actuallyMostTrained
+        && normalizedDecl === actuallyMostTrained;
+      const declaredCount = normalizedDecl ? (rec.training[normalizedDecl] || 0) : 0;
+
+      out.push({
+        filename: g.filename,
+        seed: g.meta.seed,
+        rounds: g.summary.rounds,
+        winner: g.summary.winner,
+        winnerCharacter: g.summary.winnerCharacter,
+        seat: rec.seat,
+        agent: rec.agent,
+        characterKey: rec.characterKey,
+        initial: rec.initial,
+        updates: rec.updates,
+        decisionCount: rec.decisions.length,
+        training: rec.training,
+        trainTotal,
+        accessBuys: rec.accessBuys,
+        declaredBottleneck: normalizedDecl,
+        actuallyMostTrained,
+        declaredBottleneckTrainings: declaredCount,
+        planAdhered,
+        milestonesCompletedByLLM: rec.milestonesCompleted,
+        finalMilestones: g.summary.finalPlayers?.[rec.seat - 1]?.milestonesDone || 0,
+      });
+    }
+  }
+  return out;
+}
+
+// Detect tournament directories: presence of a tournament-summary.json file
+// AND a memory-<character>.json file is the unambiguous signal. Returns the
+// parsed tournament summary + memory or null if not a tournament dir.
+function detectTournament(dir) {
+  const summaryPath = path.join(dir, 'tournament-summary.json');
+  if (!fs.existsSync(summaryPath)) return null;
+  let tournamentSummary;
+  try { tournamentSummary = JSON.parse(fs.readFileSync(summaryPath, 'utf8')); }
+  catch { return null; }
+
+  const memPath = path.join(dir, `memory-${tournamentSummary.character}.json`);
+  if (!fs.existsSync(memPath)) return null;
+  let memory;
+  try { memory = JSON.parse(fs.readFileSync(memPath, 'utf8')); }
+  catch { return null; }
+
+  return { tournamentSummary, memory };
+}
+
+function normalizeStat(s) {
+  if (!s) return null;
+  const m = String(s).toLowerCase();
+  if (m.startsWith('str')) return 'strength';
+  if (m.startsWith('tec')) return 'technique';
+  if (m.startsWith('foc')) return 'focus';
+  if (m.startsWith('fle') || m.startsWith('flx') || m.startsWith('flex')) return 'flexibility';
+  return null;
+}
+
 function fallbackRateByAgent(games) {
   const actions = {}, fallbacks = {};
   for (const g of games) {
@@ -540,6 +682,8 @@ const gearFreq = gearPurchaseFrequency(games);
 const fallbacks = fallbackRateByAgent(games);
 const charAgentMetrics = actionMetricsByCharAgent(games);
 const progression = perGameProgression(games);
+const strategies = extractStrategiesPerGame(games);
+const tournamentData = detectTournament(inputDir);
 const trends = generateMajorTrends(games, tally, charAgentMetrics, fallbacks, gearFreq);
 const recommendations = generateRecommendedFixes(games, tally, charAgentMetrics, fallbacks, gearFreq);
 
@@ -648,7 +792,8 @@ const chartSpecs = {
 const html = buildHtml({
   inputDir, manifest, games, tally, reasons, lengths, fallbacks,
   callouts, chartSpecs, milestones, agentWinRates, charWinRates,
-  charAgentMetrics, progression, trends, recommendations,
+  charAgentMetrics, progression, trends, recommendations, strategies,
+  tournamentData,
 });
 
 const outPath = path.join(inputDir, 'report.html');
@@ -661,6 +806,273 @@ if (flags.open) {
 }
 
 // ---------------- HTML template ----------------
+
+// Render the Tournament (in-context learning) section. Only present when the
+// input directory is a tournament dir (detectTournament returned non-null).
+// Surfaces the headline question — is the model learning across games? — via:
+//   - Score trajectory line chart
+//   - Per-iteration strategy + reflection cards
+//   - Linear-regression slope on the score series (learning rate proxy)
+function buildTournamentSection(td) {
+  const { tournamentSummary, memory } = td;
+  const scores = tournamentSummary.scoreTrajectory || [];
+  const escape = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',
+  }[c]));
+
+  // Linear regression on score vs iteration. Slope > 0 = improving.
+  // Simple least-squares; small N is fine since we just want a directional signal.
+  const slope = (() => {
+    if (scores.length < 2) return null;
+    const n = scores.length;
+    const xs = scores.map((_, i) => i + 1);
+    const meanX = xs.reduce((a, b) => a + b, 0) / n;
+    const meanY = scores.reduce((a, b) => a + b, 0) / n;
+    const num = xs.reduce((a, x, i) => a + (x - meanX) * (scores[i] - meanY), 0);
+    const den = xs.reduce((a, x) => a + (x - meanX) ** 2, 0);
+    return den === 0 ? 0 : num / den;
+  })();
+
+  const best = scores.length ? Math.max(...scores) : 0;
+  const bestIter = scores.length ? scores.indexOf(best) + 1 : 0;
+  const first = scores[0] ?? 0;
+  const last = scores[scores.length - 1] ?? 0;
+
+  const gameCards = (memory.games || []).map((g, idx) => {
+    const sd = g.scoreData || {};
+    const ref = g.reflection || {};
+    const init = g.initialStrategy || {};
+    const shifts = g.strategyShifts || [];
+    const score = sd.score ?? '?';
+    const prevScore = idx > 0 ? memory.games[idx - 1].scoreData?.score : null;
+    const delta = prevScore != null ? score - prevScore : null;
+    const deltaTag = delta == null ? '' :
+      delta > 0 ? `<span class="delta up">+${delta}</span>` :
+      delta < 0 ? `<span class="delta down">${delta}</span>` :
+                  `<span class="delta flat">±0</span>`;
+
+    return `
+      <div class="tournament-game">
+        <h4>
+          Iteration ${g.gameNum} <span class="iter-score">score ${score}${deltaTag}</span>
+          <span class="iter-tags">
+            ${sd.win ? '<span class="iter-tag win">WIN</span>' : '<span class="iter-tag loss">loss</span>'}
+            <span class="iter-tag">${sd.milestonesCompleted ?? '?'}/3 ms</span>
+            <span class="iter-tag">${sd.abilityTriggers ?? '?'} ability</span>
+          </span>
+        </h4>
+        <div class="tournament-game-grid">
+          <div>
+            <h5>Initial plan</h5>
+            <p class="plan-text">${escape(init.summary || '(none)')}</p>
+            <p class="plan-meta">Declared bottleneck: <b>${escape(init.bottleneckStat || '?')}</b></p>
+            ${shifts.length
+              ? `<p class="plan-meta">${shifts.length} strategy shift${shifts.length === 1 ? '' : 's'} (round${shifts.length === 1 ? '' : 's'} ${shifts.map(s => s.round).join(', ')})</p>`
+              : `<p class="plan-meta">No shifts — stayed on plan.</p>`}
+          </div>
+          <div>
+            <h5>Reflection</h5>
+            ${ref.what_worked   ? `<p><b>Worked:</b> ${escape(ref.what_worked)}</p>` : ''}
+            ${ref.what_failed   ? `<p><b>Failed:</b> ${escape(ref.what_failed)}</p>` : ''}
+            ${ref.advice_for_next_game
+              ? `<p class="advice"><b>Advice to next iteration:</b> ${escape(ref.advice_for_next_game)}</p>`
+              : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const trajectoryChart = `
+    <div class="chart" id="tournamentScoreChart"></div>
+    <script>
+      Plotly.newPlot('tournamentScoreChart', [{
+        type: 'scatter', mode: 'lines+markers',
+        x: [${scores.map((_, i) => i + 1).join(',')}],
+        y: [${scores.join(',')}],
+        line: { color: '#1a73e8', width: 3 },
+        marker: { size: 10 },
+        name: 'score'
+      }], {
+        title: 'Score trajectory across iterations',
+        xaxis: { title: 'Iteration', dtick: 1 },
+        yaxis: { title: 'Score' },
+        margin: { t: 40, r: 30, b: 50, l: 60 }
+      }, { responsive: true, displaylogo: false });
+    </script>
+  `;
+
+  return `
+    <h2>Tournament — in-context learning experiment</h2>
+    <p style="font-size: 13px; color: #666;">
+      One LLM seat (<b>${escape(tournamentSummary.character)}</b>) plays the same seed
+      (<code>${tournamentSummary.seed}</code>) ${tournamentSummary.iterations} times.
+      Between games, the model receives its prior strategies + reflections as
+      memory in the next planning prompt. Question: does the score trend up?
+    </p>
+    <div class="tournament-headline">
+      <div class="strategy-stat">
+        <div class="stat-value">${scores.length}</div>
+        <div class="stat-label">iterations completed</div>
+      </div>
+      <div class="strategy-stat">
+        <div class="stat-value">${best}</div>
+        <div class="stat-label">best score (iter ${bestIter})</div>
+      </div>
+      <div class="strategy-stat">
+        <div class="stat-value">${last - first >= 0 ? '+' : ''}${last - first}</div>
+        <div class="stat-label">first → last delta (${first} → ${last})</div>
+      </div>
+      <div class="strategy-stat">
+        <div class="stat-value" style="color: ${slope > 0.5 ? '#28a745' : slope < -0.5 ? '#dc3545' : '#6c757d'};">
+          ${slope == null ? '—' : (slope > 0 ? '+' : '') + slope.toFixed(1)}
+        </div>
+        <div class="stat-label">score / iteration slope (learning rate proxy)</div>
+      </div>
+    </div>
+    ${trajectoryChart}
+    <div class="tournament-games">
+      ${gameCards}
+    </div>
+  `;
+}
+
+// Render the Strategic Intent section. For each game with LLM strategy
+// data (planStrategy() + per-turn evaluation), surface:
+//   - initial strategy (summary, bottleneck, milestone order, opening moves)
+//   - strategy shift timeline (when, why, how it changed)
+//   - plan-vs-execution gap (declared bottleneck stat vs actually trained)
+// Built as a stand-alone helper so non-strategy reports skip it cleanly.
+function buildStrategySection(strategies) {
+  // Aggregate: how often does the LLM's declared bottleneck match its
+  // most-trained stat? That's the headline "did intent match execution" stat.
+  const withDeclared = strategies.filter(s => s.declaredBottleneck);
+  const adheredCount = withDeclared.filter(s => s.planAdhered).length;
+  const adherenceRate = withDeclared.length
+    ? (adheredCount / withDeclared.length * 100).toFixed(0)
+    : '—';
+  const totalShifts = strategies.reduce((a, s) => a + s.updates.length, 0);
+
+  const escape = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',
+  }[c]));
+  const truncate = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+  const cards = strategies.map(s => {
+    const init = s.initial?.strategy || {};
+    const opening = (init.openingMoves || []).map(m => `<li>${escape(m)}</li>`).join('');
+    const risks = (init.anticipatedRisks || []).map(r => `<li>${escape(r)}</li>`).join('');
+    const priority = (init.milestonePriority || []).join(' → ') || '(none)';
+
+    const updatesHtml = s.updates.length === 0
+      ? `<p style="color:#666;font-style:italic;">No strategy shifts declared — model stayed on its initial plan throughout.</p>`
+      : `<ol class="strategy-shifts">
+          ${s.updates.map(u => `
+            <li>
+              <div class="shift-header"><b>Round ${u.round}</b> · <i>${escape(u.changeReason || '(no reason)')}</i></div>
+              <div class="shift-diff">
+                <div class="shift-old"><b>Was:</b> ${escape(truncate(u.previousSummary || '', 200))}</div>
+                <div class="shift-new"><b>Now:</b> ${escape(truncate(u.newSummary || '', 200))}</div>
+                ${(u.previousBottleneckStat || u.newBottleneckStat) && u.previousBottleneckStat !== u.newBottleneckStat
+                  ? `<div class="shift-meta">Bottleneck: ${escape(u.previousBottleneckStat || '?')} → ${escape(u.newBottleneckStat || '?')}</div>`
+                  : ''}
+                ${JSON.stringify(u.previousMilestonePriority || []) !== JSON.stringify(u.newMilestonePriority || [])
+                  ? `<div class="shift-meta">Priority: ${(u.previousMilestonePriority || []).join(' → ') || '(none)'} ⇒ ${(u.newMilestonePriority || []).join(' → ') || '(none)'}</div>`
+                  : ''}
+              </div>
+            </li>
+          `).join('')}
+        </ol>`;
+
+    // Plan-vs-execution table
+    const trainTotal = s.trainTotal || 1;
+    const trainRow = (stat) => {
+      const c = s.training[stat] || 0;
+      const pct = (c / trainTotal * 100).toFixed(0);
+      const isDeclared = s.declaredBottleneck === stat;
+      const isMost = s.actuallyMostTrained === stat;
+      return `<tr${isDeclared ? ' class="declared-bottleneck"' : ''}>
+        <td>${stat}${isDeclared ? ' <span class="tag declared">declared bottleneck</span>' : ''}${isMost ? ' <span class="tag most">most trained</span>' : ''}</td>
+        <td>${c}</td>
+        <td>${trainTotal ? pct + '%' : '—'}</td>
+      </tr>`;
+    };
+
+    const adherenceColor = s.planAdhered === true ? '#28a745'
+      : s.planAdhered === false ? '#dc3545' : '#6c757d';
+    const adherenceLabel = s.planAdhered === true ? 'PLAN MET'
+      : s.planAdhered === false ? 'EXECUTION GAP' : 'no training data';
+
+    return `
+      <div class="strategy-card">
+        <h3>
+          <code>${escape(s.filename)}</code> — ${escape(s.characterKey)}
+          (${escape(s.agent)}) · ${s.rounds} rounds
+          · final milestones <b>${s.finalMilestones}/3</b>
+          <span class="adherence-badge" style="background:${adherenceColor}">${adherenceLabel}</span>
+        </h3>
+
+        <div class="strategy-grid">
+          <div class="strategy-initial">
+            <h4>Initial strategy <span style="color:#666;font-weight:normal;font-size:13px;">(round 1, ${(s.initial.latencyMs/1000).toFixed(1)}s, ${s.initial.responseTokens} response tokens)</span></h4>
+            <p class="strategy-summary">${escape(init.summary || '(none)')}</p>
+            <div class="strategy-meta">
+              <div><b>Bottleneck stat (model's call):</b> ${escape(init.bottleneckStat || '?')}</div>
+              <div><b>Milestone order (planned):</b> ${escape(priority)}</div>
+            </div>
+            ${opening ? `<details><summary>Opening moves (${(init.openingMoves || []).length})</summary><ol>${opening}</ol></details>` : ''}
+            ${risks ? `<details><summary>Anticipated risks (${(init.anticipatedRisks || []).length})</summary><ul>${risks}</ul></details>` : ''}
+          </div>
+
+          <div class="strategy-shifts-block">
+            <h4>Strategy shifts (${s.updates.length})</h4>
+            ${updatesHtml}
+          </div>
+
+          <div class="strategy-execution">
+            <h4>Plan vs execution — training distribution</h4>
+            <p style="font-size:13px;color:#666;">If "declared bottleneck" and "most trained" rows are the same, the model executed on its plan.</p>
+            <table class="strategy-train-table">
+              <tr><th>Stat</th><th>Trains</th><th>%</th></tr>
+              ${['strength','technique','focus','flexibility'].map(trainRow).join('')}
+              <tr><td><b>Total</b></td><td><b>${s.trainTotal}</b></td><td>100%</td></tr>
+            </table>
+            <p style="font-size:13px;color:#666;margin-top:8px;">Access cards bought: <b>${s.accessBuys}/4</b></p>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <h2>Strategic intent (LLM-only)</h2>
+    <p style="font-size: 13px; color: #666;">
+      Captured by the strategy-planning layer in <code>sim/agents/ollama.js</code> + <code>sim/run-one-game.js</code>.
+      Every LLM seat produces an initial strategy at game start and is asked, on every turn,
+      whether the strategy should shift. Shifts are emitted as their own events with a
+      structured reason. Below: per-game cards showing what the model planned, when it
+      pivoted, and whether the tactical actions (training distribution, access-card buys)
+      matched the declared plan.
+    </p>
+    <div class="strategy-headline">
+      <div class="strategy-stat">
+        <div class="stat-value">${strategies.length}</div>
+        <div class="stat-label">LLM seats with recorded strategies</div>
+      </div>
+      <div class="strategy-stat">
+        <div class="stat-value">${totalShifts}</div>
+        <div class="stat-label">total strategy shifts declared</div>
+      </div>
+      <div class="strategy-stat">
+        <div class="stat-value">${adherenceRate}${adherenceRate === '—' ? '' : '%'}</div>
+        <div class="stat-label">games where declared bottleneck = most-trained stat</div>
+      </div>
+    </div>
+    <div class="strategy-cards">
+      ${cards}
+    </div>
+  `;
+}
 
 function buildHtml(ctx) {
   const fallbackWarn = Object.entries(ctx.fallbacks)
@@ -770,6 +1182,60 @@ function buildHtml(ctx) {
   .rec-high   { background: #dc3545; }
   .rec-medium { background: #fd7e14; }
   .rec-low    { background: #6c757d; }
+
+  /* Strategic intent section */
+  .strategy-headline { display: flex; gap: 16px; margin: 16px 0 24px; }
+  .strategy-stat { flex: 1; background: #f5f5f7; padding: 16px; border-radius: 8px; text-align: center; }
+  .stat-value { font-size: 32px; font-weight: 700; color: #1a73e8; line-height: 1; }
+  .stat-label { font-size: 12px; color: #5f6368; margin-top: 6px; }
+  .strategy-cards { display: grid; gap: 20px; }
+  .strategy-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .strategy-card h3 { border: none; margin: 0 0 16px; padding: 0; font-size: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .adherence-badge { color: white; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+  .strategy-grid { display: grid; grid-template-columns: 1.2fr 1.5fr 1fr; gap: 16px; }
+  @media (max-width: 1100px) { .strategy-grid { grid-template-columns: 1fr; } }
+  .strategy-grid h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #5f6368; }
+  .strategy-summary { background: #fff8e1; border-left: 4px solid #fbc02d; padding: 10px 12px; border-radius: 4px; line-height: 1.5; font-size: 14px; }
+  .strategy-meta { margin-top: 10px; font-size: 13px; line-height: 1.7; }
+  .strategy-meta b { color: #1a73e8; }
+  .strategy-initial details { margin-top: 10px; font-size: 13px; }
+  .strategy-initial summary { cursor: pointer; color: #5f6368; }
+  .strategy-shifts { padding-left: 18px; margin: 0; }
+  .strategy-shifts li { margin: 8px 0; padding: 8px 10px; background: #e3f2fd; border-radius: 6px; font-size: 13px; line-height: 1.45; list-style: decimal; }
+  .shift-header { margin-bottom: 4px; }
+  .shift-diff { margin-top: 4px; }
+  .shift-old { color: #5f6368; font-style: italic; }
+  .shift-new { color: #1a73e8; font-weight: 500; margin-top: 2px; }
+  .shift-meta { color: #5f6368; font-size: 12px; margin-top: 4px; }
+  .strategy-train-table { font-size: 13px; margin: 0; }
+  .strategy-train-table th, .strategy-train-table td { padding: 4px 8px; }
+  .strategy-train-table tr.declared-bottleneck { background: #fff8e1; }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; margin-left: 6px; }
+  .tag.declared { background: #fbc02d; color: #5d4037; }
+  .tag.most { background: #1a73e8; color: white; }
+
+  /* Tournament section */
+  .tournament-headline { display: flex; gap: 16px; margin: 16px 0 24px; flex-wrap: wrap; }
+  .tournament-games { display: grid; gap: 16px; margin-top: 24px; }
+  .tournament-game { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .tournament-game h4 { margin: 0 0 12px; padding: 0; border: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .iter-score { color: #1a73e8; font-weight: 700; font-size: 18px; }
+  .delta { font-size: 13px; padding: 1px 8px; border-radius: 10px; margin-left: 4px; font-weight: 600; }
+  .delta.up { background: #d4edda; color: #155724; }
+  .delta.down { background: #f8d7da; color: #721c24; }
+  .delta.flat { background: #e0e0e0; color: #5f6368; }
+  .iter-tags { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .iter-tag { background: #f5f5f7; color: #5f6368; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+  .iter-tag.win { background: #28a745; color: white; }
+  .iter-tag.loss { background: #6c757d; color: white; }
+  .tournament-game-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 16px; }
+  @media (max-width: 900px) { .tournament-game-grid { grid-template-columns: 1fr; } }
+  .tournament-game-grid h5 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #5f6368; }
+  .plan-text { background: #fff8e1; border-left: 3px solid #fbc02d; padding: 8px 10px; border-radius: 4px; font-size: 13px; line-height: 1.45; margin: 0 0 8px; }
+  .plan-meta { font-size: 12px; color: #5f6368; margin: 4px 0; }
+  .tournament-game-grid p { font-size: 13px; line-height: 1.45; margin: 6px 0; }
+  .tournament-game-grid p b { color: #1a73e8; }
+  .advice { background: #e3f2fd; border-left: 3px solid #1a73e8; padding: 8px 10px; border-radius: 4px; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -822,6 +1288,9 @@ ${(ctx.recommendations || []).length === 0
 <p style="font-size: 13px; color: #666;">
   To replay any of the games above: <code>node sim/replay.js ${ctx.inputDir}/&lt;filename&gt;</code>
 </p>
+
+${ctx.tournamentData ? buildTournamentSection(ctx.tournamentData) : ''}
+${ctx.strategies && ctx.strategies.length ? buildStrategySection(ctx.strategies) : ''}
 
 <h2>Headline numbers</h2>
 <table>

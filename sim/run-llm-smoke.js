@@ -35,7 +35,6 @@ const MODEL = args.model || 'qwen2.5:7b-instruct';
 const CHARACTERS = (args.characters || 'technician,sprinter').split(',');
 const OUTPUT_DIR = args['output-dir']
   || `results/llm-smoke-${new Date().toISOString().slice(0, 10)}`;
-const MAX_ROUNDS = Number(args.maxRounds || 45);
 
 // Seat 1 = heuristic baseline, Seat 2 = LLM under test. Keeping the LLM as
 // P2 is deliberate: P1 always goes first under the time-max turn rule, so
@@ -46,7 +45,6 @@ console.log(`LLM smoke test:`);
 console.log(`  seeds:       ${SEEDS.join(', ')}`);
 console.log(`  characters:  ${CHARACTERS.join(' vs ')}`);
 console.log(`  agents:      ${AGENTS.join(' vs ')}`);
-console.log(`  max rounds:  ${MAX_ROUNDS}`);
 console.log(`  output dir:  ${OUTPUT_DIR}`);
 console.log(`  estimated:   ~${SEEDS.length * 11} minutes @ 11 min/game`);
 console.log();
@@ -81,11 +79,10 @@ for (let i = 0; i < SEEDS.length; i++) {
       policySeed: seed + 1000,
       characterKeys: CHARACTERS,
       agentNames: AGENTS,
-      maxRounds: MAX_ROUNDS,
       turnTimeoutMs: 30000, // 30s per turn; generous so one slow LLM call doesn't fall back
       writer,
     });
-    writer.close();
+    await writer.close();
     summaries.push(summary);
     const elapsedSec = ((Date.now() - t0) / 1000).toFixed(0);
     const w = summary.winner ? `P${summary.winner} (${summary.winnerCharacter}/${summary.winnerAgent})` : 'none';
@@ -95,7 +92,7 @@ for (let i = 0; i < SEEDS.length; i++) {
       `winner=${w} | LLM milestones=${p2ms}/3 | fallbacks=${summary.fallbackCount}`
     );
   } catch (err) {
-    writer.close();
+    await writer.close();
     console.error(`[${i + 1}/${SEEDS.length}] seed=${seed} FAILED: ${err.message}`);
   }
 }
@@ -117,7 +114,7 @@ console.log(`  elapsed:                ${totalMin} min`);
 console.log(`  seeds run:              ${summaries.length}`);
 console.log(`  heuristic wins:         ${heurWins}/${summaries.length}`);
 console.log(`  LLM wins:               ${llmWins}/${summaries.length}`);
-console.log(`  draws (max_rounds):     ${drawn}/${summaries.length}`);
+console.log(`  draws (no winner):      ${drawn}/${summaries.length}`);
 console.log(`  heuristic milestones:   ${heurMilestonesTotal}/${summaries.length * 3}`);
 console.log(`  LLM milestones:         ${llmMilestonesTotal}/${summaries.length * 3}`);
 console.log(`  total LLM decisions:    ${summaries.reduce((a, s) => a + (s.perAgentStats?.[1]?.actions || 0), 0)}`);

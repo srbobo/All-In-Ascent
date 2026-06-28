@@ -6,7 +6,7 @@
 //   - applyAction round-trips: state in, new state out, no mutation of input.
 //   - getLegalActions returns a non-empty list at every decision point.
 //   - Running a full game with a uniform-random policy terminates under
-//     the maxRounds safety cap.
+//     the per-test step cap (no engine-level round cap as of v0.5.0).
 //   - Running the same (seed, character, policy-seed) twice produces
 //     byte-identical event streams (top-level determinism check).
 //   - State invariants hold at every step: no negative endurance, round
@@ -66,7 +66,7 @@ function playFullGame(gameSeed, policySeed, characterKeys) {
   let { state } = createGame({ seed: gameSeed, characterKeys });
   const policy = createRng(policySeed);
   let steps = 0;
-  const maxSteps = 5000; // agent-loop safety net (distinct from engine maxRounds)
+  const maxSteps = 5000; // agent-loop safety net — engine has no round cap
   while (true) {
     const term = isTerminal(state);
     if (term.done) return { finalState: state, term, steps };
@@ -83,7 +83,7 @@ function playFullGame(gameSeed, policySeed, characterKeys) {
   const { finalState, term, steps } = playFullGame(42, 99, ['technician', 'sprinter']);
   check('random 2p game terminates', term.done);
   check('terminated with a valid reason',
-    ['all_milestones', 'max_rounds', 'forfeit'].includes(term.reason));
+    ['all_milestones', 'forfeit'].includes(term.reason));
   check('game took at least 1 step', steps >= 1);
   check('game_end event emitted', finalState.events.some(e => e.type === 'game_end'));
   // Invariants on final state.
