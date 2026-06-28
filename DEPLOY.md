@@ -6,7 +6,8 @@ optional bots) can play in real time. The stack is intentionally tiny:
 - **Backend**: a single PartyKit room class (`party/game.js`) running on
   Cloudflare Workers + Durable Objects. Free tier covers ~100k requests/day,
   plenty for friend games.
-- **Frontend**: static HTML/JS (`online.html` + `online/client.js`). Can be
+- **Frontend**: static HTML/JS — `online.html` (join form) hands off to
+  `index.html?online=1`, which loads `online-mode.js` + `game.js`. Can be
   served by PartyKit itself (free), Netlify, GitHub Pages, or Cloudflare Pages.
 - **Logs**: when a game ends, the full JSONL event log is POSTed to a webhook
   you control (defaults to nothing → falls back to DO storage).
@@ -132,9 +133,9 @@ Total worst-case at hobby scale: **~$1/month**, almost always **$0**.
 
 ```
   browser <--WebSocket--> PartyKit Worker (party/game.js)
-   online/                   ├─ in-memory state (GameRoom DO)
-   client.js                 ├─ heuristic bots for empty seats
-                             └─ on game_end → POST log to webhook
+   index.html?online=1        ├─ in-memory state (GameRoom DO)
+   + online-mode.js           ├─ heuristic bots for empty seats
+                              └─ on game_end → POST log to webhook
 ```
 
 One Durable Object instance per `room` ID. All state lives in memory; bots

@@ -16,6 +16,14 @@
 // bumps keep the same baseline so you can watch a number move in response to
 // a single tweak.
 
+// Note (TechDebt cleanup): the browser game (game.js) is stamped
+//   GAME_VERSION '0.6.0' to match this engine, and it now implements the same
+//   Scenario 2C milestone selection (it previously used the old un-constrained
+//   v0.3.x random pick). engine/data.js is no longer hand-synced: it is
+//   auto-generated from game.js's GAME DATA section by
+//   `node engine/build-data.js` (run by the test/playtest scripts; standalone
+//   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
+//
 // 0.6.0 (2026-06-27): RuleModifications — Top Rope / Lead overhaul.
 //   - Top Rope is now OPEN (no gear required) and split into N − 1 belayer
 //     stations (N = player count), each holding 2 routes and admitting at most
