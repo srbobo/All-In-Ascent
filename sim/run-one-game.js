@@ -7,7 +7,6 @@
 //     --characters=technician,sprinter \
 //     --agents=heuristic,heuristic \
 //     --output=results/demo.jsonl \
-//     [--maxRounds=30] \
 //     [--policy-seed=12345] \
 //     [--quiet]
 //
@@ -69,11 +68,16 @@ export async function runOneGame({
   seed,
   characterKeys,
   agentNames,
-  maxRounds = 45,
   policySeed = 1,
   turnTimeoutMs = 15000,
+  gameTimeoutMs = null,   // optional game-level wall-clock cap (Track 1.3)
   writer = null,   // optional: object with { write(obj), close() } to stream events
   logDecisions = false,
+  onProgress = null,           // optional callback invoked at intervals during play
+  progressIntervalMs = 60000,  // throttle: at most one progress callback this often
+  seatMemoryContexts = null,   // optional: array indexed by seat (0-based) — formatted
+                               // memory string passed into planStrategy() for that seat
+                               // (Phase 3 of the tournament experiment).
 }) {
   // Basic input validation so misconfigs fail fast instead of silently running bad games.
   if (characterKeys.length !== agentNames.length) {
@@ -91,15 +95,20 @@ export async function runOneGame({
   // Build one agent instance per seat. Each agent gets its OWN policy seed
   // derived from the base policy seed + seat index — so two agents of the
   // same type don't make identical choices on every turn.
+  // BUG FIX (v0.5.0): turnTimeoutMs was being dropped here — buildAgent's
+  // Ollama branch then defaulted to its own 15000ms cap regardless of what
+  // the caller passed to runOneGame. With the larger v0.5.0 prompts, that
+  // 15s default fires on ~50% of decisions. Plumbing the caller's value
+  // through fixes the timeout-fallback explosion.
   const agents = agentNames.map((n, i) =>
-    buildAgent(n, { policySeed: policySeed + i * 1000 }));
+    buildAgent(n, { policySeed: policySeed + i * 1000, turnTimeoutMs }));
 
   // Write the run_meta record first. It's everything a future reader needs
   // to interpret the events without re-running the game.
   const runMeta = {
     kind: 'run_meta',
     startedAt: new Date().toISOString(),
-    seed, policySeed, maxRounds,
+    seed, policySeed,
     characters: characterKeys,
     agents: agentNames,
     engineVersion: null, // filled in after createGame
@@ -109,8 +118,6 @@ export async function runOneGame({
   const { state: s0, events: bootEvents } = createGame({
     seed, characterKeys,
   });
-  // Inject maxRounds into state; the engine uses it as the safety cap.
-  s0.maxRounds = maxRounds;
   runMeta.engineVersion = s0.engineVersion;
 
   if (writer) writer.write(runMeta);
@@ -120,9 +127,106 @@ export async function runOneGame({
   let steps = 0;
   let fallbackCount = 0;
   const perAgentStats = agentNames.map(() => ({ actions: 0, fallbacks: 0 }));
-  const MAX_STEPS = 10000; // harder cap than maxRounds; just in case
+
+  // PHASE 1: Strategy planning at game start. For each LLM agent, ask for an
+  // initial strategy and stream it as a `strategy_initial` event. Stored per
+  // seat so the per-decision call can include it as context (Phase 2).
+  const seatStrategies = agentNames.map(() => null);
+  for (let i = 0; i < agents.length; i++) {
+    const ag = agents[i];
+    if (typeof ag.planStrategy !== 'function') continue; // heuristic/random skip
+    const seatPlayer = s0.players[i];
+    const planLegal = getLegalActions(s0); // legal actions from the seat that
+                                           // currently has the turn — close
+                                           // enough for opening-move planning.
+    const t0 = Date.now();
+    let outcome = 'success';
+    let errMsg = null;
+    let planResult = null;
+    try {
+      planResult = await ag.planStrategy({
+        state: s0,
+        legalActions: planLegal,
+        player: seatPlayer,
+        memoryContext: seatMemoryContexts ? seatMemoryContexts[i] : null,
+      });
+      seatStrategies[i] = planResult.strategy;
+    } catch (err) {
+      outcome = err.outcome || 'other_error';
+      errMsg = (err.message || String(err)).slice(0, 200);
+    }
+    const latencyMs = Date.now() - t0;
+    if (writer) writer.write({
+      type: 'strategy_initial',
+      payload: {
+        seat: i + 1,
+        playerNum: seatPlayer.playerNum,
+        agent: agentNames[i],
+        characterKey: characterKeys[i],
+        round: s0.round,
+        latencyMs,
+        outcome,
+        errorMessage: errMsg,
+        promptTokens: planResult?.promptTokens ?? null,
+        responseTokens: planResult?.responseTokens ?? null,
+        strategy: seatStrategies[i],
+      },
+    });
+    if (logDecisions) {
+      const tag = seatStrategies[i] ? 'planned' : `failed:${outcome}`;
+      console.log(`[strategy] seat ${i + 1} (${ag.name}): ${tag} in ${(latencyMs/1000).toFixed(1)}s`);
+    }
+  }
+  const MAX_STEPS = 10000; // programming-bug safety net (no engine round cap as of v0.5.0)
+
+  // Game-level watchdog (Track 1.3). If the caller sets gameTimeoutMs, we
+  // raise an error after that wall-clock budget regardless of what the
+  // agent or engine are doing. Saves us from 11-hour runaway runs when
+  // Ollama hangs or thermal-throttles past recovery.
+  const gameStartedAt = Date.now();
+  const gameWatchdogFired = () => gameTimeoutMs !== null
+    && (Date.now() - gameStartedAt) > gameTimeoutMs;
+
+  // Progress reporting (throttled). Caller supplies an onProgress callback;
+  // we invoke it at most once per `progressIntervalMs` at round boundaries
+  // so the smoke harness can confirm the run is alive without spamming.
+  let lastProgressAt = Date.now();
+  let lastRoundReported = 0;
+  function maybeReportProgress() {
+    if (!onProgress) return;
+    const now = Date.now();
+    if (now - lastProgressAt < progressIntervalMs) return;
+    if (state.round === lastRoundReported) return;
+    lastProgressAt = now;
+    lastRoundReported = state.round;
+    try {
+      onProgress({
+        round: state.round,
+        step: steps,
+        elapsedMs: now - gameStartedAt,
+        watchdogBudgetMs: gameTimeoutMs,
+        fallbackCount,
+        perAgentStats: perAgentStats.map((p, i) => ({
+          seat: i + 1,
+          agent: agentNames[i],
+          actions: p.actions,
+          fallbacks: p.fallbacks,
+          avgLatencyMs: p.actions > 0 ? Math.round((p.totalLatencyMs || 0) / p.actions) : 0,
+          outcomes: p.outcomes ? { ...p.outcomes } : {},
+        })),
+        milestoneProgress: state.players.map(pl => ({
+          seat: pl.playerNum,
+          done: ['beginner', 'intermediate', 'expert'].filter(k => pl.character.milestonesCompleted[k]).length,
+        })),
+      });
+    } catch (e) { /* never let progress reporting break the run */ }
+  }
 
   while (true) {
+    if (gameWatchdogFired()) {
+      throw new Error(`game watchdog: exceeded ${gameTimeoutMs}ms wall-clock budget at round ${state.round}`);
+    }
+    maybeReportProgress();
     const term = isTerminal(state);
     if (term.done) break;
     if (steps++ > MAX_STEPS) {
@@ -137,32 +241,116 @@ export async function runOneGame({
     const currentPlayer = state.players[seatIndex];
     perAgentStats[seatIndex].actions++;
 
+    // Per-decision telemetry (Track 1.1). The runner times every
+    // chooseAction, classifies its outcome, and emits an `agent_decision`
+    // event into the JSONL stream. This is what makes "why did the LLM
+    // fail" answerable in analysis: every fallback has a structured
+    // outcome (timeout / parse_error / out_of_range / http_error / aborted /
+    // network_error / other_error) rather than a free-form message.
+    const decisionT0 = Date.now();
+    const decisionController = new AbortController();
+    const decisionTimer = setTimeout(() => decisionController.abort(), turnTimeoutMs);
     let picked;
+    let outcome = 'success';
+    let errorMsg = null;
+    let promptTokens = null;
+    let responseTokens = null;
+    let usedFallback = false;
     try {
-      picked = await withTimeout(
-        agent.chooseAction({
-          state, legalActions: legal, player: currentPlayer, round: state.round,
-        }),
-        turnTimeoutMs
-      );
+      picked = await agent.chooseAction({
+        state, legalActions: legal, player: currentPlayer, round: state.round,
+        abortSignal: decisionController.signal,
+        currentStrategy: seatStrategies[seatIndex],   // Phase 2: pass current plan as context
+      });
+      promptTokens = picked.promptTokens ?? null;
+      responseTokens = picked.responseTokens ?? null;
       // Sanity: actionIndex must be a valid integer index into `legal`.
       if (!Number.isInteger(picked.actionIndex) ||
           picked.actionIndex < 0 ||
           picked.actionIndex >= legal.length) {
-        throw new Error(`invalid actionIndex ${picked.actionIndex} for ${legal.length} legal actions`);
+        const e = new Error(`invalid actionIndex ${picked.actionIndex} for ${legal.length} legal actions`);
+        e.outcome = 'out_of_range';
+        throw e;
       }
     } catch (err) {
-      // Fall back to the engine's canonical fallback: highest-XP legal climb,
-      // or endTurn if no climb is available. This keeps games progressing
-      // even when an agent is broken.
+      // Classify the outcome. The Ollama agent attaches err.outcome
+      // directly; for other agents we infer from message patterns. Anything
+      // unclassified is bucketed as 'other_error' so it stays visible.
+      outcome = err.outcome || classifyErrorMessage(err.message);
+      errorMsg = (err.message || String(err)).slice(0, 200);
       fallbackCount++;
       perAgentStats[seatIndex].fallbacks++;
+      usedFallback = true;
       picked = engineFallback(state, legal);
-      picked.rationale = `FALLBACK: ${err.message.slice(0, 100)}`;
+      picked.rationale = `FALLBACK: ${errorMsg}`;
       if (!picked.__silent && logDecisions) {
-        console.warn(`[fallback] seat ${seatIndex + 1} (${agent.name}): ${err.message}`);
+        console.warn(`[fallback:${outcome}] seat ${seatIndex + 1} (${agent.name}): ${errorMsg}`);
+      }
+    } finally {
+      clearTimeout(decisionTimer);
+    }
+
+    const latencyMs = Date.now() - decisionT0;
+    const ps = perAgentStats[seatIndex];
+    ps.outcomes = ps.outcomes || {};
+    ps.outcomes[outcome] = (ps.outcomes[outcome] || 0) + 1;
+    ps.totalLatencyMs = (ps.totalLatencyMs || 0) + latencyMs;
+    if (promptTokens) ps.totalPromptTokens = (ps.totalPromptTokens || 0) + promptTokens;
+    if (responseTokens) ps.totalResponseTokens = (ps.totalResponseTokens || 0) + responseTokens;
+
+    // PHASE 2: Strategy-shift detection. If the LLM declared a strategy change
+    // this turn, emit a `strategy_update` event AND swap the seat's stored
+    // strategy so future decisions see the new plan. The agent's internal
+    // closure was already updated by chooseAction; we sync our copy.
+    if (!usedFallback && picked.strategyChanged && picked.strategyUpdate) {
+      const prevStrategy = seatStrategies[seatIndex];
+      seatStrategies[seatIndex] = picked.strategyUpdate;
+      ps.strategyUpdates = (ps.strategyUpdates || 0) + 1;
+      if (writer) writer.write({
+        type: 'strategy_update',
+        payload: {
+          seat: seatIndex + 1,
+          playerNum: currentPlayer.playerNum,
+          agent: agentNames[seatIndex],
+          round: state.round,
+          step: steps,
+          changeReason: picked.strategyUpdate.changeReason || '(no reason given)',
+          previousSummary: prevStrategy?.summary || null,
+          newSummary: picked.strategyUpdate.summary,
+          previousMilestonePriority: prevStrategy?.milestonePriority || [],
+          newMilestonePriority: picked.strategyUpdate.milestonePriority || [],
+          previousBottleneckStat: prevStrategy?.bottleneckStat || null,
+          newBottleneckStat: picked.strategyUpdate.bottleneckStat || null,
+        },
+      });
+      if (logDecisions) {
+        console.log(`[strategy-shift] seat ${seatIndex + 1} round ${state.round}: ${picked.strategyUpdate.changeReason || '(no reason)'}`);
       }
     }
+
+    if (writer) writer.write({
+      type: 'agent_decision',
+      payload: {
+        playerNum: currentPlayer.playerNum,
+        seat: seatIndex + 1,
+        round: state.round,
+        agent: agentNames[seatIndex],
+        latencyMs,
+        outcome,
+        errorMessage: errorMsg,
+        promptTokens,
+        responseTokens,
+        actionType: legal[picked.actionIndex]?.type,
+        rationale: picked.rationale,
+        usedFallback,
+        // PHASE 2: Snapshot of which strategy was active when this decision
+        // was made. Captured as a summary-only reference (full strategy is
+        // available via the most recent strategy_initial / strategy_update
+        // event for this seat).
+        activeStrategy: seatStrategies[seatIndex]?.summary || null,
+        strategyChanged: picked.strategyChanged === true,
+      },
+    });
 
     const chosen = legal[picked.actionIndex];
     const action = { ...chosen, rationale: picked.rationale };
@@ -227,25 +415,42 @@ function engineFallback(state, legal) {
 // Wrap a promise with a timeout. Rejects with a descriptive error if the
 // promise doesn't settle in time. Used to cap per-turn latency, critical
 // for LLM agents where 30-second hangs are a real failure mode.
-function withTimeout(promise, ms) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`agent timeout after ${ms}ms`)), ms);
-    promise.then(
-      v => { clearTimeout(timer); resolve(v); },
-      e => { clearTimeout(timer); reject(e); }
-    );
-  });
+// Classify an agent-thrown error into a fixed-vocabulary outcome label.
+// The Ollama agent attaches err.outcome directly (we check that first in
+// the runner). This helper handles agents that don't tag — heuristic /
+// random or the legacy interface — by pattern-matching the message.
+function classifyErrorMessage(msg) {
+  if (!msg) return 'other_error';
+  const m = String(msg).toLowerCase();
+  if (m.includes('timed out') || m.includes('timeout')) return 'timeout';
+  if (m.includes('aborted') || m.includes('abort')) return 'aborted';
+  if (m.includes('json parse') || m.includes('missing message.content')) return 'parse_error';
+  if (m.includes('out-of-range') || m.includes('invalid actionindex')) return 'out_of_range';
+  if (m.includes('http ') && /\b[45]\d\d\b/.test(m)) return 'http_error';
+  if (m.includes('network') || m.includes('econnrefused') || m.includes('fetch failed')) return 'network_error';
+  return 'other_error';
 }
 
 // ---------- JSONL writer helper ----------
 
 // Simple append-mode JSONL writer. Each object becomes one line.
+//
+// IMPORTANT: close() returns a Promise that resolves only after the stream
+// has fully flushed to disk. Callers that immediately read the file (e.g.
+// the tournament harness scoring the just-written game) MUST `await` this
+// promise — `stream.end()` is asynchronous and the file can still be
+// buffered when readFileSync() runs.
 export function createJsonlWriter(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const stream = fs.createWriteStream(filePath, { flags: 'w' });
   return {
     write(obj) { stream.write(JSON.stringify(obj) + '\n'); },
-    close() { stream.end(); },
+    close() {
+      return new Promise((resolve, reject) => {
+        stream.once('error', reject);
+        stream.end(() => resolve());
+      });
+    },
   };
 }
 
@@ -260,7 +465,6 @@ if (invokedDirectly) {
   const seed = Number(args.seed ?? 1);
   const characterKeys = String(args.characters ?? 'technician,sprinter').split(',');
   const agentNames = String(args.agents ?? 'heuristic,heuristic').split(',');
-  const maxRounds = Number(args.maxRounds ?? 45);
   const policySeed = Number(args['policy-seed'] ?? 1);
   const outputPath = args.output
     ? String(args.output)
@@ -270,10 +474,10 @@ if (invokedDirectly) {
   const writer = createJsonlWriter(outputPath);
   try {
     const { summary } = await runOneGame({
-      seed, characterKeys, agentNames, maxRounds, policySeed,
+      seed, characterKeys, agentNames, policySeed,
       writer, logDecisions: !quiet,
     });
-    writer.close();
+    await writer.close();
     if (!quiet) {
       console.log(`\nGame complete.`);
       console.log(`  winner:    Player ${summary.winner ?? '—'} (${summary.winnerAgent ?? 'none'} / ${summary.winnerCharacter ?? 'none'})`);
@@ -285,7 +489,7 @@ if (invokedDirectly) {
       console.log(`  output:    ${outputPath}`);
     }
   } catch (err) {
-    writer.close();
+    await writer.close();
     console.error(`ERROR: ${err.message}`);
     process.exit(1);
   }
@@ -316,9 +520,6 @@ if (invokedDirectly) {
  *
  *   --output=results/my-game.jsonl
  *       Where to save the event log. Defaults to results/YYYY-MM-DD/...
- *
- *   --maxRounds=30
- *       Safety cap — stop the game if nobody's won after this many rounds.
  *
  *   --policy-seed=12345
  *       Makes the agents' random choices reproducible too.

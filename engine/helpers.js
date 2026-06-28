@@ -23,19 +23,21 @@ import { TRAINING_AREAS, GEAR_SHOP, XP_TABLE, CHARACTERS } from './data.js';
 // Does the character satisfy the equipment gating for `area`?
 // Returns { hasAccess: boolean, missingItems: string[] }.
 // Free Solo's "Life or Die" passive bypasses all equipment requirements.
+//
+// RuleModifications (2026-06-27):
+//   - Bouldering and Top Rope are OPEN — no gear required for either.
+//   - Lead Climbing requires Belay Device + Locking Carabiner + Lead Rope
+//     (Harness was removed from the game).
 export function checkAreaAccess(char, area) {
   if (char.key === 'freeSolo') return { hasAccess: true, missingItems: [] };
-  if (area === 'bouldering') return { hasAccess: true, missingItems: [] };
+  if (area === 'bouldering' || area === 'topRope') {
+    return { hasAccess: true, missingItems: [] };
+  }
 
   const owned = new Set(char.equipment);
 
-  if (area === 'topRope') {
-    const needs = ['Harness', 'Belay Device'];
-    const missing = needs.filter(n => !owned.has(n));
-    return { hasAccess: missing.length === 0, missingItems: missing };
-  }
   if (area === 'leadClimbing') {
-    const needs = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
+    const needs = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
     const missing = needs.filter(n => !owned.has(n));
     return { hasAccess: missing.length === 0, missingItems: missing };
   }
@@ -47,13 +49,72 @@ export function checkAreaAccess(char, area) {
 // =============================================================================
 
 // Returns how many players may occupy a given section simultaneously.
-// Top Rope and Lead are gated by belayer count (1–3 across the game).
-// Training equipment is 1-at-a-time. Everything else is effectively unlimited.
-export function getSectionCapacity(section, belayersUnlocked) {
-  if (section === 'topRope' || section === 'leadClimbing') return belayersUnlocked;
+//
+// RuleModifications (2026-06-27):
+//   - Top Rope: total simultaneous occupancy = belayerCount (one climber per
+//     belayer station). The REAL gate is per-station (see canClimbTopRopeRoute
+//     / isBelayerStationFree); this number is the aggregate, used for display
+//     and any generic capacity query.
+//   - Lead Climbing: a single belayer — capacity 1, independent of belayerCount.
+//   - Training equipment: 1-at-a-time. Everything else effectively unlimited.
+export function getSectionCapacity(section, belayerCount) {
+  if (section === 'topRope') return Math.max(0, belayerCount);
+  if (section === 'leadClimbing') return 1;
   if (isTrainingEquipment(section)) return 1;
   // bouldering, gearShop, rest, lobby — treat as unlimited.
   return 10;
+}
+
+// =============================================================================
+// TOP ROPE BELAYER STATIONS (RuleModifications 2026-06-27)
+// =============================================================================
+
+// Stations occupied by players OTHER than `playerNum`. Returns a Set of
+// 0-based belayer-station indices that are currently blocked for this player.
+export function getOccupiedBelayerStations(state, playerNum) {
+  const occupied = new Set();
+  for (const p of state.players) {
+    if (p.playerNum === playerNum) continue;
+    const c = p.character;
+    if (c.location === 'topRope' && c.belayerStation !== null && c.belayerStation !== undefined) {
+      occupied.add(c.belayerStation);
+    }
+  }
+  return occupied;
+}
+
+// Is belayer station `stationIndex` available for `playerNum`? A station is
+// available if no OTHER player occupies it (the asking player may already be
+// parked there from an earlier turn this round — that's still "free" to them).
+export function isBelayerStationFree(state, stationIndex, playerNum) {
+  return !getOccupiedBelayerStations(state, playerNum).has(stationIndex);
+}
+
+// May `playerNum` attempt this top-rope `route` right now? Legal if the route's
+// belayer station is free for them. (Switching belayers is implicit: a climb at
+// a different free station moves the player there; a station held by someone
+// else blocks both of its routes.)
+export function canClimbTopRopeRoute(state, playerNum, route) {
+  const station = route.belayer;
+  if (station === null || station === undefined) return true; // untagged → no station gate
+  return isBelayerStationFree(state, station, playerNum);
+}
+
+// Choose a belayer station for a player who must occupy one but isn't tied to a
+// specific route's station (e.g. a Top Rope milestone attempt). Reuses the
+// player's current station if they're already parked at Top Rope; otherwise the
+// lowest-index free station. Returns null if every station is taken.
+export function pickFreeBelayerStation(state, playerNum) {
+  const me = state.players.find(p => p.playerNum === playerNum);
+  if (me && me.character.location === 'topRope' &&
+      me.character.belayerStation !== null && me.character.belayerStation !== undefined) {
+    return me.character.belayerStation;
+  }
+  const occupied = getOccupiedBelayerStations(state, playerNum);
+  for (let i = 0; i < state.belayerCount; i++) {
+    if (!occupied.has(i)) return i;
+  }
+  return null;
 }
 
 // Is `location` the name of one of the four training equipment stations?
@@ -74,7 +135,7 @@ export function canEnterSection(section, playerNum, state) {
   if (player.character.location === section) {
     return { canEnter: true, reason: '' };
   }
-  const capacity = getSectionCapacity(section, state.belayersUnlocked);
+  const capacity = getSectionCapacity(section, state.belayerCount);
   const occupants = getPlayersInSection(state.players, section);
   if (occupants.length >= capacity) {
     const names = occupants.map(p => `Player ${p.playerNum}`).join(', ');

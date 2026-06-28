@@ -60,11 +60,13 @@ check(
 );
 
 // --- Gear shop ---
-// v0.3.0: gear shop is intentionally smaller (18 items: 4 access cards + 14 Mixture-3 cards).
+// gear shop is intentionally smaller (17 items: 3 access cards + 14 Mixture-3
+// cards; the Harness access card was removed in RuleModifications).
 check('Gear shop ≥15 items', GEAR_SHOP.length >= 15);
 
-// Prerequisites must reference real gear names (e.g. "Belay Device" requires
-// "Harness" — if that name is misspelled, the prereq silently never matches).
+// Prerequisites must reference real gear names (e.g. "Locking Carabiner"
+// requires "Belay Device" — if that name is misspelled, the prereq silently
+// never matches).
 const gearNames = new Set(GEAR_SHOP.map(g => g.name));
 const brokenPrereqs = GEAR_SHOP.flatMap(g =>
   (g.prerequisiteItems || []).filter(name => !gearNames.has(name)).map(name => `${g.name} -> ${name}`)
