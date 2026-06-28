@@ -202,7 +202,6 @@ async function main() {
 
   // CLI overrides (every numeric field of interest can be forced from the command line).
   if (args.repetitions)  config.repetitions  = Number(args.repetitions);
-  if (args.maxRounds)    config.maxRounds    = Number(args.maxRounds);
   if (args.parallelism)  config.parallelism  = Number(args.parallelism);
   if (args.characterSampling) config.characterSampling = String(args.characterSampling);
 
@@ -223,7 +222,6 @@ async function main() {
   console.log(`  reps/matchup:     ${config.repetitions}`);
   console.log(`  total games:      ${totalGames}`);
   console.log(`  parallelism:      ${config.parallelism}`);
-  console.log(`  max rounds:       ${config.maxRounds}`);
   console.log(`  output dir:       ${outputDir}`);
   console.log();
 
@@ -325,14 +323,13 @@ async function runOneTask(matchup, repIndex, outputDir, config) {
       policySeed,
       characterKeys: matchup.characters,
       agentNames: matchup.agents,
-      maxRounds: config.maxRounds || 30,
       turnTimeoutMs: (config.turnTimeoutSeconds || 15) * 1000,
       writer,
     });
-    writer.close();
+    await writer.close();
     return result;
   } catch (err) {
-    writer.close();
+    await writer.close();
     // Leave the partial file on disk for post-mortem; the resume check
     // above treats files without a run_summary line as incomplete and reruns.
     throw err;

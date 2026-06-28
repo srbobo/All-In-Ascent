@@ -1,7 +1,6 @@
 {
   "_comment": "Smoke-test config: tiny matrix with only fast agents. Used for end-to-end pipeline verification, NOT for real balance analysis.",
   "repetitions": 3,
-  "maxRounds": 45,
   "turnTimeoutSeconds": 15,
   "parallelism": 2,
   "playerCounts": [2, 3],

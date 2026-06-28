@@ -35,7 +35,6 @@ Welcome to**All-In Ascent**, where you step into the climbing shoes of an aspiri
 
 **Players:**1–4
 **Win condition:**First player to complete all 3 Milestone Routes
-**Maximum game length:**45 rounds (game ends with no winner if no one finishes by then)
 **Complexity:**Medium
 
 ---
@@ -51,11 +50,11 @@ Welcome to**All-In Ascent**, where you step into the climbing shoes of an aspiri
 -**4 core stats**: Strength, Technique, Focus, Flexibility
 -**Endurance system**— separate stamina pool that drains with effort
 -**4 training equipment cards**— one per stat
--**18 gear cards**in the shop (4 access cards + 14 permanent-passive cards)
+-**17 gear cards**in the shop (3 access cards + 14 permanent-passive cards)
 -**2 six-sided dice**(more on some climbs — see Dice System)
 -**3 Milestone Route cards**drawn at game start: one Beginner, one Intermediate, one Expert
 -**Route Clearing Token**(rotates 0 → 1 → 2 → 0)
--**Belayer counter**(starts at 1, max 3)
+-**Top Rope belayer stations**— N − 1 stations for N players (e.g. 2 in a 3-player game), fixed for the whole game; each station holds 2 routes and admits one climber
 -**XP and Level trackers**per player
 
 ---
@@ -69,10 +68,10 @@ Welcome to**All-In Ascent**, where you step into the climbing shoes of an aspiri
  - One**Intermediate**route (V3–V7 / 5.9–5.11c / Lead 5.10a–5.11c)
  - One**Expert**route (V8–V12 / 5.12a–5.13c / Lead 5.12a–5.14a)
  - **All three milestones must come from DIFFERENT climbing areas** (one Bouldering, one Top Rope, one Lead — in any combination). Sort the route deck by tier, then draw cards in order: Beginner first, then Intermediate from a different area, then Expert from the third remaining area. If a drawn card matches an already-taken area, set it aside and draw again; reshuffle set-asides back at the end.
-4. Deal**5 random routes**into each climbing area (Bouldering, Top Rope, Lead).
-5. Deal**3 random non-access gear cards**into the gear shop. The 4 access cards (Harness, Belay Device, Locking Carabiner, Lead Rope) are always available for purchase.
+4. Deal**5 random routes**into Bouldering and Lead Climbing. Set up the Top Rope area as**N − 1 belayer stations**(N = player count), dealing**2 random routes to each station**.
+5. Deal**3 random non-access gear cards**into the gear shop. The 3 access cards (Belay Device, Locking Carabiner, Lead Rope) are always available for purchase.
 6. Place the**Route Clearing Token**at Position 0.
-7. Set the**Belayer Counter**to 1.
+7. Set up the**N − 1 Top Rope belayer stations**(none in a 1-player game).
 8. Each player begins with:
  - Level 1
  - 0 XP
@@ -87,7 +86,7 @@ Welcome to**All-In Ascent**, where you step into the climbing shoes of an aspiri
 
 **Be the FIRST player to successfully complete all 3 Milestone Routes — and WIN.**
 
-If no player has all three by the end of round 45, the game ends with no winner. Pace your investments accordingly.
+There is no round limit. The game runs until a player completes all three milestones — pace your investments for the long game.
 
 ---
 
@@ -121,7 +120,7 @@ Dares the impossible — but only when the stats are bulletproof.
 -**Starting stats:**Str 11 / Tech 23 / Focus 20 / Flex 16
 -**Starting endurance:**100
 -**Growth per level:**+1.5 Str / +4 Tech / +3 Focus / +2.5 Flex / +6 endurance
--**Passive — Life or Die:**Can attempt Top Rope and Lead routes WITHOUT owning the access cards (Harness, Belay Device, Locking Carabiner, Lead Rope). All dice roll effects are negated (no luck swing).**Can ONLY attempt climbs where your effective stats — base + training + permanent gear bonuses — already meet every requirement.**
+-**Passive — Life or Die:**Can attempt Lead routes WITHOUT owning the access cards (Belay Device, Locking Carabiner, Lead Rope). (Top Rope is open to everyone now.) All dice roll effects are negated (no luck swing).**Can ONLY attempt climbs where your effective stats — base + training + permanent gear bonuses — already meet every requirement.**
 
 ### The Route Reader (Problem Solver)
 Studies routes meticulously before attempting. Knowledge is power.
@@ -168,14 +167,15 @@ The game proceeds in**rounds**. Within a round:
 2.**A round ends**when every player has 0 time remaining (or has explicitly chosen End Turn).
 3.**At round end:**
  - The Route Clearing Token rotates: 0 → 1 → 2 → 0
- - All routes in the cleared area are replaced with new random routes
+ - All routes in the cleared area are replaced with new random routes (when Top Rope clears, every belayer station refreshes together)
+ -**All players return to the Lobby**, freeing every belayer station
  - Each player's time units reset to 10 (+1 if they own Approach Shoes)
  -**Endurance carries over**between rounds (no automatic refill)
  -**Training bonuses PERSIST across rounds**(they accumulate over the whole game)
  - Once-per-round abilities (e.g. Route Reader's stat redistribute) reset
- - At round 5: the 2nd belayer unlocks. At round 12: the 3rd belayer unlocks.
+ - Belayer count is**fixed at N − 1**all game — there is no round-based unlock.
 
-The game ends as soon as any one player completes their 3rd milestone, OR at the end of round 45 with no winner.
+The game ends as soon as any one player completes their 3rd milestone. There is no round limit.
 
 ---
 
@@ -202,20 +202,20 @@ Short, powerful problems without ropes.
 
 ### Top Rope (5.6–5.13c)
 Roped climbing with a belay from above.
--**Required equipment:**Harness AND Belay Device
--**Belayer-gated:**at most N players may have status "in topRope" at the same time, where N = belayer count (1 → 2 → 3)
-- 5 routes available at a time (23 in deck)
+-**No equipment required**— Top Rope is open to all players.
+-**Belayer stations:**the area is split into**N − 1 belayer stations**(N = player count), each holding**2 routes**and admitting**one climber at a time**. You join a belayer by attempting one of its two routes; you may switch to another station's routes only if that station is free. A station another player occupies**blocks both of its routes**for you until the routes clear (or that player returns to the Lobby at round end).
+- 2 routes per station (so 2 × (N − 1) visible total; 23 in deck)
 - Time cost: 3–7. Endurance cost: 15–100. XP rewards: 30–100 success / 10–88 fail
 
 ### Lead Climbing (5.8–5.14a)
 The highest-stakes discipline — clip the rope as you ascend.
--**Required equipment:**Harness + Belay Device + Locking Carabiner + Lead Rope
--**Belayer-gated**(same counter as Top Rope)
+-**Required equipment:**Belay Device + Locking Carabiner + Lead Rope
+-**Single belayer:**only**one climber at a time**may be in Lead Climbing.
 - 5 routes available at a time (23 in deck)
 - Time cost: 4–8. Endurance cost: 25–100. XP rewards: 40–100 success / 15–98 fail
 
 ### Free Solo Exception
-The Free Solo character bypasses ALL access-card requirements for Top Rope and Lead — they can attempt those routes from turn 1 without owning Harness, Belay Device, Locking Carabiner, or Lead Rope. The trade-off is severe: see the character description above.
+The Free Solo character bypasses the Lead access-card requirement — they can attempt Lead routes from turn 1 without owning Belay Device, Locking Carabiner, or Lead Rope. (Top Rope needs no gear from anyone.) The trade-off is severe: see the character description above.
 
 ---
 
@@ -287,20 +287,19 @@ The training area has 4 stations. Training grants**permanent bonuses**to a stat 
 
 ## THE GEAR SHOP
 
-The shop contains**18 cards total**: 4 access cards (always available) and 14 permanent-passive cards (3 visible at any time, refreshed when bought).
+The shop contains**17 cards total**: 3 access cards (always available) and 14 permanent-passive cards (3 visible at any time, refreshed when bought).
 
 You spend XP from your**current level**to buy gear. This is the XP you've earned since your last level-up — it does NOT carry over when you level up.
 
-### Access cards (always visible, gate climbing areas)
+### Access cards (always visible, gate Lead Climbing)
 
 | Card | Cost | Effect |
 |---|---|---|
-| Harness | 80 | Unlocks Top Rope. −2 to all stats on any rope route |
-| Belay Device | 70 | Required for Lead. −2 Strength on Lead routes (requires Harness) |
-| Locking Carabiner | 60 | Part of the Lead system. +5 max endurance (requires Harness + Belay Device) |
-| Lead Rope | 120 | Unlocks Lead. −3 Strength on Lead routes (requires all three above) |
+| Belay Device | 70 | Part of the Lead system. −2 Strength on Lead routes |
+| Locking Carabiner | 60 | Part of the Lead system. +5 max endurance (requires Belay Device) |
+| Lead Rope | 120 | Unlocks Lead. −3 Strength on Lead routes (requires Belay Device + Locking Carabiner) |
 
->**Free Solo**ignores all four — they can attempt Top Rope and Lead from turn 1 without buying any of these.
+>**Free Solo**ignores all three — they can attempt Lead from turn 1 without buying any of these. (Top Rope needs no gear from anyone.)
 
 ### Specialty cards (target tagged routes)
 
@@ -385,11 +384,11 @@ The**Route Clearing Token**sits at one of three positions:
 -**Position 1**→ next round-end clears Top Rope (then advances to position 2)
 -**Position 2**→ next round-end clears Bouldering (then advances back to position 0)
 
-When an area is cleared, its 5 visible routes are discarded and 5 new routes are drawn at random from that area's deck.
+When Bouldering or Lead is cleared, its 5 visible routes are discarded and 5 new routes are drawn at random from that area's deck. When Top Rope is cleared, **all belayer stations refresh together** — every station's 2 routes are redrawn.
 
-**Belayer unlocks**are tied to round number, not the token:
-- Round 5: belayers go from 1 → 2
-- Round 12: belayers go from 2 → 3
+**At every round end, all players return to the Lobby**, which frees all belayer stations for the next round.
+
+**Belayer count is fixed**at N − 1 (N = player count) for the whole game. There is no round-based belayer unlock.
 
 ---
 
@@ -397,8 +396,8 @@ When an area is cleared, its 5 visible routes are discarded and 5 new routes are
 
 ### Section capacity
 - Bouldering: unlimited
-- Top Rope: limited by belayer count (1–3)
-- Lead Climbing: limited by belayer count (1–3, same pool as Top Rope)
+- Top Rope: N − 1 belayer stations, **1 climber per station** (a station is blocked while another player holds it)
+- Lead Climbing: a single belayer — **1 climber at a time**
 - Training equipment: 1 player per station per round (exclusive)
 - Gear Shop: unlimited
 - Rest area: unlimited
@@ -426,10 +425,10 @@ Milestone routes:
 - Are tracked individually per player — your milestones complete for YOU only
 - Can be attempted in any order
 
-If round 45 ends with no player having all three milestones, the game ends with no winner.
+There is no round limit — the game continues until a player completes all three milestones.
 
 ### Climbing area requirements still apply
-A milestone in the Top Rope deck still requires the Harness + Belay Device (or the Free Solo passive). A milestone in the Lead deck still requires the full Lead system.
+A milestone in the Top Rope deck needs no gear, but it still requires a **free belayer station** to attempt (you cannot top-rope without a belayer). A milestone in the Lead deck still requires the full Lead system (Belay Device + Locking Carabiner + Lead Rope, or the Free Solo passive) and the single Lead belayer slot.
 
 ---
 
@@ -437,7 +436,7 @@ A milestone in the Top Rope deck still requires the Harness + Belay Device (or t
 
 ### General
 1.**Read the milestone tags FIRST.**If two milestones share a tag, the matching specialty gear card is your highest-value purchase.
-2.**Buy access cards EARLY.**Every game guarantees one milestone in Top Rope and one in Lead Climbing (or vice versa), so the Harness + Belay Device + Locking Carabiner + Lead Rope path is structurally mandatory (Free Solo excepted).
+2.**Buy the Lead access cards EARLY if a milestone is in Lead.**Top Rope is open to everyone, but Lead still requires Belay Device + Locking Carabiner + Lead Rope (Free Solo excepted). If your milestone is in Lead, that path is structurally mandatory. Also watch belayer contention: Top Rope stations and the single Lead slot can be blocked by opponents.
 3.**Train the stat with the LARGEST gap**to your milestone requirements — not the lowest absolute stat. The lowest stat may not be the bottleneck.
 4.**Level up matters more than spendable XP.**Level-ups grant permanent stat increases that compound.
 5.**Watch the Route Clearing Token.**A route you've been planning to attempt may disappear next round.
@@ -462,9 +461,9 @@ A milestone in the Top Rope deck still requires the Harness + Belay Device (or t
 
 ### Round-end events (in order)
 1. Token rotates; one area's routes are cleared and refreshed.
-2. Time units reset (+1 if Approach Shoes owned).
-3. Once-per-round flags reset.
-4. Belayer unlock check (+1 belayer at round 5 and again at round 12).
+2. All players return to the Lobby (belayer stations freed).
+3. Time units reset (+1 if Approach Shoes owned).
+4. Once-per-round flags reset.
 5. Endurance carries over.
 6. Training bonuses persist.
 
@@ -472,8 +471,8 @@ A milestone in the Top Rope deck still requires the Harness + Belay Device (or t
 | Area | Requires |
 |---|---|
 | Bouldering | Nothing |
-| Top Rope | Harness + Belay Device (OR Free Solo) |
-| Lead Climbing | Harness + Belay Device + Locking Carabiner + Lead Rope (OR Free Solo) |
+| Top Rope | Nothing (but needs a free belayer station) |
+| Lead Climbing | Belay Device + Locking Carabiner + Lead Rope (OR Free Solo) |
 
 ### Costs at a glance
 | Action | Time | Endurance |
@@ -484,8 +483,7 @@ A milestone in the Top Rope deck still requires the Harness + Belay Device (or t
 | Buy gear | 1 | 0 |
 
 ### Game ends when
-- A player completes 3 milestones, OR
-- Round 45 ends with no winner.
+- A player completes 3 milestones (there is no round limit).
 
 ---
 
@@ -500,5 +498,5 @@ The game celebrates progression. From V0 to V12, every successful send feels rew
 ---
 
 *Game design: Alpine Indoors Development Team*
-*Engine version: 0.3.1 (route-tagged routes; Mixture-3 gear deck; Free Solo training fix)*
+*Engine version: 0.6.0 (RuleModifications — open Top Rope with N−1 belayer stations of 2 routes each; Lead drops the Harness and is capped at 1 climber; Harness removed; round-end returns all players to the Lobby)*
 *This rulebook reflects the rules as encoded in `engine/data.js` and `engine/engine.js`. If a mechanic appears here that disagrees with the engine, the engine is authoritative — please file a rulebook update.*

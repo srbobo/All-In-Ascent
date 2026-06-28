@@ -47,7 +47,11 @@ check('attemptedRoutes initialized empty',
   Object.keys(state.attemptedRoutes).length === 2 &&
   Object.keys(state.attemptedRoutes[1]).length === 0);
 check('5 bouldering routes drawn', state.availableRoutes.bouldering.length === 5);
-check('5 top-rope routes drawn', state.availableRoutes.topRope.length === 5);
+// 2 players → belayerCount 1 → 1 station × 2 routes = 2 top-rope routes, each
+// tagged with belayer 0.
+check('top-rope routes = 2 per belayer station',
+  state.availableRoutes.topRope.length === 2 &&
+  state.availableRoutes.topRope.every(r => r.belayer === 0));
 check('5 lead routes drawn', state.availableRoutes.leadClimbing.length === 5);
 check('3 gear items in shop rotation', state.availableGear.length === 3);
 check('milestones selected: beginner',
@@ -56,7 +60,9 @@ check('milestones selected: intermediate',
   state.milestoneRoutes.intermediate && state.milestoneRoutes.intermediate.route);
 check('milestones selected: expert',
   state.milestoneRoutes.expert && state.milestoneRoutes.expert.route);
-check('belayersUnlocked starts at 1', state.belayersUnlocked === 1);
+check('belayerCount = players - 1', state.belayerCount === 1);
+check('players start with no belayer station',
+  state.players.every(p => p.character.belayerStation === null));
 check('routeClearingPosition starts at 0', state.routeClearingPosition === 0);
 check('gameEnded is false', state.gameEnded === false);
 check('winner is null', state.winner === null);

@@ -123,8 +123,12 @@ console.log('QUESTION 1: GAME LENGTH ANALYSIS');
 console.log('==========================================================');
 
 const finished = games.filter(g => g.reason === 'all_milestones');
-const unfinished = games.filter(g => g.reason === 'max_rounds');
-console.log(`\nGames overall: ${games.length}, finished via all_milestones: ${finished.length} (${(finished.length / games.length * 100).toFixed(0)}%), max_rounds: ${unfinished.length} (${(unfinished.length / games.length * 100).toFixed(0)}%)`);
+// v0.5.0: the engine no longer has a max_rounds cap. "Unfinished" now means
+// games that ended via 'forfeit' (agents got stuck without legal progress).
+// Older result files may still carry 'max_rounds' as a reason — both are
+// counted here.
+const unfinished = games.filter(g => g.reason === 'forfeit' || g.reason === 'max_rounds');
+console.log(`\nGames overall: ${games.length}, finished via all_milestones: ${finished.length} (${(finished.length / games.length * 100).toFixed(0)}%), unfinished: ${unfinished.length} (${(unfinished.length / games.length * 100).toFixed(0)}%)`);
 
 // Length distribution of FINISHED games
 const finishedRounds = finished.map(g => g.rounds).sort((a, b) => a - b);
@@ -174,12 +178,13 @@ for (const [k, v] of Object.entries(msBuckets)) {
 }
 
 // What happens in late rounds of unfinished games?
-console.log('\nUnfinished games (max_rounds): per-round action density');
+console.log('\nUnfinished games (forfeit / legacy max_rounds): per-round action density');
 console.log('  How many actions does each round see, averaged across all unfinished games?');
 const lateGames = unfinished.length ? unfinished : [];
 if (lateGames.length) {
+  const maxRoundSeen = Math.max(0, ...lateGames.map(g => g.rounds || 0));
   const roundActionAverage = {};
-  for (let r = 1; r <= 45; r++) {
+  for (let r = 1; r <= maxRoundSeen; r++) {
     let sum = 0, count = 0;
     for (const g of lateGames) {
       if (g.actionsByRound[r]) {
@@ -306,9 +311,10 @@ for (const [k, v] of Object.entries(trainEq)) {
   console.log(`  ${k.padEnd(22)} (${stat.padEnd(12)}) ${String(v).padStart(4)} sessions (${(v / totalTrains * 100).toFixed(1)}%)`);
 }
 
-// In 2-player games, top rope + lead are gated by 1 belayer initially. Did contention ever block?
+// Top Rope has N-1 belayer stations (1 climber each); Lead has a single belayer.
+// In 2-player games that means 1 top-rope belayer + 1 lead slot. Did contention block?
 console.log(`\nTop Rope + Lead area contention:`);
-console.log('  (2-player games only — only 1 belayer until round 5, 2 belayers until round 12, 3 after)');
+console.log('  (2-player games only — 1 top-rope belayer station + 1 lead slot, fixed all game)');
 const twoPlayer = games.filter(g => g.characters.length === 2);
 let bothInRopeRound = 0;
 let totalRoundsObserved = 0;

@@ -16,6 +16,7 @@ import {
   rollClimbDice, applyDiceToRequirements, resolveClimbOutcome,
   computeClimbXp, getFailureEnduranceExtra, freeSoloCanAttempt,
   applyBetaBoostIfActive, computeRestRecovery, applyLevelUpIfNeeded,
+  canClimbTopRopeRoute, isBelayerStationFree, pickFreeBelayerStation,
 } from './helpers.js';
 import { createRng } from './rng.js';
 import { ROUTES } from './data.js';
@@ -60,61 +61,91 @@ const boulderRoute = () => ({
 {
   const c = techCharBase();
   check('bouldering always accessible', checkAreaAccess(c, 'bouldering').hasAccess);
-  check('topRope requires Harness + Belay',
-    !checkAreaAccess(c, 'topRope').hasAccess &&
-    checkAreaAccess(c, 'topRope').missingItems.length === 2);
-  c.equipment = ['Harness', 'Belay Device'];
-  check('topRope ok with Harness + Belay', checkAreaAccess(c, 'topRope').hasAccess);
-  check('leadClimbing needs 4 items without Free Solo',
-    !checkAreaAccess(c, 'leadClimbing').hasAccess);
-  c.equipment = ['Harness', 'Belay Device', 'Locking Carabiner', 'Lead Rope'];
-  check('leadClimbing ok with all 4 items', checkAreaAccess(c, 'leadClimbing').hasAccess);
+  // RuleModifications: Top Rope is open — no gear required.
+  check('topRope is open (no gear required)', checkAreaAccess(c, 'topRope').hasAccess);
+  check('leadClimbing needs 3 items without Free Solo',
+    !checkAreaAccess(c, 'leadClimbing').hasAccess &&
+    checkAreaAccess(c, 'leadClimbing').missingItems.length === 3);
+  c.equipment = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
+  check('leadClimbing ok with the 3 remaining access cards',
+    checkAreaAccess(c, 'leadClimbing').hasAccess);
 
   const fs = freeCharBase();
   check('Free Solo bypasses lead equipment',
     checkAreaAccess(fs, 'leadClimbing').hasAccess);
-  check('Free Solo bypasses topRope equipment',
-    checkAreaAccess(fs, 'topRope').hasAccess);
 }
 
 // =============================================================================
 // SECTION CAPACITY
 // =============================================================================
-check('topRope capacity = belayers(1)', getSectionCapacity('topRope', 1) === 1);
-check('topRope capacity scales with belayers(3)', getSectionCapacity('topRope', 3) === 3);
-check('leadClimbing uses same belayer cap', getSectionCapacity('leadClimbing', 2) === 2);
+// Top Rope aggregate capacity = belayer-station count.
+check('topRope capacity = belayerCount(1)', getSectionCapacity('topRope', 1) === 1);
+check('topRope capacity scales with belayerCount(3)', getSectionCapacity('topRope', 3) === 3);
+// Lead is a single belayer — capacity 1 regardless of belayer count.
+check('leadClimbing capacity is always 1', getSectionCapacity('leadClimbing', 2) === 1);
 check('training equipment capacity = 1',
   getSectionCapacity('Grip Board', 3) === 1 && isTrainingEquipment('Grip Board'));
 check('bouldering unlimited (10)', getSectionCapacity('bouldering', 1) === 10);
 
-// canEnterSection — a minimal state with two players
+// Lead capacity 1 via canEnterSection — second climber blocked.
 {
-  const p1 = { playerNum: 1, character: { ...techCharBase(), location: 'topRope' } };
+  const p1 = { playerNum: 1, character: { ...techCharBase(), location: 'leadClimbing' } };
   const p2 = { playerNum: 2, character: { ...techCharBase(), location: 'lobby' } };
-  const state = { players: [p1, p2], belayersUnlocked: 1 };
-  // topRope full (1/1 capacity, p1 there); p2 cannot enter.
-  const r = canEnterSection('topRope', 2, state);
-  check('canEnterSection: topRope full at capacity=1 blocks p2', !r.canEnter);
-  // p1 already there → re-entry allowed.
+  const state = { players: [p1, p2], belayerCount: 2 };
+  check('canEnterSection: lead full at capacity=1 blocks p2',
+    !canEnterSection('leadClimbing', 2, state).canEnter);
   check('canEnterSection: same-location re-entry allowed',
-    canEnterSection('topRope', 1, state).canEnter);
+    canEnterSection('leadClimbing', 1, state).canEnter);
+}
+
+// =============================================================================
+// TOP ROPE BELAYER STATIONS (RuleModifications)
+// =============================================================================
+{
+  // 3 players → belayerCount 2. p1 parked at station 0, p2 at station 1.
+  const p1 = { playerNum: 1, character: { ...techCharBase(), location: 'topRope', belayerStation: 0 } };
+  const p2 = { playerNum: 2, character: { ...techCharBase(), location: 'topRope', belayerStation: 1 } };
+  const p3 = { playerNum: 3, character: { ...techCharBase(), location: 'lobby', belayerStation: null } };
+  const state = { players: [p1, p2, p3], belayerCount: 2 };
+
+  const routeAt = (b) => ({ name: `r${b}`, strength: 0, technique: 0, focus: 0, flexibility: 0, belayer: b });
+  // p3 is blocked from both occupied stations.
+  check('station 0 blocked for p3 (held by p1)', !isBelayerStationFree(state, 0, 3));
+  check('canClimbTopRopeRoute: p3 blocked from a station-0 route',
+    !canClimbTopRopeRoute(state, 3, routeAt(0)));
+  // p1 may still climb their OWN station's other route.
+  check('canClimbTopRopeRoute: p1 can climb own station-0 route',
+    canClimbTopRopeRoute(state, 1, routeAt(0)));
+  // Every station is taken → no free station for p3 (e.g. a milestone attempt).
+  check('pickFreeBelayerStation: none free for p3', pickFreeBelayerStation(state, 3) === null);
+  // Player already parked reuses their station.
+  check('pickFreeBelayerStation: p1 reuses station 0', pickFreeBelayerStation(state, 1) === 0);
+}
+{
+  // 3 players, only station 1 occupied → p3 gets the lowest free station (0).
+  const p1 = { playerNum: 1, character: { ...techCharBase(), location: 'lobby', belayerStation: null } };
+  const p2 = { playerNum: 2, character: { ...techCharBase(), location: 'topRope', belayerStation: 1 } };
+  const p3 = { playerNum: 3, character: { ...techCharBase(), location: 'lobby', belayerStation: null } };
+  const state = { players: [p1, p2, p3], belayerCount: 2 };
+  check('pickFreeBelayerStation: lowest free station chosen', pickFreeBelayerStation(state, 3) === 0);
 }
 
 // =============================================================================
 // GEAR BONUSES
 // =============================================================================
 // v0.3.0 — Chalk Bag, Finger Tape, Climbing Shoes were removed from the deck.
-// Validate the per-route gear filter system using ACCESS CARDS that still exist
-// (Harness has -2 all on Top Rope/Lead routes — verifiable filter behavior).
+// RuleModifications — Harness removed too. Validate the per-route gear filter
+// system using Belay Device (-2 Strength on Lead routes — verifiable filter).
 {
   const c = techCharBase();
-  c.equipment = ['Harness'];
-  // Harness applies to Top Rope routes (routeFilter=["Top Rope", "Lead"]).
+  c.equipment = ['Belay Device'];
   const tr = { ...boulderRoute() };
+  // Belay Device only affects Lead routes (routeFilter=["Lead"]).
   const bBouldering = calculateGearBonuses(c, tr, 'bouldering', {});
-  check('Harness: no match on bouldering', bBouldering.strength === 0);
-  const bTopRope = calculateGearBonuses(c, tr, 'topRope', {});
-  check('Harness: -2 all stats on topRope', bTopRope.strength === 2 && bTopRope.technique === 2 && bTopRope.focus === 2 && bTopRope.flexibility === 2);
+  check('Belay Device: no match on bouldering', bBouldering.strength === 0);
+  const bLead = calculateGearBonuses(c, tr, 'leadClimbing', {});
+  check('Belay Device: -2 Strength on lead only',
+    bLead.strength === 2 && bLead.technique === 0 && bLead.focus === 0 && bLead.flexibility === 0);
 }
 {
   // Permanent stat-trainer gear (Grip Strength Trainer value=+2) should NOT
