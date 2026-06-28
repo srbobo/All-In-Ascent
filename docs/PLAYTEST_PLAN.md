@@ -47,7 +47,7 @@ Benchmark Ollama-served local models on a fixed 20-decision benchmark. Selection
 Top 2 selected; both retained for the matrix to distinguish "character is broken" from "this model just likes that character."
 
 ### Phase 2 — Headless engine
-Refactor [game.js](game.js) into a pure logic engine (DOM-free, deterministic, Node-runnable) without breaking the existing browser game. Surface:
+Refactor [game.js](../game.js) into a pure logic engine (DOM-free, deterministic, Node-runnable) without breaking the existing browser game. Surface:
 - `createGame({seed, characterKeys}) → {state, events}`
 - `getLegalActions(state) → Action[]`
 - `applyAction(state, action) → {state, events}`
@@ -93,17 +93,17 @@ One command — `npm run playtest` — does: tests → matrix → report → ope
 
 | Phase | Status | Key files |
 |---|---|---|
-| 1 — Model shortlist | Code-ready, **not benchmarked** (requires Ollama install) | [sim/agents/ollama.js](sim/agents/ollama.js) |
-| 2 — Headless engine | **Done.** 149 unit-test assertions pass. | [engine/state.js](engine/state.js), [engine/helpers.js](engine/helpers.js), [engine/engine.js](engine/engine.js), [engine/rng.js](engine/rng.js) |
-| 3 — Telemetry | **Done.** Structured emitter, full event stream, JSONL output. | [engine/telemetry.js](engine/telemetry.js), event emissions in [engine/engine.js](engine/engine.js) |
-| 4 — Agents | **Done** for random + heuristic; **code-ready** for ollama (untested without Ollama installed) | [sim/agents/random.js](sim/agents/random.js), [sim/agents/heuristic.js](sim/agents/heuristic.js), [sim/agents/ollama.js](sim/agents/ollama.js) |
-| 5 — Orchestrator | **Done.** Matrix expansion, parallelism, resumability, manifest, summary. | [sim/run-matrix.js](sim/run-matrix.js), [sim/run-one-game.js](sim/run-one-game.js), [sim/replay.js](sim/replay.js), [sim/config.json](sim/config.json), [sim/config.smoke.json](sim/config.smoke.json) |
-| 6 — Dashboard | **Done.** Single HTML, Plotly via CDN, all 5 callout sections, 8 charts. | [analysis/build-report.js](analysis/build-report.js) |
-| 7 — Repeatability | **Done.** `npm run playtest` and `npm run playtest:smoke` chain everything. Cross-run diff tool compares two result dirs side-by-side with engine-version compatibility check. | [package.json](package.json), [PLAYTEST.md](PLAYTEST.md), [analysis/diff-runs.js](analysis/diff-runs.js) |
+| 1 — Model shortlist | Code-ready, **not benchmarked** (requires Ollama install) | [sim/agents/ollama.js](../sim/agents/ollama.js) |
+| 2 — Headless engine | **Done.** 149 unit-test assertions pass. | [engine/state.js](../engine/state.js), [engine/helpers.js](../engine/helpers.js), [engine/engine.js](../engine/engine.js), [engine/rng.js](../engine/rng.js) |
+| 3 — Telemetry | **Done.** Structured emitter, full event stream, JSONL output. | [engine/telemetry.js](../engine/telemetry.js), event emissions in [engine/engine.js](../engine/engine.js) |
+| 4 — Agents | **Done** for random + heuristic; **code-ready** for ollama (untested without Ollama installed) | [sim/agents/random.js](../sim/agents/random.js), [sim/agents/heuristic.js](../sim/agents/heuristic.js), [sim/agents/ollama.js](../sim/agents/ollama.js) |
+| 5 — Orchestrator | **Done.** Matrix expansion, parallelism, resumability, manifest, summary. | [sim/run-matrix.js](../sim/run-matrix.js), [sim/run-one-game.js](../sim/run-one-game.js), [sim/replay.js](../sim/replay.js), [sim/config.json](../sim/config.json), [sim/config.smoke.json](../sim/config.smoke.json) |
+| 6 — Dashboard | **Done.** Single HTML, Plotly via CDN, all 5 callout sections, 8 charts. | [analysis/build-report.js](../analysis/build-report.js) |
+| 7 — Repeatability | **Done.** `npm run playtest` and `npm run playtest:smoke` chain everything. Cross-run diff tool compares two result dirs side-by-side with engine-version compatibility check. | [package.json](../package.json), [PLAYTEST.md](PLAYTEST.md), [analysis/diff-runs.js](../analysis/diff-runs.js) |
 
 End-to-end smoke runs in ~6 seconds (12 games + 8-chart report).
 
-The original browser game ([index.html](index.html) + [game.js](game.js)) was **not modified** — it still plays for human users exactly as before. The headless engine mirrors `game.js` data via `engine/data.js`.
+The original browser game ([index.html](../index.html) + [game.js](../game.js)) was **not modified** — it still plays for human users exactly as before. The headless engine mirrors `game.js` data via `engine/data.js`.
 
 ---
 
@@ -136,9 +136,9 @@ The original browser game ([index.html](index.html) + [game.js](game.js)) was **
 
 ## 6. Open items
 
-1. **Ollama benchmark not run.** Code is ready; needs `brew install ollama && brew services start ollama && ollama pull qwen2.5:14b-instruct`. After that, edit [sim/config.json](sim/config.json) to list the model and rerun `npm run playtest:smoke`.
+1. **Ollama benchmark not run.** Code is ready; needs `brew install ollama && brew services start ollama && ollama pull qwen2.5:14b-instruct`. After that, edit [sim/config.json](../sim/config.json) to list the model and rerun `npm run playtest:smoke`.
 2. **Heuristic improvement.** The current heuristic is intentionally simple. The LLM agent should beat it; if it doesn't, the LLM isn't earning its compute. Consider this a deliberate baseline, not a bug.
-3. **Commit C — browser UI rewiring.** Deferred. The headless engine and the human-playable game share data but not logic. Wiring [index.html](index.html) + [game.js](game.js) to the engine would let human play emit the same structured telemetry, but isn't required for automated playtesting.
+3. **Commit C — browser UI rewiring.** Deferred. The headless engine and the human-playable game share data but not logic. Wiring [index.html](../index.html) + [game.js](../game.js) to the engine would let human play emit the same structured telemetry, but isn't required for automated playtesting.
 4. **Full-matrix duration.** With the default config (2 agents, sample:15, 7 reps, 3 player counts) the matrix is ~700 games. At 5 minutes per LLM game on the M5, that's ~60 hours — overnight or weekend run. Smoke variant is ~12 games for sanity checking.
 5. **Expert milestone balance.** First playtest pointed at expert routes being possibly character-gated. Recommendation in `expert_milestone_difficulty.md`: surface this in the first real report, then decide whether to lower expert requirements or accept that some character/milestone combos are unwinnable.
 

@@ -1,3 +1,13 @@
+// All In Ascent — browser game bundle.
+//
+// This file is the SINGLE SOURCE OF TRUTH for game data. The GAME DATA section
+// below is extracted into engine/data.js by `node engine/build-data.js` (run
+// automatically by the test/playtest npm scripts) so the Node engine, sim
+// harness, and analysis tools read the same values without hand-syncing.
+// Rules version is kept in step with the Node engine (engine/version.js).
+const GAME_VERSION = '0.4.0';
+if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
+
 // ===== GAME DATA =====
 
 const CHARACTERS = {
@@ -556,14 +566,27 @@ function selectMilestoneRoutes() {
  });
  });
 
- // Randomly select one from each difficulty
- const beginnerIndex = Math.floor(Math.random() * beginnerRoutes.length);
- const intermediateIndex = Math.floor(Math.random() * intermediateRoutes.length);
- const expertIndex = Math.floor(Math.random() * expertRoutes.length);
+ // Scenario 2C: sequential area-exclusion sampling (v0.4.0).
+ // The three milestones must span three DIFFERENT climbing areas. Mirrors
+ // engine/state.js pickMilestoneRoutes so local play matches online play.
+ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
- gameState.milestoneRoutes.beginner = beginnerRoutes[beginnerIndex];
- gameState.milestoneRoutes.intermediate = intermediateRoutes[intermediateIndex];
- gameState.milestoneRoutes.expert = expertRoutes[expertIndex];
+ // 1. Beginner — free pick from any area.
+ const beginner = pick(beginnerRoutes);
+
+ // 2. Intermediate — only from a different area than the beginner pick.
+ let intermediatePool = intermediateRoutes.filter(r => r.area !== beginner.area);
+ if (intermediatePool.length === 0) intermediatePool = intermediateRoutes; // safety fallback
+ const intermediate = pick(intermediatePool);
+
+ // 3. Expert — only from a third area, different from both prior picks.
+ let expertPool = expertRoutes.filter(r => r.area !== beginner.area && r.area !== intermediate.area);
+ if (expertPool.length === 0) expertPool = expertRoutes; // safety fallback
+ const expert = pick(expertPool);
+
+ gameState.milestoneRoutes.beginner = beginner;
+ gameState.milestoneRoutes.intermediate = intermediate;
+ gameState.milestoneRoutes.expert = expert;
 }
 
 function renderMilestonePanel() {

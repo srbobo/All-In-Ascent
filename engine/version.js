@@ -16,6 +16,13 @@
 // bumps keep the same baseline so you can watch a number move in response to
 // a single tweak.
 
+// Note (TechDebt cleanup): the browser game (game.js) now matches this engine
+//   at v0.4.0 — it implements the same Scenario 2C milestone selection and is
+//   stamped with GAME_VERSION '0.4.0'. engine/data.js is no longer hand-synced:
+//   it is auto-generated from game.js's GAME DATA section by
+//   `node engine/build-data.js` (run by the test/playtest scripts). No rules
+//   change, so no version bump.
+//
 // 0.4.0 (2026-05-08): Milestone selection now enforces "Scenario 2C —
 //   sequential area-exclusion sampling." The three milestones are still
 //   one Beginner / one Intermediate / one Expert, but they are guaranteed

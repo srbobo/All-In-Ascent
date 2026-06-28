@@ -174,6 +174,6 @@ The report has these sections, in order:
 
 ## Known limitations / next steps
 
-- The browser UI ([index.html](index.html) + [game.js](game.js)) still uses its original code path. The headless engine and human-playable game share data (`engine/data.js` mirrors `game.js`) but not logic. Wiring the UI to the engine is a deferred task — only matters if you want human players to share the structured telemetry.
+- The browser UI ([index.html](../index.html) + [game.js](../game.js)) still uses its original code path. The headless engine and human-playable game share data (`engine/data.js` mirrors `game.js`) but not logic. Wiring the UI to the engine is a deferred task — only matters if you want human players to share the structured telemetry.
 - The default heuristic agent is intentionally simple and currently completes only 2/3 milestones in many seeds (expert milestones at 5.13a+ are character-gated). The point of the heuristic is to be a stable baseline that LLM agents have to clearly beat.
 - Ollama agent integration is coded but untested end-to-end (depends on Ollama being installed).
