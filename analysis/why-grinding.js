@@ -35,7 +35,6 @@ const allAttempts = [];        // every climb/milestone attempt with metadata
 const sameRouteRetries = {};   // per game: { "area:route": [ list of t-values when retried ] }
 const gradePassRates = {};     // grade → { attempts, passes }
 const xpEarnedDistribution = []; // every xp gained value (failures often give little)
-const availablePoolPassability = []; // for each turn: how many of the legal climbs had worst-gap >= -10
 const ratiopaleByGap = { passable: 0, risky: 0, skip: 0 }; // when LLM picks, how often is it picking from the SKIP bucket
 
 function reconstructPlayerStateAt(events, idx, playerNum) {
@@ -133,7 +132,6 @@ for (const file of files) {
   }
 
   const seenAttemptedThisGame = {};
-  let lastRoundReset = 0;
 
   for (let i = 0; i < events.length; i++) {
     const e = events[i];

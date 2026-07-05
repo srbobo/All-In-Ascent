@@ -26,7 +26,6 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { exec } from 'node:child_process';
 
 // ---------------- Argument parsing ----------------
@@ -329,15 +328,10 @@ function generateMajorTrends(games, tally, charAgentMetrics, fallbacks, gearFreq
   }
 
   // T5: dead gear (purchased zero or close to zero times)
-  // We need to enumerate ALL items, not just purchased ones. Import GEAR_SHOP
-  // to find the diff. Done via dynamic check.
-  const purchasedSet = new Set(Object.keys(gearFreq));
-  // Read gear list lazily (importing here avoids circular import on top-of-file).
-  let unboughtGear = [];
+  // Reports items with low purchase counts relative to game count. Items that
+  // were NEVER bought don't appear in gearFreq at all, so this only surfaces
+  // rarely-bought (not never-bought) gear.
   try {
-    // Use require-equivalent for ESM via dynamic import is awkward; just enumerate
-    // a small known list of "expected" items for the dead-gear check.
-    // For simplicity, we report items with 0 purchases relative to game count.
     const lowFreq = Object.entries(gearFreq)
       .filter(([, v]) => v < Math.max(1, nGames * 0.1))
       .sort((a, b) => a[1] - b[1])
