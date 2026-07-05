@@ -32,7 +32,7 @@
 //     not a gameplay condition).
 
 import {
-  ROUTES, GEAR_SHOP, CHARACTERS, TRAINING_AREAS,
+  ROUTES, GEAR_SHOP, TRAINING_AREAS,
 } from './data.js';
 import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';

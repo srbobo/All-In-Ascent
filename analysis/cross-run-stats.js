@@ -159,7 +159,6 @@ console.log('\nMilestone-completion-round distribution (across all finished game
 const allMs = finished.flatMap(g => g.milestoneCompletedRound);
 const msByRound = {};
 for (const m of allMs) msByRound[m.round] = (msByRound[m.round] || 0) + 1;
-const sortedMsRounds = Object.entries(msByRound).map(([r, c]) => ({ round: +r, count: c })).sort((a, b) => a.round - b.round);
 
 // Bucket milestones by round range
 const msBuckets = { '1-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-25': 0, '26-30': 0, '31-35': 0, '36-45': 0 };
@@ -317,11 +316,9 @@ console.log(`\nTop Rope + Lead area contention:`);
 console.log('  (2-player games only — 1 top-rope belayer station + 1 lead slot, fixed all game)');
 const twoPlayer = games.filter(g => g.characters.length === 2);
 let bothInRopeRound = 0;
-let totalRoundsObserved = 0;
 for (const g of twoPlayer) {
   // Heuristic: if BOTH players had at least 1 topRope OR lead attempt in the same round, that's potential contention
   // We don't track per-round attempts directly, so use total counts as a proxy
-  totalRoundsObserved++;
   if ((g.topRopeAttemptsByPlayer[1] > 0 || g.leadAttemptsByPlayer[1] > 0) &&
       (g.topRopeAttemptsByPlayer[2] > 0 || g.leadAttemptsByPlayer[2] > 0)) {
     bothInRopeRound++;

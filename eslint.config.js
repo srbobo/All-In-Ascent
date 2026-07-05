@@ -60,7 +60,9 @@ const rules = {
   'no-cond-assign': 'error',
   'use-isnan': 'error',
   'valid-typeof': 'error',
-  eqeqeq: 'warn',
+  // `x == null` / `x != null` deliberately match both null and undefined —
+  // rewriting them to strict equality would change behavior, so ignore them.
+  eqeqeq: ['warn', 'always', { null: 'ignore' }],
 };
 
 export default [

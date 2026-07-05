@@ -21,7 +21,6 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { exec } from 'node:child_process';
 
 // ---------------- Arg parsing ----------------

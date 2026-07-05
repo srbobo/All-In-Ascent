@@ -637,7 +637,6 @@ function renderMilestonePanel() {
 
  const difficulties = ['beginner', 'intermediate', 'expert'];
  const colors = { beginner: '#4ade80', intermediate: '#fbbf24', expert: '#ef4444' };
- const icons = { beginner: '', intermediate: '', expert: '' };
 
  difficulties.forEach(difficulty => {
  const milestone = gameState.milestoneRoutes[difficulty];
@@ -674,7 +673,6 @@ function renderMilestonePanel() {
 
  gameState.players.forEach(player => {
  const completed = player.character.milestonesCompleted[difficulty];
- const statusIcon = completed ? '': '';
  const statusText = completed ? 'COMPLETE': 'Not Complete';
  const statusColor = completed ? '#22c55e': '#6b7280';
 
@@ -966,18 +964,6 @@ function renderGameBoard() {
 // Player state is rendered into #playersContainer by renderPlayers().
 // The sticky strip / collapse toggle / show-full-details pill were removed
 // during a UI cleanup pass; full panels are now always visible.
-
-function renderRestArea() {
- const container = document.getElementById('restAreaInfo');
- if (!container) return;
-
- // Add capacity indicator
- const playersHere = getPlayersInSection('rest');
- const capacity = getSectionCapacity('rest');
- container.innerHTML = `<div style="background: #e8f4f8; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; border-left: 4px solid #007bff;">
- <strong> Occupancy: ${playersHere.length}/${capacity}</strong>${playersHere.length > 0 ? `<br><span style="color: #666;">Players here: ${playersHere.map(p => `P${p.playerNum}`).join(', ')}</span>`: ''}
- </div>`;
-}
 
 function renderGameInfo() {
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
@@ -1341,13 +1327,6 @@ function createRouteCard(route, area, idx) {
 : [];
 
  // Build dice roll effects display
- const statIcons = {
- strength: '',
- technique: '',
- focus: '',
- flexibility: ''
- };
-
  const statNames = {
  strength: 'Str',
  technique: 'Tech',

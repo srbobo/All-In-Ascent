@@ -25,7 +25,7 @@
 
 import { TRAINING_AREAS, GEAR_SHOP } from '../../engine/data.js';
 import {
-  computeEffectiveStats, getSpendableXp, getEffectiveGearCost,
+  computeEffectiveStats, getSpendableXp,
 } from '../../engine/helpers.js';
 
 // RuleModifications: Harness removed; these three gate Lead Climbing only.
@@ -212,16 +212,6 @@ function weakestStat(char) {
     if (v < minVal) { minVal = v; minStat = s; }
   }
   return minStat;
-}
-
-function weakestToTrainer(stat) {
-  switch (stat) {
-    case 'strength':    return 'Grip Strength Trainer';
-    case 'technique':   return 'Technique Training System';
-    case 'focus':       return 'Meditation App';
-    case 'flexibility': return 'Resistance Bands';
-    default:            return null;
-  }
 }
 
 function findActionIndex(list, pred) {
