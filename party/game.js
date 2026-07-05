@@ -32,7 +32,10 @@ import { CHARACTERS } from '../engine/data.js';
 import { createHeuristicAgent } from '../sim/agents/heuristic.js';
 
 const MAX_SEATS = 4;
-const BOT_MOVE_DELAY_MS = 800;
+// Pause between bot moves so humans can read what happened. Overridable via
+// env for headless runs (party/_smoke.js sets 0); `globalThis.process` is
+// undefined in the Cloudflare Workers runtime, so the fallback applies there.
+const BOT_MOVE_DELAY_MS = Number(globalThis.process?.env?.BOT_MOVE_DELAY_MS ?? 800);
 
 export default class GameRoom {
   constructor(room) {
@@ -332,6 +335,11 @@ export default class GameRoom {
         if (this.phase !== 'in_progress') break;
         this.advance(legal[actionIndex]);
       }
+    } catch (err) {
+      // A bot-agent or engine throw must not escape as an unhandled rejection —
+      // maybePlayBot() is fire-and-forget from startGame(). Log and leave the
+      // room alive; the stalled bot seat surfaces on the next human action.
+      console.error(`[GameRoom ${this.room?.id}] bot loop error:`, err);
     } finally {
       this.botRunning = false;
     }
