@@ -1,0 +1,13 @@
+# Netlify build control.
+#
+# Skip Netlify builds (branch deploys + PR deploy previews) for the TechDebt
+# branch while the cleanup lands, without touching production or other PRs.
+#
+# How it works: Netlify runs the `ignore` command before every build to decide
+# whether to skip it — exit 0 = skip, non-zero = build. $HEAD is the PR head
+# branch on deploy previews; $BRANCH is the branch on branch deploys. Builds on
+# main (production) and every other branch/PR proceed as usual.
+#
+# To re-enable builds for this branch, delete this [build] block (or the file).
+[build]
+  ignore = "test \"$HEAD\" = \"TechDebt\" -o \"$BRANCH\" = \"TechDebt\""
