@@ -2772,12 +2772,6 @@ function determineNextPlayer() {
  renderGameBoard();
 }
 
-function nextPlayer() {
- // This function is now replaced by determineNextPlayer
- // Keeping it for backwards compatibility in case it's called elsewhere
- determineNextPlayer();
-}
-
 function endRound() {
  addLog(`Round ${gameState.round} ended!`);
 
