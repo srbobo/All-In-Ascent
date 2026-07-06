@@ -23,6 +23,7 @@ import { createGame } from '../engine/state.js';
 import { getLegalActions, applyAction, isTerminal } from '../engine/engine.js';
 import { createRandomAgent } from './agents/random.js';
 import { createHeuristicAgent } from './agents/heuristic.js';
+import { createRolloutAgent } from './agents/rollout.js';
 import { createOllamaAgent } from './agents/ollama.js';
 
 // ---------- CLI argument parsing ----------
@@ -48,6 +49,9 @@ function buildAgent(name, opts) {
   switch (name) {
     case 'random':    return createRandomAgent({ seed: opts.policySeed });
     case 'heuristic': return createHeuristicAgent();
+    // R2 pure search agent: full-width rollout evaluation, no LLM. The
+    // search-strength ceiling that LLM priors get measured against.
+    case 'rollout':   return createRolloutAgent();
   }
   // "ollama:<model-name>" syntax — e.g. "ollama:deepseek-r1:7b".
   // We split on the FIRST colon only so the model tag keeps its own colons.
@@ -66,7 +70,7 @@ function buildAgent(name, opts) {
       decisionTemperature: opts.decisionTemperature ?? null,
     });
   }
-  throw new Error(`unknown agent: ${name}. Available: random, heuristic, ollama:<model>`);
+  throw new Error(`unknown agent: ${name}. Available: random, heuristic, rollout, ollama:<model>`);
 }
 
 // ---------- Main runner ----------
