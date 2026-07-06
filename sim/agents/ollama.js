@@ -30,6 +30,7 @@
 
 import { CHARACTERS, GEAR_SHOP, TRAINING_AREAS } from '../../engine/data.js';
 import { computeEffectiveStats, checkAreaAccess, dispatchToolCall } from '../../engine/helpers.js';
+import { evaluateActions } from './rollout.js';
 
 export function createOllamaAgent({
   model,
@@ -43,14 +44,16 @@ export function createOllamaAgent({
   decisionTemperature = null,
   timeoutMs = 15000,
   rewardCreativity = true,  // include "prefer creative lines" in system prompt
-  // Lite CPP: 'index' (default, LEGAL ACTIONS numbered list + action_index)
-  // or 'tools' (semantic tool calls dispatched via dispatchToolCall).
+  // 'index' (default, LEGAL ACTIONS numbered list + action_index),
+  // 'tools' (semantic tool calls dispatched via dispatchToolCall), or
+  // 'rollout' (R2: LLM emits its action_index as a measured PRIOR; the
+  // full-width rollout evaluation decides the actual action).
   agentMode = 'index',
 }) {
   const decisionTemp = decisionTemperature ?? temperature;
   if (!model) throw new Error('ollama agent: `model` is required (e.g. "deepseek-r1:7b" or "qwen2.5:7b-instruct")');
-  if (agentMode !== 'index' && agentMode !== 'tools') {
-    throw new Error(`ollama agent: unknown agentMode "${agentMode}" (expected "index" or "tools")`);
+  if (agentMode !== 'index' && agentMode !== 'tools' && agentMode !== 'rollout') {
+    throw new Error(`ollama agent: unknown agentMode "${agentMode}" (expected "index", "tools", or "rollout")`);
   }
 
   // Per-agent strategic memory. Set by planStrategy() at game start, updated
@@ -376,12 +379,17 @@ export function createOllamaAgent({
     },
 
     async chooseAction({ state, legalActions, player, abortSignal, currentStrategy: externalStrategy }) {
-      // Route to the tools-mode implementation if enabled. Index mode below
-      // is 100% untouched — the two paths are parallel, not layered, so we
-      // don't risk breaking the baseline while iterating on Lite CPP.
-      if (agentMode === 'tools') {
-        return chooseActionToolsMode({ state, legalActions, player, abortSignal, externalStrategy });
-      }
+      if (agentMode === 'tools')   return chooseActionToolsMode({ state, legalActions, player, abortSignal, externalStrategy });
+      if (agentMode === 'rollout') return chooseActionRolloutMode({ state, legalActions, player, abortSignal, externalStrategy });
+      return chooseActionIndexMode({ state, legalActions, player, abortSignal, externalStrategy });
+    },
+  };
+
+  // Index-mode implementation — body unchanged, extracted from the public
+  // method when rollout mode was added so the R2 prior can reuse it
+  // wholesale. (Function declarations hoist, so defining it after `return`
+  // is safe — same lifetime as chooseActionToolsMode above.)
+  async function chooseActionIndexMode({ state, legalActions, player, abortSignal, externalStrategy }) {
       // Use the explicit strategy passed by the caller if provided; else fall
       // back to the agent's internal memory. This makes the runner the source
       // of truth and avoids races if the same agent is used across games.
@@ -488,8 +496,65 @@ export function createOllamaAgent({
         promptTokens: data.prompt_eval_count ?? null,
         responseTokens: data.eval_count ?? null,
       };
-    },
-  };
+  }
+
+  // R2 rollout mode: the LLM's index-mode answer is captured as a PRIOR —
+  // measured, not obeyed. The full-width rollout evaluation picks the action
+  // actually played. LLM failures never fall back to the engine heuristic
+  // here: the search result stands on its own, so this mode is structurally
+  // fallback-free. The prior-vs-rollout agreement rate is the experiment's
+  // primary metric ("does the LLM understand this game?").
+  async function chooseActionRolloutMode({ state, legalActions, player, abortSignal, externalStrategy }) {
+    // Defined inside the function: a `const` placed after the factory's
+    // `return` statement never initializes (TDZ) even though function
+    // declarations hoist.
+    const ROLLOUT_PRIOR_MIN_ACTIONS = 3;  // skip the LLM call on trivial turns
+    const seatIndex = state.currentPlayerIndex;
+
+    // 1. Search: evaluate every legal action (full-width — the temp-0.05
+    //    run proved LLM-filtered candidate sets omit the winning move).
+    const t0 = Date.now();
+    const { evals, bestIndex } = await evaluateActions(state, legalActions, seatIndex);
+    const rolloutTimeMs = Date.now() - t0;
+
+    // 2. Prior: the unmodified index-mode call, captured for measurement.
+    let prior = null;
+    let priorOutcome = 'success';
+    if (legalActions.length < ROLLOUT_PRIOR_MIN_ACTIONS) {
+      priorOutcome = 'skipped_trivial';
+    } else {
+      try {
+        prior = await chooseActionIndexMode({ state, legalActions, player, abortSignal, externalStrategy });
+      } catch (err) {
+        priorOutcome = err.outcome || 'other_error';
+      }
+    }
+
+    const llmIdx = prior?.actionIndex ?? null;
+    const agree = llmIdx != null && llmIdx === bestIndex;
+    const ev = evals[bestIndex];
+    return {
+      actionIndex: bestIndex,
+      rationale: `rollout EV ${ev.mean.toFixed(1)} — ${agree ? 'AGREES with' : 'overrides'} LLM prior`
+        + (llmIdx != null
+            ? ` (llm chose ${llmIdx}: ${(prior.rationale || '').slice(0, 120)})`
+            : ` (prior ${priorOutcome})`),
+      // Strategy machinery still flows from the LLM prior so the memory /
+      // reflection system keeps working unchanged in rollout mode.
+      strategyChanged: prior?.strategyChanged === true,
+      strategyUpdate: prior?.strategyUpdate ?? null,
+      promptTokens: prior?.promptTokens ?? null,
+      responseTokens: prior?.responseTokens ?? null,
+      // R2 instrumentation — surfaced in run-one-game's agent_decision event.
+      llmActionIndex: llmIdx,
+      rolloutBestIndex: bestIndex,
+      priorAgreement: llmIdx == null ? null : agree,
+      priorOutcome,
+      rolloutEvBest: +ev.mean.toFixed(2),
+      rolloutEvLlm: llmIdx != null ? +evals[llmIdx].mean.toFixed(2) : null,
+      rolloutTimeMs,
+    };
+  }
 }
 
 // Attach an `outcome` tag to thrown errors so the harness can classify

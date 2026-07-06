@@ -419,6 +419,15 @@ export async function runOneGame({
         toolCall: picked.toolCall ?? null,
         attemptsUsed: picked.attemptsUsed ?? null,
         noteAdded: picked.noteAdded ?? null,
+        // R2 rollout-mode instrumentation: the LLM's prior vs the search's
+        // choice. priorAgreement is the experiment's primary metric.
+        llmActionIndex: picked.llmActionIndex ?? null,
+        rolloutBestIndex: picked.rolloutBestIndex ?? null,
+        priorAgreement: picked.priorAgreement ?? null,
+        priorOutcome: picked.priorOutcome ?? null,
+        rolloutEvBest: picked.rolloutEvBest ?? null,
+        rolloutEvLlm: picked.rolloutEvLlm ?? null,
+        rolloutTimeMs: picked.rolloutTimeMs ?? null,
       },
     });
 

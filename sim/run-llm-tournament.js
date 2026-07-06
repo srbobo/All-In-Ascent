@@ -59,8 +59,8 @@ const QUIET_NOTIFY  = args['quiet-notifications'] === 'true';
 // Lite CPP: 'index' (default, LEGAL ACTIONS numbered) or 'tools'
 // (semantic tool dispatch via engine.dispatchToolCall). See sim/agents/ollama.js.
 const AGENT_MODE    = args['agent-mode'] || 'index';
-if (AGENT_MODE !== 'index' && AGENT_MODE !== 'tools') {
-  console.error(`unknown --agent-mode "${AGENT_MODE}" (expected: index | tools)`);
+if (!['index', 'tools', 'rollout'].includes(AGENT_MODE)) {
+  console.error(`unknown --agent-mode "${AGENT_MODE}" (expected: index | tools | rollout)`);
   process.exit(1);
 }
 // Temp-ablation experiment: per-turn decision temperature for the LLM seat.
