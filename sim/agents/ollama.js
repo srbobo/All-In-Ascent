@@ -3,7 +3,8 @@
 // PREREQUISITE (runs on your M5):
 //   1. Install Ollama: brew install ollama
 //   2. Start it:      brew services start ollama
-//   3. Pull a model:  ollama pull qwen2.5:14b-instruct
+//   3. Pull a model:  ollama pull deepseek-r1:7b   # reasoning model w/ <think> blocks
+//                     ollama pull qwen2.5:7b-instruct   # alternative, non-reasoning
 //
 // HOW IT WORKS:
 //   Each turn, we send the model a compact natural-language description of
@@ -17,7 +18,9 @@
 // DESIGN NOTES:
 //   - Temperature 0.3: we want deterministic-ish play with enough variety
 //     to see creative lines.
-//   - format: 'json' tells Ollama to constrain output to valid JSON.
+//   - Reasoning models (deepseek-r1, qwq) wrap output in <think>...</think>
+//     blocks; extractJsonFromReasoning() strips those before JSON.parse.
+//     format:'json' is intentionally NOT set — it would suppress reasoning.
 //   - We send only the information a human would see from this player's
 //     seat: full self info, shared state, and only the CURRENT legal
 //     actions enumerated. Full observation history is NOT sent per turn —
@@ -25,32 +28,228 @@
 //     choice for the first version; adding a short recent-events window
 //     would be the first thing to try if play is weak.
 
-import { CHARACTERS, GEAR_SHOP } from '../../engine/data.js';
-import { computeEffectiveStats, checkAreaAccess } from '../../engine/helpers.js';
+import { CHARACTERS, GEAR_SHOP, TRAINING_AREAS } from '../../engine/data.js';
+import { computeEffectiveStats, checkAreaAccess, dispatchToolCall } from '../../engine/helpers.js';
 
 export function createOllamaAgent({
   model,
   host = 'http://localhost:11434',
   temperature = 0.3,
+  // Split temperature (temp-ablation experiment): per-turn ACTION decisions
+  // can run near-greedy while planning/reflection keep `temperature` for
+  // variety. Rationale: the 10-iter tournament showed identical plans with
+  // wildly variable execution — the variance lives in decision sampling.
+  // null = inherit `temperature` (legacy behavior, all prior baselines).
+  decisionTemperature = null,
   timeoutMs = 15000,
   rewardCreativity = true,  // include "prefer creative lines" in system prompt
+  // Lite CPP: 'index' (default, LEGAL ACTIONS numbered list + action_index)
+  // or 'tools' (semantic tool calls dispatched via dispatchToolCall).
+  agentMode = 'index',
 }) {
-  if (!model) throw new Error('ollama agent: `model` is required (e.g. "qwen2.5:14b-instruct")');
+  const decisionTemp = decisionTemperature ?? temperature;
+  if (!model) throw new Error('ollama agent: `model` is required (e.g. "deepseek-r1:7b" or "qwen2.5:7b-instruct")');
+  if (agentMode !== 'index' && agentMode !== 'tools') {
+    throw new Error(`ollama agent: unknown agentMode "${agentMode}" (expected "index" or "tools")`);
+  }
 
   // Per-agent strategic memory. Set by planStrategy() at game start, updated
   // by chooseAction() when the model declares a strategy shift. Used as
   // context in subsequent decisions so the model can reference its own plan.
   let currentStrategy = null;
 
+  // Intra-game notebook (Lite CPP Phase 2c). Populated from the optional
+  // `note` field emitted alongside tool calls. Cap at 10; oldest truncated.
+  // Cleared at game start via planStrategy(). Only used in agentMode='tools'
+  // — index mode has no writable scratchpad channel.
+  const NOTEBOOK_CAP = 10;
+  let notes = [];
+  const addNote = (round, text) => {
+    if (!text || typeof text !== 'string') return;
+    const clean = text.trim().slice(0, 200);
+    if (!clean) return;
+    notes.push({ round, text: clean });
+    if (notes.length > NOTEBOOK_CAP) notes = notes.slice(-NOTEBOOK_CAP);
+  };
+
+  // Tools-mode chooseAction implementation. Kept as a nested closure so it
+  // shares `notes`, `currentStrategy`, `model`, etc. Called from the public
+  // chooseAction when agentMode === 'tools'.
+  //
+  // Retry loop (Phase 2b): on `invalid_tool` dispatch failure, we append a
+  // corrective "tool error" user message to the conversation and re-call the
+  // LLM. Up to MAX_TOOL_RETRIES total retries after the initial attempt.
+  // parse_error / http_error / timeout / aborted propagate immediately —
+  // those are infrastructure failures, not correctable-by-the-model errors.
+  const MAX_TOOL_RETRIES = 2;
+  async function chooseActionToolsMode({ state, legalActions, player, abortSignal, externalStrategy }) {
+    const strategyForPrompt = externalStrategy || currentStrategy;
+    const char = player.character;
+    const recentHistory = extractRecentHistory(state, player.playerNum, 8);
+    const systemPrompt = buildToolSystemPrompt(char.key, rewardCreativity);
+    const userPrompt = buildToolUserPrompt(state, legalActions, player, recentHistory, strategyForPrompt, notes);
+
+    // Growing conversation across retry attempts. Same base pair on every
+    // attempt; corrective assistant/user turns get appended between retries.
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user',   content: userPrompt },
+    ];
+
+    // Telemetry captured across the retry loop so run-one-game can emit
+    // tool_error events per attempt.
+    const retryTrail = [];   // [{ attempt, tool, args, reason, detail }, ...]
+    let attemptsUsed = 0;
+
+    for (let attempt = 0; attempt <= MAX_TOOL_RETRIES; attempt++) {
+      attemptsUsed = attempt + 1;
+      // keep_alive: -1 pins the model in memory instead of Ollama's 5-min
+      // default unload. Avoids reload cost between decisions/iterations that
+      // contributed to thermal accumulation → collapse observed in the first
+      // tools-mode tournament run.
+      const body = { model, messages, stream: false, keep_alive: -1, options: { temperature: decisionTemp } };
+
+      const res = await fetchWithTimeout(
+        `${host}/api/chat`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+        timeoutMs,
+        abortSignal,
+      );
+      if (!res.ok) throw tagged('http_error', `ollama HTTP ${res.status}: ${await res.text().catch(() => '')}`);
+
+      const data = await res.json();
+      const content = data?.message?.content;
+      if (!content) throw tagged('parse_error', 'ollama response missing message.content');
+
+      const jsonStr = extractJsonFromReasoning(content);
+      let parsed;
+      try { parsed = JSON.parse(jsonStr); }
+      catch (e) {
+        // Parse failure is NOT retriable — indicates the model can't produce
+        // structured JSON at all, which retries won't fix (would just burn
+        // budget). Propagate to fallback path.
+        throw tagged('parse_error',
+          `ollama tool JSON parse failed (attempt ${attempt + 1}): ${jsonStr.slice(0, 160)}`,
+          { attemptsUsed, retryTrail });
+      }
+
+      const toolCall = { tool: parsed.tool, args: parsed.args };
+      const dispatch = dispatchToolCall(legalActions, toolCall);
+
+      if (dispatch.ok) {
+        const actionIndex = legalActions.indexOf(dispatch.action);
+        if (actionIndex === -1) {
+          throw tagged('invalid_tool',
+            'dispatchToolCall returned an action not in legalActions (invariant violated)',
+            { tool: parsed.tool, args: parsed.args, reason: 'dispatch_invariant', attemptsUsed, retryTrail });
+        }
+
+        // Success! Capture the optional note before returning.
+        if (parsed.note) addNote(state.round, parsed.note);
+
+        const rationale = typeof parsed.rationale === 'string'
+          ? parsed.rationale.slice(0, 500)
+          : '(no rationale)';
+
+        // Strategy-shift handling — identical to index mode.
+        const strategyChanged = parsed.strategy_changed === true;
+        let strategyUpdate = null;
+        if (strategyChanged) {
+          const newSummary = stringField(parsed.new_strategy_summary, 600);
+          const changeReason = stringField(parsed.change_reason, 400);
+          if (newSummary) {
+            strategyUpdate = {
+              summary: newSummary,
+              changeReason: changeReason || '(no reason given)',
+              milestonePriority: Array.isArray(parsed.new_milestone_priority)
+                ? parsed.new_milestone_priority.filter(t => ['beginner', 'intermediate', 'expert'].includes(t))
+                : (strategyForPrompt?.milestonePriority || []),
+              bottleneckStat: stringField(parsed.new_bottleneck_stat, 50)
+                || strategyForPrompt?.bottleneckStat || 'unknown',
+              openingMoves: strategyForPrompt?.openingMoves || [],
+              anticipatedRisks: strategyForPrompt?.anticipatedRisks || [],
+            };
+            currentStrategy = strategyUpdate;
+          }
+        }
+
+        return {
+          actionIndex,
+          rationale,
+          strategyChanged,
+          strategyUpdate,
+          promptTokens: data.prompt_eval_count ?? null,
+          responseTokens: data.eval_count ?? null,
+          toolCall,
+          noteAdded: parsed.note ? String(parsed.note).slice(0, 200) : null,
+          attemptsUsed,
+          retryTrail,   // empty on first-try success; non-empty when retries were used
+        };
+      }
+
+      // Dispatch failed. Record the failed attempt for telemetry.
+      retryTrail.push({
+        attempt: attempt + 1,
+        tool: parsed.tool ?? null,
+        args: parsed.args ?? null,
+        reason: dispatch.reason,
+        detail: dispatch.detail,
+      });
+
+      if (attempt < MAX_TOOL_RETRIES) {
+        // Feed the model the error and its own last response, then re-prompt.
+        // Assistant turn = what it just said (verbatim, so it sees its own
+        // mistake). User turn = corrective feedback + hint to consult the
+        // WHAT'S ACTIONABLE NOW block already in the original user prompt.
+        messages.push({ role: 'assistant', content });
+        messages.push({
+          role: 'user',
+          content: [
+            `Your tool call failed:`,
+            `  tool: ${JSON.stringify(parsed.tool)}`,
+            `  args: ${JSON.stringify(parsed.args)}`,
+            `  reason: ${dispatch.reason}`,
+            `  detail: ${dispatch.detail}`,
+            ``,
+            `Consult the WHAT'S ACTIONABLE NOW block in the previous message and emit a corrected JSON tool call. This is retry ${attempt + 1} of ${MAX_TOOL_RETRIES}. If you exhaust retries a fallback agent will take this turn instead of you.`,
+          ].join('\n'),
+        });
+        continue;
+      }
+
+      // Retries exhausted — throw so run-one-game.js triggers heuristic
+      // fallback. Carry the full retry trail so JSONL analysis can see the
+      // sequence of failed attempts.
+      throw tagged('invalid_tool',
+        `dispatch failed after ${attemptsUsed} attempts. Last: ${dispatch.reason}: ${dispatch.detail}`,
+        {
+          tool: parsed.tool,
+          args: parsed.args,
+          reason: dispatch.reason,
+          detail: dispatch.detail,
+          attemptsUsed,
+          retryTrail,
+        });
+    }
+
+    // Unreachable — loop either returns on success or throws on final failure.
+    throw tagged('invalid_tool', 'retry loop fell through (should be unreachable)');
+  }
+
   return {
     name: `ollama:${model}`,
+    agentMode,
     getCurrentStrategy() { return currentStrategy; },
+    getNotes() { return notes.slice(); },  // defensive copy for external readers
 
     // PHASE 1: Strategic planning call — invoked ONCE at game start by the
     // runner. The model surveys its character, the drawn milestones, and
     // the opening board state, and produces a structured strategy. Costs
     // one extra ~10-15s LLM call per LLM seat per game.
     async planStrategy({ state, legalActions, player, abortSignal, memoryContext }) {
+      // Clear the intra-game notebook — notes are game-scoped, not tournament-
+      // scoped. Cross-game learning lives in the memory-<char>.json file.
+      notes = [];
       const char = player.character;
       const systemPrompt = buildStrategySystemPrompt(char.key, rewardCreativity, !!memoryContext);
       const userPrompt = buildStrategyUserPrompt(state, legalActions, player, memoryContext);
@@ -62,7 +261,7 @@ export function createOllamaAgent({
           { role: 'user',   content: userPrompt },
         ],
         stream: false,
-        format: 'json',
+        keep_alive: -1,   // pin model in memory (avoid Ollama 5-min unload)
         options: { temperature },
       };
 
@@ -78,9 +277,10 @@ export function createOllamaAgent({
       const content = data?.message?.content;
       if (!content) throw tagged('parse_error', 'ollama response missing message.content');
 
+      const jsonStr = extractJsonFromReasoning(content);
       let parsed;
-      try { parsed = JSON.parse(content); }
-      catch (e) { throw tagged('parse_error', `ollama strategy JSON parse failed: ${content.slice(0, 120)}`); }
+      try { parsed = JSON.parse(jsonStr); }
+      catch (e) { throw tagged('parse_error', `ollama strategy JSON parse failed: ${jsonStr.slice(0, 120)}`); }
 
       // Validate the shape — surface a useful error if any required field is missing.
       const strategy = {
@@ -129,7 +329,7 @@ export function createOllamaAgent({
           { role: 'user',   content: userPrompt },
         ],
         stream: false,
-        format: 'json',
+        keep_alive: -1,   // pin model in memory (avoid Ollama 5-min unload)
         options: { temperature },
       };
 
@@ -145,9 +345,10 @@ export function createOllamaAgent({
       const content = data?.message?.content;
       if (!content) throw tagged('parse_error', 'ollama reflection response missing content');
 
+      const jsonStr = extractJsonFromReasoning(content);
       let parsed;
-      try { parsed = JSON.parse(content); }
-      catch (e) { throw tagged('parse_error', `ollama reflection JSON parse failed: ${content.slice(0, 120)}`); }
+      try { parsed = JSON.parse(jsonStr); }
+      catch (e) { throw tagged('parse_error', `ollama reflection JSON parse failed: ${jsonStr.slice(0, 120)}`); }
 
       const reflection = {
         summary: stringField(parsed.summary, 800) || '(no summary)',
@@ -175,6 +376,12 @@ export function createOllamaAgent({
     },
 
     async chooseAction({ state, legalActions, player, abortSignal, currentStrategy: externalStrategy }) {
+      // Route to the tools-mode implementation if enabled. Index mode below
+      // is 100% untouched — the two paths are parallel, not layered, so we
+      // don't risk breaking the baseline while iterating on Lite CPP.
+      if (agentMode === 'tools') {
+        return chooseActionToolsMode({ state, legalActions, player, abortSignal, externalStrategy });
+      }
       // Use the explicit strategy passed by the caller if provided; else fall
       // back to the agent's internal memory. This makes the runner the source
       // of truth and avoids races if the same agent is used across games.
@@ -195,8 +402,8 @@ export function createOllamaAgent({
           { role: 'user',   content: userPrompt },
         ],
         stream: false,
-        format: 'json',
-        options: { temperature },
+        keep_alive: -1,   // pin model in memory (avoid Ollama 5-min unload)
+        options: { temperature: decisionTemp },
       };
 
       const res = await fetchWithTimeout(
@@ -218,13 +425,19 @@ export function createOllamaAgent({
       const content = data?.message?.content;
       if (!content) throw tagged('parse_error', 'ollama response missing message.content');
 
+      const jsonStr = extractJsonFromReasoning(content);
       let parsed;
-      try { parsed = JSON.parse(content); }
-      catch (e) { throw tagged('parse_error', `ollama JSON parse failed: ${content.slice(0, 120)}`); }
+      try { parsed = JSON.parse(jsonStr); }
+      catch (e) { throw tagged('parse_error', `ollama JSON parse failed: ${jsonStr.slice(0, 120)}`); }
 
-      const idx = parsed.action_index;
+      // Coerce action_index to integer — reasoning models occasionally emit
+      // the index as a string ("10") instead of a number (10). Accept both.
+      const rawIdx = parsed.action_index;
+      const idx = typeof rawIdx === 'number'
+        ? rawIdx
+        : (typeof rawIdx === 'string' && /^-?\d+$/.test(rawIdx.trim()) ? Number(rawIdx.trim()) : NaN);
       if (!Number.isInteger(idx) || idx < 0 || idx >= legalActions.length) {
-        throw tagged('out_of_range', `ollama returned out-of-range action_index ${idx} (legal: 0..${legalActions.length - 1})`);
+        throw tagged('out_of_range', `ollama returned out-of-range action_index ${JSON.stringify(rawIdx)} (legal: 0..${legalActions.length - 1})`);
       }
 
       const rationale = typeof parsed.rationale === 'string'
@@ -280,10 +493,13 @@ export function createOllamaAgent({
 }
 
 // Attach an `outcome` tag to thrown errors so the harness can classify
-// without parsing the message string downstream.
-function tagged(outcome, message) {
+// without parsing the message string downstream. Optional `extra` object
+// carries structured context (e.g. tool+args+reason on invalid_tool errors
+// so the retry loop can build a corrective feedback message).
+function tagged(outcome, message, extra = null) {
   const err = new Error(message);
   err.outcome = outcome;
+  if (extra && typeof extra === 'object') Object.assign(err, extra);
   return err;
 }
 
@@ -293,6 +509,39 @@ function tagged(outcome, message) {
 function stringField(v, maxLen) {
   if (v == null) return null;
   return String(v).slice(0, maxLen);
+}
+
+// Reasoning models (deepseek-r1, qwq, qwen3 thinking) emit free-form text
+// before their final JSON: <think>...</think> blocks, prose, and sometimes
+// markdown fences. This helper isolates the final JSON object from all that.
+// Also tolerant of non-reasoning models that return clean JSON — the strip
+// passes are no-ops in that case.
+function extractJsonFromReasoning(content) {
+  let s = content;
+  // 1. Drop <think>...</think> blocks (deepseek-r1, qwq). Greedy match
+  //    handles multiple blocks; the last reasoning block always closes
+  //    before the JSON answer.
+  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  // 2. If an opening <think> tag exists without a close (truncation),
+  //    drop everything from <think> onward — caller will fail to parse
+  //    and surface a useful error.
+  const openThink = s.search(/<think>/i);
+  if (openThink !== -1) s = s.slice(0, openThink);
+  // 3. Strip markdown code fences (```json ... ``` or ``` ... ```).
+  s = s.replace(/```(?:json)?/gi, '').replace(/```/g, '');
+  // 4. Find the LAST balanced {...} block by scanning forward, tracking
+  //    brace depth, and remembering each completed top-level object. The
+  //    last one wins (reasoning can include JSON snippets mid-thought).
+  let depth = 0, start = -1, lastObj = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '{') { if (depth === 0) start = i; depth++; }
+    else if (c === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) { lastObj = s.slice(start, i + 1); start = -1; }
+    }
+  }
+  return lastObj ?? s.trim();
 }
 
 // --- Prompt builders ---
@@ -567,7 +816,12 @@ function buildSystemPrompt(characterKey, rewardCreativity) {
     // how each action type works so it's not guessing at training/rest/
     // access mechanics. Kept compact (~150 tokens).
     `GAME MECHANICS:`,
-    `- Training: +5 to one stat (permanent). Costs 2 time + endurance (per-station cost is shown in the action list). One player per training station per round.`,
+    `- Training (4 stations, +5 to one stat, permanent, costs 2 time):`,
+    `    Campus Board -> Strength   (15 endurance)`,
+    `    Continuous MoonBoard -> Technique (12 endurance)`,
+    `    Grip Board -> Focus   (10 endurance)`,
+    `    Balance and Core -> Flexibility  (8 endurance)`,
+    `  One player per station per round. Pick the station that trains the stat you NEED (see TRAINING PRIORITY below), not by name.`,
     `- Rest: restores endurance to max. Costs 1 time. No other side effect.`,
     `- Climbing: dice + stats vs requirements. Failed climbs still earn reduced XP. The same route cannot be retried within the same round.`,
     `- Access cards: Bouldering and Top Rope are OPEN (no gear required). Lead Climbing needs Belay Device + Locking Carabiner + Lead Rope. Free Solo bypasses gear access requirements.`,
@@ -577,6 +831,13 @@ function buildSystemPrompt(characterKey, rewardCreativity) {
     // A3: Access-card priority primer — flag the structural decision that
     // the model has been blind to across every prior LLM playtest.
     `ACCESS CARDS PRIORITY: If any of your milestone routes is in Lead Climbing, you cannot attempt it without the three access cards (Belay Device, Locking Carabiner, Lead Rope). Buying them early is often more valuable than incremental training. Top Rope needs no gear.`,
+    ``,
+    // Targets the dominant failure mode observed across qwen2.5:7b and
+    // deepseek-r1:7b runs: model rationalizes training the character's
+    // strongest stat (e.g. Focus for Iron Lung) instead of the stat the
+    // MILESTONE ROUTES actually gate on. The per-turn user prompt shows
+    // signed gaps so the model doesn't have to do the arithmetic.
+    `TRAINING PRIORITY: For each milestone route you can still pursue, your STAT GAP = (route requirement) - (your effective stat). A POSITIVE gap is a deficit you must close. The stat with the LARGEST positive gap across your reachable milestones is your bottleneck — train THAT stat next, regardless of which stat your character description emphasizes. Character archetypes describe starting strengths, NOT optimal training. Example: if Iron Lung's expert milestone needs Strength 50 and your effective Strength is 16, you must train Strength even though Iron Lung is "the endurance character."`,
     ``,
     rewardCreativity
       ? `HOW YOU ARE SCORED — TWO things, both equally:
@@ -668,12 +929,19 @@ function buildUserPrompt(state, legalActions, player, recentHistory = [], curren
   if (char.betaBoostActive) lines.push(`  Beta Boost: ACTIVE (next climb: +3 all stats)`);
   lines.push(``);
 
-  lines.push(`MILESTONE TARGETS:`);
+  lines.push(`MILESTONE TARGETS (gaps: positive number = stat deficit you must train; "OK" = met):`);
+  const gap = (req, cur) => {
+    const d = req - cur;
+    return d > 0 ? `+${d}` : (d === 0 ? 'OK' : `${d}`);
+  };
   for (const tier of ['beginner', 'intermediate', 'expert']) {
     const m = state.milestoneRoutes[tier];
     const r = m.route;
     const tagStr = r.tag ? ` [tag: ${r.tag}]` : ' [untagged]';
-    lines.push(`  ${tier}: ${r.name} (${r.grade}, ${m.area})${tagStr} — req Str ${r.strength} / Tech ${r.technique} / Focus ${r.focus} / Flex ${r.flexibility}, Endurance ${r.endurance}`);
+    const eff = computeEffectiveStats(char, r, m.area, {});
+    lines.push(`  ${tier}: ${r.name} (${r.grade}, ${m.area})${tagStr}`);
+    lines.push(`    req S${r.strength}/T${r.technique}/F${r.focus}/X${r.flexibility}, Endurance ${r.endurance}`);
+    lines.push(`    your gaps: S${gap(r.strength, eff.strength)} T${gap(r.technique, eff.technique)} F${gap(r.focus, eff.focus)} X${gap(r.flexibility, eff.flexibility)}`);
   }
   lines.push(``);
 
@@ -733,6 +1001,282 @@ function buildUserPrompt(state, legalActions, player, recentHistory = [], curren
   return lines.join('\n');
 }
 
+// =============================================================================
+// TOOLS MODE (Lite CPP) — parallel prompt path
+// =============================================================================
+// Replaces the numbered LEGAL ACTIONS list with a semantic tool schema. Same
+// game-state observations (stats, gaps, milestones, opponents, history) —
+// only the action-encoding block differs. The model emits a tool call by name
+// and the engine dispatches it via dispatchToolCall (helpers.js).
+
+function buildToolSystemPrompt(characterKey, rewardCreativity) {
+  const tmpl = CHARACTERS[characterKey];
+  const ability = tmpl.specialAbility;
+  return [
+    `You are playing the board game "All In Ascent" as ${tmpl.name} (${tmpl.archetype}).`,
+    ``,
+    `HOW TO WIN: Complete ALL THREE milestone routes (beginner, intermediate, expert) before any opponent does. The game continues until someone completes all three — there is no round limit.`,
+    ``,
+    `YOUR UNIQUE ABILITY — ${ability.name}:`,
+    `  ${ability.description}`,
+    `  This ability is what sets your character apart. Lean into it. Find moments where it gives you an edge other players don't have.`,
+    ``,
+    `ROUTE TAGS: Each climb is tagged as one of {Pinch/Crimp, Toe/Heel Hook, Roof/Sloper, Dynamic}, or untagged. Some gear cards in the shop target specific tags. Notice patterns in your milestones — if multiple share a tag, gear that targets that tag may be especially valuable.`,
+    ``,
+    `GAME MECHANICS:`,
+    `- Training (4 stations, +5 to one stat, permanent, costs 2 time):`,
+    `    Campus Board -> Strength   (15 endurance)`,
+    `    Continuous MoonBoard -> Technique (12 endurance)`,
+    `    Grip Board -> Focus   (10 endurance)`,
+    `    Balance and Core -> Flexibility  (8 endurance)`,
+    `  One player per station per round. In tools mode you pick the STAT (train(stat="strength")) — the engine picks the matching station.`,
+    `- Rest: restores endurance to max. Costs 1 time. No other side effect.`,
+    `- Climbing: dice + stats vs requirements. Failed climbs still earn reduced XP. The same route cannot be retried within the same round.`,
+    `- Access cards: Bouldering and Top Rope are OPEN (no gear required). Lead Climbing needs Belay Device + Locking Carabiner + Lead Rope. Free Solo bypasses gear access requirements.`,
+    `- Top Rope belayers: split into (players - 1) belayer stations; a station an opponent holds blocks both its routes until routes clear. Lead Climbing has one belayer. Bouldering is unlimited.`,
+    `- Route clearing: end of round wipes ONE area's regular routes (cycle: Lead -> Top Rope -> Bouldering) and returns everyone to the Lobby. Milestone routes NOT affected.`,
+    ``,
+    `ACCESS CARDS PRIORITY: If any milestone is in Lead Climbing, you cannot attempt it without all three access cards. Buying them early often beats incremental training.`,
+    ``,
+    `TRAINING PRIORITY: For each milestone route you can still pursue, STAT GAP = (route requirement) - (your effective stat). Positive = deficit. Train the stat with the LARGEST positive gap first, regardless of your character's starting-stat emphasis. Character archetypes describe starting strengths, NOT optimal training.`,
+    ``,
+    rewardCreativity
+      ? `HOW YOU ARE SCORED — TWO things, both equally:
+  1. WINNING the game (completing all 3 milestones first).
+  2. CREATIVE USE OF YOUR ABILITY — using it in unexpected, risky, or non-obvious ways.
+  Express in your rationale when you are deliberately leveraging your character's identity.`
+      : `You are scored only on completing all 3 milestones first.`,
+    ``,
+    `ON EACH TURN you will see: current state (stats, endurance, XP, gear, time), the three milestone routes with your gaps, opponents, your recent actions, your current strategy, your notebook (if you've written anything), and a summary of what each tool can do RIGHT NOW.`,
+    ``,
+    `STRATEGY EVALUATION: Before picking an action, compare what's happening to your current strategy. If new information materially changes the best plan, declare a strategy shift. Otherwise keep it.`,
+    ``,
+    // Lite CPP tool schema block — replaces "LEGAL ACTIONS numbered".
+    `AVAILABLE TOOLS (invoke exactly one per turn):`,
+    `  train              args: { "stat": "strength" | "technique" | "focus" | "flexibility" }`,
+    `                     Trains the stat you specify by picking the matching station. Fails if that station is occupied.`,
+    `  rest               args: {}`,
+    `                     Restore endurance to max. Costs 1 time. Fails if you have 0 time remaining.`,
+    `  climb              args: { "route_name": "<exact route name>" }`,
+    `                     Attempt a regular route in an accessible area. Route must currently be climbable — see WHAT'S ACTIONABLE NOW.`,
+    `  attempt_milestone  args: { "tier": "beginner" | "intermediate" | "expert" }`,
+    `                     Attempt that tier's milestone route. Fails if access cards missing, insufficient time/endurance, or beloayer station occupied.`,
+    `  buy_gear           args: { "gear_name": "<exact gear name>" }`,
+    `                     Purchase a gear card from the shop's current rotation. Fails if XP insufficient or not in the shop.`,
+    `  end_turn           args: {}`,
+    `                     Pass — waste any remaining time. NOT the same as rest.`,
+    ``,
+    `NOTEBOOK (persistent this game): You may optionally add ONE short note (max 200 chars) to your notebook via a "note" field in your response. Notes persist across turns in this game and appear at the top of every future prompt. Use them to write down tactical rules ("Once beginner done, attempt The Standard on top rope"), remembered opponent behavior, or reminders. They do NOT persist to the next game — cross-game learning is a separate memory system.`,
+    ``,
+    `OUTPUT FORMAT — respond with EXACTLY one JSON object, no other text:`,
+    `{`,
+    `  "tool": "train" | "rest" | "climb" | "attempt_milestone" | "buy_gear" | "end_turn",`,
+    `  "args": { ... appropriate to the tool, see schema above ... },`,
+    `  "rationale": "<one short sentence — what you are trying and why>",`,
+    `  "note": "<optional; will be saved to your notebook for future turns this game>",`,
+    `  "strategy_changed": <true | false>,`,
+    `  "change_reason": "<short — what new info forced the shift>",   // when strategy_changed`,
+    `  "new_strategy_summary": "<2-3 sentences describing the updated plan>",   // when strategy_changed`,
+    `  "new_milestone_priority": ["beginner" | "intermediate" | "expert", ...],   // optional`,
+    `  "new_bottleneck_stat": "strength" | "technique" | "focus" | "flexibility"   // optional`,
+    `}`,
+    ``,
+    `IF YOUR TOOL CALL IS INVALID (unknown route, occupied station, wrong tier for tier that's blocked), you will receive a corrective message and get up to 2 retries to emit a valid call. After that, control passes to a fallback agent. So — before responding, check WHAT'S ACTIONABLE NOW below and confirm your call matches.`,
+  ].filter(Boolean).join('\n');
+}
+
+// Group legalActions by tool name and format a compact per-tool summary
+// telling the LLM which args currently succeed. Replaces the flat "LEGAL
+// ACTIONS numbered" block. Uses the same formatAction() output for train/
+// climb/milestone/buyGear so requirement details are preserved.
+function formatAvailableToolsBlock(state, legalActions, player) {
+  const lines = [`WHAT'S ACTIONABLE NOW (tools + valid args — you will be RETRIED if you call something not listed here):`];
+
+  // train(stat) — which stats can you train right now?
+  const trainActs = legalActions.filter(a => a.type === 'train');
+  const trainStatFromArea = (areaName) => TRAINING_AREAS.find(a => a.name === areaName)?.stat;
+  const trainableStats = trainActs.map(a => trainStatFromArea(a.areaName)).filter(Boolean);
+  if (trainableStats.length) {
+    lines.push(`  train(stat)  available stats: ${trainableStats.join(', ')}`);
+  } else {
+    lines.push(`  train(stat)  UNAVAILABLE — all stations occupied or you're out of time/endurance`);
+  }
+  const trainedElsewhere = TRAINING_AREAS.map(a => a.stat).filter(s => !trainableStats.includes(s));
+  if (trainedElsewhere.length && trainableStats.length) {
+    lines.push(`               (blocked: ${trainedElsewhere.join(', ')})`);
+  }
+  lines.push(``);
+
+  // rest / end_turn
+  const canRest = legalActions.some(a => a.type === 'rest');
+  const canEnd = legalActions.some(a => a.type === 'endTurn');
+  lines.push(`  rest()       ${canRest ? 'available' : 'UNAVAILABLE (out of time this turn)'}`);
+  lines.push(`  end_turn()   ${canEnd ? 'available' : 'UNAVAILABLE'} — pass without gaining endurance`);
+  lines.push(``);
+
+  // climb(route_name) — grouped by area with per-route requirement summary.
+  const climbActs = legalActions.filter(a => a.type === 'climb');
+  if (climbActs.length) {
+    lines.push(`  climb(route_name)  ${climbActs.length} route${climbActs.length === 1 ? '' : 's'} available:`);
+    const byArea = {};
+    for (const a of climbActs) (byArea[a.area] ??= []).push(a);
+    for (const [area, acts] of Object.entries(byArea)) {
+      lines.push(`    ${area}:`);
+      for (const a of acts) {
+        // Reuse formatAction to preserve stat/cost/XP details
+        const detail = formatAction(a, state, player).replace(/^CLIMB /, '');
+        lines.push(`      "${a.routeName}" — ${detail}`);
+      }
+    }
+  } else {
+    lines.push(`  climb(route_name)  UNAVAILABLE — no accessible routes right now`);
+  }
+  lines.push(``);
+
+  // attempt_milestone(tier)
+  const msActs = legalActions.filter(a => a.type === 'milestone');
+  if (msActs.length) {
+    lines.push(`  attempt_milestone(tier)  ${msActs.length} attemptable:`);
+    for (const a of msActs) {
+      const detail = formatAction(a, state, player).replace(/^MILESTONE — /, '');
+      lines.push(`      "${a.difficulty}" — ${detail}`);
+    }
+  } else {
+    lines.push(`  attempt_milestone(tier)  UNAVAILABLE — all milestones done, blocked by access, or insufficient resources`);
+  }
+  const attemptableTiers = new Set(msActs.map(a => a.difficulty));
+  const blockedTiers = ['beginner', 'intermediate', 'expert'].filter(t => !attemptableTiers.has(t));
+  if (blockedTiers.length && msActs.length) {
+    lines.push(`      (blocked: ${blockedTiers.join(', ')})`);
+  }
+  lines.push(``);
+
+  // buy_gear(gear_name)
+  const gearActs = legalActions.filter(a => a.type === 'buyGear');
+  if (gearActs.length) {
+    lines.push(`  buy_gear(gear_name)  ${gearActs.length} purchasable:`);
+    for (const a of gearActs) {
+      const detail = formatAction(a, state, player).replace(/^BUY /, '');
+      lines.push(`      "${a.gearName}" — ${detail}`);
+    }
+  } else {
+    lines.push(`  buy_gear(gear_name)  UNAVAILABLE — nothing you can afford in the shop right now`);
+  }
+
+  return lines.join('\n');
+}
+
+function buildToolUserPrompt(state, legalActions, player, recentHistory = [], currentStrategy = null, notes = []) {
+  const char = player.character;
+  const lines = [];
+  lines.push(`Round ${state.round}. You are Player ${player.playerNum} — ${char.name} (Level ${char.level}).`);
+  lines.push(``);
+
+  // NOTEBOOK — surfaced first so its contents anchor the model's reasoning
+  // for the rest of the prompt. Empty on the first turn of each game.
+  if (notes.length > 0) {
+    lines.push(`YOUR NOTEBOOK (${notes.length} note${notes.length === 1 ? '' : 's'}, persistent across turns this game):`);
+    for (const n of notes) lines.push(`  [r${n.round}] "${n.text}"`);
+    lines.push(``);
+  } else {
+    lines.push(`YOUR NOTEBOOK: (empty — add a note via the "note" field if you want to record a tactical rule for future turns)`);
+    lines.push(``);
+  }
+
+  // STRATEGY block — identical semantics to index mode.
+  if (currentStrategy) {
+    lines.push(`YOUR CURRENT STRATEGY (decide whether to keep or update it):`);
+    lines.push(`  Plan: ${currentStrategy.summary}`);
+    if (currentStrategy.milestonePriority?.length) {
+      lines.push(`  Milestone order: ${currentStrategy.milestonePriority.join(' → ')}`);
+    }
+    if (currentStrategy.bottleneckStat) {
+      lines.push(`  Bottleneck stat: ${currentStrategy.bottleneckStat}`);
+    }
+    if (currentStrategy.openingMoves?.length) {
+      lines.push(`  Original opening moves: ${currentStrategy.openingMoves.join(' | ')}`);
+    }
+    if (currentStrategy.anticipatedRisks?.length) {
+      lines.push(`  Anticipated risks: ${currentStrategy.anticipatedRisks.join(' | ')}`);
+    }
+    lines.push(``);
+  } else {
+    lines.push(`YOUR CURRENT STRATEGY: (none recorded yet — treat this turn as a fresh planning moment.)`);
+    lines.push(``);
+  }
+
+  // STATE — reuse exact same rendering as index-mode buildUserPrompt for A/B parity.
+  lines.push(`YOUR STATE:`);
+  lines.push(`  Stats:        Str ${char.stats.strength} | Tech ${char.stats.technique} | Focus ${char.stats.focus} | Flex ${char.stats.flexibility}`);
+  lines.push(`  Training:     +${char.trainingBonuses.strength} / +${char.trainingBonuses.technique} / +${char.trainingBonuses.focus} / +${char.trainingBonuses.flexibility}`);
+  lines.push(`  Gear bonus:   +${char.gearBonuses.strength} / +${char.gearBonuses.technique} / +${char.gearBonuses.focus} / +${char.gearBonuses.flexibility}`);
+  lines.push(`  Endurance:    ${char.currentEndurance} / ${char.maxEndurance}`);
+  lines.push(`  Time this turn: ${char.timeRemaining}`);
+  lines.push(`  XP total:     ${char.xp}`);
+  lines.push(`  Equipment:    ${char.equipment.length ? char.equipment.join(', ') : '(none)'}`);
+  lines.push(`  Milestones done: ${Object.entries(char.milestonesCompleted).filter(([, v]) => v).map(([k]) => k).join(', ') || '(none yet)'}`);
+  if (char.betaBoostActive) lines.push(`  Beta Boost: ACTIVE (next climb: +3 all stats)`);
+  lines.push(``);
+
+  lines.push(`MILESTONE TARGETS (gaps: positive = stat deficit; "OK" = met):`);
+  const gap = (req, cur) => {
+    const d = req - cur;
+    return d > 0 ? `+${d}` : (d === 0 ? 'OK' : `${d}`);
+  };
+  for (const tier of ['beginner', 'intermediate', 'expert']) {
+    const m = state.milestoneRoutes[tier];
+    const r = m.route;
+    const tagStr = r.tag ? ` [tag: ${r.tag}]` : ' [untagged]';
+    const eff = computeEffectiveStats(char, r, m.area, {});
+    lines.push(`  ${tier}: ${r.name} (${r.grade}, ${m.area})${tagStr}`);
+    lines.push(`    req S${r.strength}/T${r.technique}/F${r.focus}/X${r.flexibility}, Endurance ${r.endurance}`);
+    lines.push(`    your gaps: S${gap(r.strength, eff.strength)} T${gap(r.technique, eff.technique)} F${gap(r.focus, eff.focus)} X${gap(r.flexibility, eff.flexibility)}`);
+  }
+  lines.push(``);
+
+  lines.push(`MILESTONE ACCESS:`);
+  const accessCardNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
+  for (const tier of ['beginner', 'intermediate', 'expert']) {
+    const m = state.milestoneRoutes[tier];
+    if (!m) continue;
+    const a = checkAreaAccess(char, m.area);
+    const tierLabel = tier.padEnd(13);
+    if (a.hasAccess) {
+      lines.push(`  ${tierLabel} (${m.area}) OPEN`);
+    } else {
+      const haveCards = char.equipment.filter(e => accessCardNames.includes(e));
+      const haveStr = haveCards.length ? `have: ${haveCards.join(', ')}` : 'have: none';
+      lines.push(`  ${tierLabel} (${m.area}) BLOCKED — need: ${a.missingItems.join(', ')} (${haveStr})`);
+    }
+  }
+  lines.push(``);
+
+  lines.push(`OPPONENTS:`);
+  for (const p of state.players) {
+    if (p.playerNum === player.playerNum) continue;
+    const done = Object.entries(p.character.milestonesCompleted).filter(([, v]) => v).map(([k]) => k[0].toUpperCase()).join('') || '-';
+    lines.push(`  Player ${p.playerNum} (${p.character.name}, L${p.character.level}): milestones ${done}`);
+  }
+  lines.push(``);
+
+  if (recentHistory.length > 0) {
+    lines.push(`YOUR RECENT ACTIONS (most recent last):`);
+    for (const h of recentHistory) lines.push(`  - ${h}`);
+    lines.push(``);
+  }
+
+  const clearingMap = { 0: 'Lead Climbing', 1: 'Top Rope', 2: 'Bouldering' };
+  const clearingAreaLabel = clearingMap[state.routeClearingPosition] || 'unknown';
+  lines.push(`ROUND CLEARING: at end of this round, ${clearingAreaLabel}'s regular routes will be wiped and replaced, and all players return to the Lobby. Milestone routes are NOT affected.`);
+  lines.push(``);
+
+  // The Lite CPP replacement for the numbered LEGAL ACTIONS block.
+  lines.push(formatAvailableToolsBlock(state, legalActions, player));
+  lines.push(``);
+  lines.push(`Respond with ONE JSON object per the OUTPUT FORMAT in the system prompt.`);
+  return lines.join('\n');
+}
+
 // Compute and format the per-stat gap between effective stats and a route's
 // requirements. Returns a string like "GAPS: Str+5 Tech-3 Focus-12 Flex+2".
 // Worst-stat gap is also returned numerically for quick rule application.
@@ -772,10 +1316,16 @@ function formatAction(a, state, player) {
       const tagStr = r.tag ? ` [${r.tag}]` : '';
       return `MILESTONE — ${a.difficulty}: ${r.name} (${r.grade}, ${m.area})${tagStr}; req Str${r.strength}/Tech${r.technique}/Focus${r.focus}/Flex${r.flexibility}, you have ${eff.strength}/${eff.technique}/${eff.focus}/${eff.flexibility} (gaps: ${label}); time ${r.time}, endurance ${r.endurance}`;
     }
-    case 'train':
-      return `TRAIN at ${a.areaName}`;
+    case 'train': {
+      // Surface the stat each station actually trains. Without this, the model
+      // has to cross-reference the area-stat table from the system prompt on
+      // every decision and frequently picks the wrong station.
+      const station = TRAINING_AREAS.find(t => t.name === a.areaName);
+      const statStr = station ? ` -> +5 ${station.stat.toUpperCase()}` : '';
+      return `TRAIN at ${a.areaName}${statStr}`;
+    }
     case 'rest':
-      return `REST (recover endurance)`;
+      return `REST (+full endurance, costs 1 time)`;
     case 'buyGear': {
       // Surface the card's actual effect — the LLM can't reason about a name like
       // "Mountain Mentor" without seeing what it does.
@@ -785,7 +1335,7 @@ function formatAction(a, state, player) {
       return `BUY ${a.gearName}${cost}${desc}`;
     }
     case 'endTurn':
-      return `END TURN (pass)`;
+      return `END TURN (pass — no endurance gain, distinct from REST)`;
     default:
       return `(unknown: ${JSON.stringify(a)})`;
   }
@@ -811,6 +1361,14 @@ async function fetchWithTimeout(url, options, timeoutMs, externalSignal) {
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } catch (err) {
+    // Some fetch implementations reject with the abort `reason` directly
+    // (a primitive string like 'external' or 'timeout'). Coerce to an Error
+    // first so we can attach an `.outcome` tag without throwing.
+    if (typeof err !== 'object' || err === null) {
+      const e = new Error(`ollama request aborted (reason: ${String(err)})`);
+      e.outcome = err === 'external' ? 'aborted' : (err === 'timeout' ? 'timeout' : 'network_error');
+      throw e;
+    }
     if (err.name === 'AbortError') {
       const reason = controller.signal.reason;
       if (reason === 'external') {

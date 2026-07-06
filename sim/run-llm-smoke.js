@@ -7,7 +7,7 @@
 // USAGE:
 //   node sim/run-llm-smoke.js
 //   node sim/run-llm-smoke.js --seeds=1,7,13,42,99,888,2024
-//   node sim/run-llm-smoke.js --model=qwen2.5:14b-instruct
+//   node sim/run-llm-smoke.js --model=qwen2.5:7b-instruct   # non-reasoning alternative
 //   node sim/run-llm-smoke.js --output-dir=results/llm-7b-smoke
 
 import fs from 'node:fs';
@@ -31,7 +31,7 @@ const args = parseArgs(process.argv);
 // directly compare LLM outcomes to those earlier heuristic-only runs.
 const SEEDS = (args.seeds || '1,7,13,42,99,888,2024')
   .split(',').map(s => Number(s.trim()));
-const MODEL = args.model || 'qwen2.5:7b-instruct';
+const MODEL = args.model || 'deepseek-r1:7b';
 const CHARACTERS = (args.characters || 'technician,sprinter').split(',');
 const OUTPUT_DIR = args['output-dir']
   || `results/llm-smoke-${new Date().toISOString().slice(0, 10)}`;
@@ -79,7 +79,7 @@ for (let i = 0; i < SEEDS.length; i++) {
       policySeed: seed + 1000,
       characterKeys: CHARACTERS,
       agentNames: AGENTS,
-      turnTimeoutMs: 30000, // 30s per turn; generous so one slow LLM call doesn't fall back
+      turnTimeoutMs: 180000, // 180s — reasoning models (deepseek-r1) emit long <think> blocks
       writer,
     });
     await writer.close();

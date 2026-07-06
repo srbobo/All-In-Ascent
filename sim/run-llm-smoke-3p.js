@@ -11,7 +11,7 @@
 //
 // USAGE:
 //   node sim/run-llm-smoke-3p.js
-//   node sim/run-llm-smoke-3p.js --seeds=1,7,13 --model=qwen2.5:7b-instruct \
+//   node sim/run-llm-smoke-3p.js --seeds=1,7,13 --model=deepseek-r1:7b \
 //                                --characters=technician,sprinter,ironLung
 
 import fs from 'node:fs';
@@ -36,9 +36,9 @@ const args = parseArgs(process.argv);
 const SEEDS = (args.seeds || '1,7,13')
   .split(',').map(s => Number(s.trim()));
 
-const MODEL = args.model || 'qwen2.5:7b-instruct';
+const MODEL = args.model || 'deepseek-r1:7b';
 const CHARACTERS = (args.characters || 'technician,sprinter,ironLung').split(',');
-const GAME_TIMEOUT_MIN = Number(args['game-timeout-min'] || 45);
+const GAME_TIMEOUT_MIN = Number(args['game-timeout-min'] || 90);
 
 if (CHARACTERS.length !== 3) {
   console.error(`error: 3-player smoke needs exactly 3 characters (got ${CHARACTERS.length})`);
@@ -110,13 +110,14 @@ for (let i = 0; i < SEEDS.length; i++) {
       policySeed: seed + 1000,
       characterKeys: CHARACTERS,
       agentNames: AGENTS,
-      // Per-decision timeout: 90s accommodates qwen2.5:7b with the
-      // v0.5.0 prompt size; AbortController cancels mid-request now
-      // (Track 1.1) so timeouts don't leak background HTTP calls.
-      turnTimeoutMs: 90000,
-      // Game-level watchdog (Track 1.3): hard cap of 45 minutes per game.
-      // If a game runs longer it almost certainly means Ollama is hung —
-      // saves us from 11-hour runaway runs.
+      // Per-decision timeout: 180s for reasoning models (deepseek-r1)
+      // whose <think> blocks add 30-90s vs qwen2.5:7b's 14s baseline.
+      // AbortController cancels mid-request (Track 1.1) so timeouts
+      // don't leak background HTTP calls.
+      turnTimeoutMs: 180000,
+      // Game-level watchdog (Track 1.3): hard cap, default 90 min for
+      // reasoning models. If a game runs longer it almost certainly
+      // means Ollama is hung — saves us from 11-hour runaway runs.
       gameTimeoutMs: GAME_TIMEOUT_MIN * 60 * 1000,
       onProgress,
       progressIntervalMs: 60000,
