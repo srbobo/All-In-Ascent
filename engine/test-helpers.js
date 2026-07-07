@@ -17,6 +17,7 @@ import {
   computeClimbXp, getFailureEnduranceExtra, freeSoloCanAttempt,
   applyBetaBoostIfActive, computeRestRecovery, applyLevelUpIfNeeded,
   canClimbTopRopeRoute, isBelayerStationFree, pickFreeBelayerStation,
+  dispatchToolCall,
 } from './helpers.js';
 import { createRng } from './rng.js';
 import { ROUTES } from './data.js';
@@ -375,6 +376,114 @@ check('Other chars no extra fail endurance', getFailureEnduranceExtra(techCharBa
   check('level-up: strength went up', c.stats.strength > 12);
   check('level-up: technique went up', c.stats.technique > 26);
   check('level-up: maxEndurance went up', c.maxEndurance > 100);
+}
+
+// =============================================================================
+// TOOL DISPATCH (Lite CPP)
+// =============================================================================
+// Pure-function checks for dispatchToolCall — no engine state coupling.
+// We hand-build a `legal` array shaped like getLegalActions' output.
+
+{
+  const legal = [
+    { type: 'endTurn' },
+    { type: 'rest' },
+    { type: 'train', areaName: 'Campus Board' },         // strength
+    { type: 'train', areaName: 'Grip Board' },           // focus
+    { type: 'train', areaName: 'Balance and Core' },     // flexibility
+    // (Continuous MoonBoard/technique intentionally omitted — station occupied)
+    { type: 'climb', area: 'bouldering', routeName: 'The Gauntlet Opener' },
+    { type: 'climb', area: 'bouldering', routeName: 'Crimson Ladder' },
+    { type: 'milestone', difficulty: 'beginner', area: 'bouldering', routeName: 'The Gauntlet Opener' },
+    // (intermediate intentionally omitted — assume access blocked)
+    { type: 'buyGear', gearName: 'Belay Device' },
+    { type: 'buyGear', gearName: 'Lead Rope' },
+  ];
+
+  // Happy paths
+  const t1 = dispatchToolCall(legal, { tool: 'train', args: { stat: 'strength' } });
+  check('dispatch: train(strength) → Campus Board',
+    t1.ok && t1.action?.areaName === 'Campus Board');
+
+  const t2 = dispatchToolCall(legal, { tool: 'train', args: { stat: 'focus' } });
+  check('dispatch: train(focus) → Grip Board',
+    t2.ok && t2.action?.areaName === 'Grip Board');
+
+  const t3 = dispatchToolCall(legal, { tool: 'rest' });
+  check('dispatch: rest → rest action', t3.ok && t3.action?.type === 'rest');
+
+  const t4 = dispatchToolCall(legal, { tool: 'end_turn' });
+  check('dispatch: end_turn → endTurn action', t4.ok && t4.action?.type === 'endTurn');
+
+  const t5 = dispatchToolCall(legal, { tool: 'climb', args: { route_name: 'Crimson Ladder' } });
+  check('dispatch: climb(route_name=Crimson Ladder)',
+    t5.ok && t5.action?.routeName === 'Crimson Ladder');
+
+  // camelCase accepted alongside snake_case
+  const t5b = dispatchToolCall(legal, { tool: 'climb', args: { routeName: 'Crimson Ladder' } });
+  check('dispatch: climb(routeName=...) camelCase accepted', t5b.ok);
+
+  const t6 = dispatchToolCall(legal, { tool: 'attempt_milestone', args: { tier: 'beginner' } });
+  check('dispatch: attempt_milestone(beginner) → milestone action',
+    t6.ok && t6.action?.difficulty === 'beginner');
+
+  const t7 = dispatchToolCall(legal, { tool: 'buy_gear', args: { gear_name: 'Lead Rope' } });
+  check('dispatch: buy_gear(Lead Rope) → buyGear action',
+    t7.ok && t7.action?.gearName === 'Lead Rope');
+
+  // Well-formed but illegal — surfaces a reason the LLM can react to
+  const e1 = dispatchToolCall(legal, { tool: 'train', args: { stat: 'technique' } });
+  check('dispatch: train(technique) with station occupied → train_station_unavailable',
+    !e1.ok && e1.reason === 'train_station_unavailable');
+
+  const e2 = dispatchToolCall(legal, { tool: 'climb', args: { route_name: 'Made Up Route' } });
+  check('dispatch: climb(non-existent) → route_not_climbable',
+    !e2.ok && e2.reason === 'route_not_climbable');
+
+  const e3 = dispatchToolCall(legal, { tool: 'attempt_milestone', args: { tier: 'intermediate' } });
+  check('dispatch: attempt_milestone(blocked) → milestone_not_attemptable',
+    !e3.ok && e3.reason === 'milestone_not_attemptable');
+
+  const e4 = dispatchToolCall(legal, { tool: 'buy_gear', args: { gear_name: 'Nothing.jpg' } });
+  check('dispatch: buy_gear(unknown) → gear_not_buyable',
+    !e4.ok && e4.reason === 'gear_not_buyable');
+
+  // Malformed input — surfaces specific reason codes for the retry prompt
+  const m1 = dispatchToolCall(legal, { tool: 'train', args: { stat: 'stamina' } });
+  check('dispatch: train(invalid stat) → invalid_stat',
+    !m1.ok && m1.reason === 'invalid_stat');
+
+  const m2 = dispatchToolCall(legal, { tool: 'attempt_milestone', args: { tier: 'god_tier' } });
+  check('dispatch: attempt_milestone(invalid tier) → invalid_tier',
+    !m2.ok && m2.reason === 'invalid_tier');
+
+  const m3 = dispatchToolCall(legal, { tool: 'climb', args: {} });
+  check('dispatch: climb() missing args → missing_route_name',
+    !m3.ok && m3.reason === 'missing_route_name');
+
+  const m4 = dispatchToolCall(legal, { tool: 'buy_gear', args: {} });
+  check('dispatch: buy_gear() missing args → missing_gear_name',
+    !m4.ok && m4.reason === 'missing_gear_name');
+
+  const m5 = dispatchToolCall(legal, { tool: 'yolo' });
+  check('dispatch: unknown tool → unknown_tool',
+    !m5.ok && m5.reason === 'unknown_tool');
+
+  const m6 = dispatchToolCall(legal, null);
+  check('dispatch: null toolCall → malformed_call',
+    !m6.ok && m6.reason === 'malformed_call');
+
+  const m7 = dispatchToolCall(legal, 'not an object');
+  check('dispatch: string toolCall → malformed_call',
+    !m7.ok && m7.reason === 'malformed_call');
+
+  // Detail strings surface enough info for the LLM to correct itself
+  check('dispatch: route_not_climbable detail lists currently climbable routes',
+    e2.detail.includes('Crimson Ladder') || e2.detail.includes('Gauntlet Opener'));
+  check('dispatch: invalid_stat detail lists valid stats',
+    m1.detail.includes('strength') && m1.detail.includes('focus'));
+  check('dispatch: unknown_tool detail lists valid tools',
+    m5.detail.includes('train') && m5.detail.includes('climb'));
 }
 
 // =============================================================================

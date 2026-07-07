@@ -14,7 +14,7 @@
 // USAGE:
 //   node sim/run-llm-tournament.js
 //   node sim/run-llm-tournament.js --character=ironLung --seed=1 --iterations=5
-//   node sim/run-llm-tournament.js --model=qwen2.5:7b-instruct --opponents=technician,sprinter
+//   node sim/run-llm-tournament.js --model=deepseek-r1:7b --opponents=technician,sprinter
 //
 // Output dir: results/tournament-<character>-seed<seed>-<date>/
 //   memory-<character>.json   — accumulating per-character memory file
@@ -29,6 +29,7 @@ import { runOneGame, createJsonlWriter } from './run-one-game.js';
 import { scoreGame } from '../analysis/score-game.js';
 import { CHARACTERS } from '../engine/data.js';
 import { loadMemory, appendGameToMemory, saveMemory, formatMemoryForPrompt } from './tournament/memory.js';
+import { notify, writeStatus, writeHeartbeat } from './tournament/heartbeat.js';
 
 function parseArgs(argv) {
   const out = {};
@@ -47,10 +48,40 @@ const args = parseArgs(process.argv);
 const CHARACTER     = args.character || 'ironLung';
 const SEED          = Number(args.seed || 1);
 const ITERATIONS    = Number(args.iterations || 5);
-const MODEL         = args.model || 'qwen2.5:7b-instruct';
+const MODEL         = args.model || 'deepseek-r1:7b';
 const OPPONENTS     = (args.opponents || 'technician,sprinter').split(',');
+// Default 60 min. Games that stalemate at the expert milestone need more
+// than 45 min to resolve naturally; if the watchdog still fires, partial
+// scoring in run-one-game.js captures the score-so-far anyway.
 const GAME_TIMEOUT_MIN = Number(args['game-timeout-min'] || 60);
 const RESET_MEMORY  = args['reset-memory'] === 'true';
+const QUIET_NOTIFY  = args['quiet-notifications'] === 'true';
+// Lite CPP: 'index' (default, LEGAL ACTIONS numbered) or 'tools'
+// (semantic tool dispatch via engine.dispatchToolCall). See sim/agents/ollama.js.
+const AGENT_MODE    = args['agent-mode'] || 'index';
+if (!['index', 'tools', 'rollout'].includes(AGENT_MODE)) {
+  console.error(`unknown --agent-mode "${AGENT_MODE}" (expected: index | tools | rollout)`);
+  process.exit(1);
+}
+// Temp-ablation experiment: per-turn decision temperature for the LLM seat.
+// null (flag omitted) = legacy 0.3 baseline. Planning/reflection unaffected.
+const DECISION_TEMP = args['decision-temp'] != null ? Number(args['decision-temp']) : null;
+if (DECISION_TEMP != null && !(DECISION_TEMP >= 0 && DECISION_TEMP <= 2)) {
+  console.error(`--decision-temp must be a number in [0, 2] (got ${args['decision-temp']})`);
+  process.exit(1);
+}
+// Reasoning-effort for thinking models (gpt-oss): --think=low|medium|high.
+// Omit for non-thinking models (qwen2.5 rejects requests carrying `think`).
+const THINK_LEVEL = args['think'] || null;
+if (THINK_LEVEL != null && !['low', 'medium', 'high'].includes(THINK_LEVEL)) {
+  console.error(`--think must be low | medium | high (got ${THINK_LEVEL})`);
+  process.exit(1);
+}
+// Thermal management: minutes to sleep between iterations. The M5 sustains
+// roughly 3 hours of continuous 7B inference before throttling collapses
+// latency 10x (observed twice: iters 4-5 died at ~950s/decision). Cooldowns
+// spread the thermal load. 0 = no cooldown (legacy).
+const COOLDOWN_MIN  = Number(args['cooldown-min'] || 0);
 
 if (!CHARACTERS[CHARACTER]) {
   console.error(`unknown character: ${CHARACTER}. Available: ${Object.keys(CHARACTERS).join(', ')}`);
@@ -90,6 +121,10 @@ console.log(`  opponents (heur):   ${OPPONENTS.join(' / ')}`);
 console.log(`  seed (same every iteration): ${SEED}`);
 console.log(`  iterations:         ${ITERATIONS}`);
 console.log(`  model:              ${MODEL}`);
+console.log(`  agent mode:         ${AGENT_MODE}`);
+console.log(`  decision temp:      ${DECISION_TEMP ?? '(default 0.3)'}`);
+console.log(`  think level:        ${THINK_LEVEL ?? '(n/a — non-thinking model)'}`);
+console.log(`  cooldown:           ${COOLDOWN_MIN} min between iterations`);
 console.log(`  game watchdog:      ${GAME_TIMEOUT_MIN} min/iteration`);
 console.log(`  output dir:         ${OUT_DIR}`);
 console.log(`  reset memory:       ${RESET_MEMORY}`);
@@ -103,6 +138,40 @@ console.log();
 
 const scoreTrajectory = [];
 const tournamentStartedAt = Date.now();
+
+// --- Health probe lifecycle ---
+//
+// STATUS.txt + HEARTBEAT.txt + macOS popups so the user can verify the
+// process is alive without tailing logs. Solves repeated false-kill incidents
+// where 2-3 hour tournaments were stopped because they looked idle.
+writeStatus(OUT_DIR, 'RUNNING', {
+  character: CHARACTER, seed: SEED, model: MODEL,
+  iterations: ITERATIONS, completedIters: 0,
+  startedAt: new Date(tournamentStartedAt).toISOString(),
+});
+notify('Tournament started',
+  `${CHARACTER} × ${ITERATIONS} iter on ${MODEL}\nOutput: ${OUT_DIR}`,
+  { quiet: QUIET_NOTIFY });
+
+// SIGINT/SIGTERM handlers — record INTERRUPTED state so the user knows the
+// difference between "killed mid-run" and "exited cleanly".
+let interrupted = false;
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => {
+    if (interrupted) return;
+    interrupted = true;
+    writeStatus(OUT_DIR, 'INTERRUPTED', {
+      signal: sig,
+      iterCompletedSoFar: scoreTrajectory.length,
+      scoreTrajectory: `[${scoreTrajectory.join(', ')}]`,
+      stoppedAt: new Date().toISOString(),
+    });
+    notify('Tournament INTERRUPTED',
+      `Stopped at iter ${scoreTrajectory.length + 1}/${ITERATIONS}\nscores so far: [${scoreTrajectory.join(', ')}]`,
+      { quiet: QUIET_NOTIFY, sound: 'Sosumi' });
+    process.exit(130);
+  });
+}
 
 for (let iter = 1; iter <= ITERATIONS; iter++) {
   const iterStartedAt = Date.now();
@@ -152,6 +221,12 @@ for (let iter = 1; iter <= ITERATIONS; iter++) {
       ).join(' ');
       const ms = p.milestoneProgress.map(m => m.done).join('/');
       process.stdout.write(`    [iter=${iter}] r${p.round} step=${p.step} ${min(p.elapsedMs)}m ${seats} ms=${ms}\n`);
+      // Heartbeat — rewrites HEARTBEAT.txt every progress tick (~60s). A stale
+      // mtime on that file is the signal that the LLM is hung mid-decision.
+      writeHeartbeat(OUT_DIR, {
+        iterNum: iter, totalIters: ITERATIONS, watchdogMin: GAME_TIMEOUT_MIN,
+        iterStartTime: iterStartedAt, progress: p, scoreHistory: scoreTrajectory,
+      });
     };
 
     const result = await runOneGame({
@@ -159,8 +234,11 @@ for (let iter = 1; iter <= ITERATIONS; iter++) {
       characterKeys: CHARACTERS_IN_ORDER,
       agentNames: AGENTS,
       policySeed: SEED + 1000 + iter * 100,   // vary heuristic randomness per iter; LLM is qualitative
-      turnTimeoutMs: 90000,
+      turnTimeoutMs: 180000,
       gameTimeoutMs: GAME_TIMEOUT_MIN * 60 * 1000,
+      agentMode: AGENT_MODE,
+      decisionTemperature: DECISION_TEMP,
+      thinkLevel: THINK_LEVEL,
       seatMemoryContexts,
       writer,
       onProgress,
@@ -171,6 +249,18 @@ for (let iter = 1; iter <= ITERATIONS; iter++) {
   } catch (err) {
     await writer.close();
     console.error(`  [iter=${iter}] FAILED: ${err.message}`);
+    // Notify on non-watchdog failures too — previously these silently vanished
+    // from the trajectory and left the user with 30+ min gaps between popups.
+    // (Watchdog no longer throws — it returns a summary with reason='game_watchdog'.)
+    notify(`Iter ${iter}/${ITERATIONS} FAILED`,
+      err.message.slice(0, 140),
+      { quiet: QUIET_NOTIFY, sound: 'Basso' });
+    writeStatus(OUT_DIR, 'RUNNING', {
+      completedIters: scoreTrajectory.length,
+      lastIterError: err.message.slice(0, 200),
+      scoreTrajectory: `[${scoreTrajectory.join(', ')}]`,
+      updated: new Date().toISOString(),
+    });
     continue;
   }
 
@@ -194,8 +284,26 @@ for (let iter = 1; iter <= ITERATIONS; iter++) {
   // Run reflection. We need the LLM agent instance — pull it back out of
   // the runner is awkward, so we just build a fresh one. Reflection is a
   // one-shot LLM call; the model has all the context it needs in the prompt.
-  console.log(`  ✓ game complete in ${((Date.now() - iterStartedAt) / 60000).toFixed(1)} min — score=${llmScore.score} (win=${llmScore.win}, ms=${llmScore.milestonesCompleted}/3, ability=${llmScore.abilityTriggers})`);
+  // Distinguish natural completion from watchdog termination. Watchdog games
+  // still produce a valid score (partial milestones counted) and still run
+  // reflection — they're just labeled differently for the user.
+  const isWatchdog = summary?.reason === 'game_watchdog';
+  const endLabel = isWatchdog ? `game watchdog fired at r${summary.rounds}` : 'game complete';
+  console.log(`  ${isWatchdog ? '⏱' : '✓'} ${endLabel} in ${((Date.now() - iterStartedAt) / 60000).toFixed(1)} min — score=${llmScore.score} (win=${llmScore.win}, ms=${llmScore.milestonesCompleted}/3, ability=${llmScore.abilityTriggers})`);
   console.log(`  reflecting...`);
+  // Iter-complete signal — popup + status refresh. Most important checkpoint
+  // for the user: confirms forward progress even if the next iter is slow.
+  writeStatus(OUT_DIR, 'RUNNING', {
+    completedIters: iter, of: ITERATIONS,
+    lastScore: llmScore.score, lastMilestones: `${llmScore.milestonesCompleted}/3`,
+    lastEnd: isWatchdog ? 'watchdog' : 'natural',
+    scoreTrajectory: `[${[...scoreTrajectory].join(', ')}]`,
+    updated: new Date().toISOString(),
+  });
+  const titlePrefix = isWatchdog ? `Iter ${iter}/${ITERATIONS} watchdog` : `Iter ${iter}/${ITERATIONS} done`;
+  notify(`${titlePrefix} — score ${llmScore.score}`,
+    `${llmScore.milestonesCompleted}/3 milestones, ${llmScore.abilityTriggers} ability uses\nTrajectory: [${scoreTrajectory.join(', ')}]`,
+    { quiet: QUIET_NOTIFY, sound: isWatchdog ? 'Basso' : 'Glass' });
 
   const reflectionAgent = createOllamaAgent({ model: MODEL, timeoutMs: 120000 });
   const reflectionT0 = Date.now();
@@ -246,6 +354,24 @@ for (let iter = 1; iter <= ITERATIONS; iter++) {
       console.log(`    advice: ${reflection.advice_for_next_game.slice(0, 100)}${reflection.advice_for_next_game.length > 100 ? '...' : ''}`);
     }
   }
+
+  // Thermal cooldown between iterations (skip after the last one). STATUS.txt
+  // reflects the pause so a fresh mtime + "COOLING" reads as intentional,
+  // not a hang — the HEARTBEAT stops updating during the sleep by design.
+  if (COOLDOWN_MIN > 0 && iter < ITERATIONS) {
+    console.log(`  ❄ cooling ${COOLDOWN_MIN} min before iteration ${iter + 1}...`);
+    writeStatus(OUT_DIR, 'COOLING', {
+      completedIters: iter, of: ITERATIONS,
+      resumesAt: new Date(Date.now() + COOLDOWN_MIN * 60000).toISOString(),
+      scoreTrajectory: `[${scoreTrajectory.join(', ')}]`,
+    });
+    await new Promise(r => setTimeout(r, COOLDOWN_MIN * 60000));
+    writeStatus(OUT_DIR, 'RUNNING', {
+      completedIters: iter, of: ITERATIONS,
+      scoreTrajectory: `[${scoreTrajectory.join(', ')}]`,
+      updated: new Date().toISOString(),
+    });
+  }
   console.log();
 }
 
@@ -281,3 +407,20 @@ fs.writeFileSync(path.join(OUT_DIR, 'tournament-summary.json'), JSON.stringify({
   elapsedMin: Number(totalMin),
   completedAt: new Date().toISOString(),
 }, null, 2));
+
+// Final terminal-state signals. Pick the right status based on whether all
+// iterations actually produced scores (partial completion is still a useful
+// run, but we surface it differently).
+const allRan = scoreTrajectory.length === ITERATIONS;
+const trajStr = `[${scoreTrajectory.join(', ')}]`;
+const bestStr = scoreTrajectory.length ? Math.max(...scoreTrajectory) : '—';
+writeStatus(OUT_DIR, allRan ? 'COMPLETE' : 'PARTIAL', {
+  completedIters: scoreTrajectory.length, of: ITERATIONS,
+  scoreTrajectory: trajStr,
+  best: bestStr,
+  elapsedMin: totalMin,
+  completedAt: new Date().toISOString(),
+});
+notify(allRan ? 'Tournament COMPLETE' : 'Tournament partial',
+  `${scoreTrajectory.length}/${ITERATIONS} iters, best=${bestStr}\nTrajectory: ${trajStr}`,
+  { quiet: QUIET_NOTIFY, sound: allRan ? 'Hero' : 'Glass' });

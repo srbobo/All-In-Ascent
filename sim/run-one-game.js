@@ -23,6 +23,7 @@ import { createGame } from '../engine/state.js';
 import { getLegalActions, applyAction, isTerminal } from '../engine/engine.js';
 import { createRandomAgent } from './agents/random.js';
 import { createHeuristicAgent } from './agents/heuristic.js';
+import { createRolloutAgent } from './agents/rollout.js';
 import { createOllamaAgent } from './agents/ollama.js';
 
 // ---------- CLI argument parsing ----------
@@ -48,8 +49,11 @@ function buildAgent(name, opts) {
   switch (name) {
     case 'random':    return createRandomAgent({ seed: opts.policySeed });
     case 'heuristic': return createHeuristicAgent();
+    // R2 pure search agent: full-width rollout evaluation, no LLM. The
+    // search-strength ceiling that LLM priors get measured against.
+    case 'rollout':   return createRolloutAgent();
   }
-  // "ollama:<model-name>" syntax — e.g. "ollama:qwen2.5:14b-instruct".
+  // "ollama:<model-name>" syntax — e.g. "ollama:deepseek-r1:7b".
   // We split on the FIRST colon only so the model tag keeps its own colons.
   if (name.startsWith('ollama:')) {
     const model = name.slice('ollama:'.length);
@@ -57,9 +61,18 @@ function buildAgent(name, opts) {
       model,
       host: opts.ollamaHost || 'http://localhost:11434',
       timeoutMs: opts.turnTimeoutMs || 15000,
+      // Lite CPP: 'index' (numbered LEGAL ACTIONS + action_index) or 'tools'
+      // (semantic tool calls dispatched via dispatchToolCall in helpers.js).
+      // Default 'index' preserves the baseline for A/B comparisons.
+      agentMode: opts.agentMode || 'index',
+      // Temp-ablation: near-greedy action decisions while planning keeps
+      // its default. null = inherit (legacy baselines unchanged).
+      decisionTemperature: opts.decisionTemperature ?? null,
+      // Reasoning-effort for thinking models (gpt-oss). null = field omitted.
+      thinkLevel: opts.thinkLevel ?? null,
     });
   }
-  throw new Error(`unknown agent: ${name}. Available: random, heuristic, ollama:<model>`);
+  throw new Error(`unknown agent: ${name}. Available: random, heuristic, rollout, ollama:<model>`);
 }
 
 // ---------- Main runner ----------
@@ -78,6 +91,13 @@ export async function runOneGame({
   seatMemoryContexts = null,   // optional: array indexed by seat (0-based) — formatted
                                // memory string passed into planStrategy() for that seat
                                // (Phase 3 of the tournament experiment).
+  agentMode = 'index',         // Lite CPP: 'index' (default) or 'tools'.
+                               // Applies to ALL ollama seats — the heuristic
+                               // baseline is unaffected. See sim/agents/ollama.js.
+  decisionTemperature = null,  // Temp-ablation: per-turn decision temperature
+                               // for ollama seats (null = model default 0.3).
+  thinkLevel = null,           // Reasoning effort for thinking models
+                               // (gpt-oss: low|medium|high). null = omitted.
 }) {
   // Basic input validation so misconfigs fail fast instead of silently running bad games.
   if (characterKeys.length !== agentNames.length) {
@@ -101,7 +121,7 @@ export async function runOneGame({
   // 15s default fires on ~50% of decisions. Plumbing the caller's value
   // through fixes the timeout-fallback explosion.
   const agents = agentNames.map((n, i) =>
-    buildAgent(n, { policySeed: policySeed + i * 1000, turnTimeoutMs }));
+    buildAgent(n, { policySeed: policySeed + i * 1000, turnTimeoutMs, agentMode, decisionTemperature, thinkLevel }));
 
   // Write the run_meta record first. It's everything a future reader needs
   // to interpret the events without re-running the game.
@@ -111,6 +131,13 @@ export async function runOneGame({
     seed, policySeed,
     characters: characterKeys,
     agents: agentNames,
+    // Lite CPP marker: 'index' vs 'tools'. Recorded so measure-drift and
+    // build-report can categorize traces without needing to inspect events.
+    agentMode,
+    // Temp-ablation marker: null = legacy 0.3 baseline.
+    decisionTemperature,
+    // Reasoning-effort marker for thinking models (null for non-thinking).
+    thinkLevel,
     engineVersion: null, // filled in after createGame
   };
 
@@ -222,9 +249,15 @@ export async function runOneGame({
     } catch (e) { /* never let progress reporting break the run */ }
   }
 
+  // Watchdog termination doesn't throw — it breaks the loop with a flag,
+  // and the post-loop code synthesizes a run_summary with reason='game_watchdog'.
+  // This preserves partial data (milestones scored, ability triggers, per-decision
+  // telemetry) which would otherwise be dropped by the caller's error handler.
+  let watchdogFired = false;
   while (true) {
     if (gameWatchdogFired()) {
-      throw new Error(`game watchdog: exceeded ${gameTimeoutMs}ms wall-clock budget at round ${state.round}`);
+      watchdogFired = true;
+      break;
     }
     maybeReportProgress();
     const term = isTerminal(state);
@@ -328,6 +361,45 @@ export async function runOneGame({
       }
     }
 
+    // Lite CPP Phase 3: emit per-retry tool_error events BEFORE the
+    // agent_decision so the sequence in the JSONL matches the causal order
+    // (each failed attempt happened before the final action). retryTrail is
+    // populated by the tools-mode agent on both success (empty if first-try)
+    // and final failure. Absent for index-mode agents.
+    if (writer && Array.isArray(picked.retryTrail) && picked.retryTrail.length > 0) {
+      for (const t of picked.retryTrail) {
+        writer.write({
+          type: 'tool_error',
+          payload: {
+            playerNum: currentPlayer.playerNum,
+            seat: seatIndex + 1,
+            round: state.round,
+            agent: agentNames[seatIndex],
+            attempt: t.attempt,
+            tool: t.tool,
+            args: t.args,
+            reason: t.reason,
+            detail: t.detail,
+          },
+        });
+      }
+    }
+
+    // Lite CPP Phase 3: emit note_added when the LLM captured a notebook
+    // entry alongside its action call. Intra-game scratchpad — game-scoped.
+    if (writer && picked.noteAdded) {
+      writer.write({
+        type: 'note_added',
+        payload: {
+          playerNum: currentPlayer.playerNum,
+          seat: seatIndex + 1,
+          round: state.round,
+          agent: agentNames[seatIndex],
+          text: picked.noteAdded,
+        },
+      });
+    }
+
     if (writer) writer.write({
       type: 'agent_decision',
       payload: {
@@ -349,6 +421,19 @@ export async function runOneGame({
         // event for this seat).
         activeStrategy: seatStrategies[seatIndex]?.summary || null,
         strategyChanged: picked.strategyChanged === true,
+        // Lite CPP tools-mode telemetry. Null on index-mode / heuristic / random.
+        toolCall: picked.toolCall ?? null,
+        attemptsUsed: picked.attemptsUsed ?? null,
+        noteAdded: picked.noteAdded ?? null,
+        // R2 rollout-mode instrumentation: the LLM's prior vs the search's
+        // choice. priorAgreement is the experiment's primary metric.
+        llmActionIndex: picked.llmActionIndex ?? null,
+        rolloutBestIndex: picked.rolloutBestIndex ?? null,
+        priorAgreement: picked.priorAgreement ?? null,
+        priorOutcome: picked.priorOutcome ?? null,
+        rolloutEvBest: picked.rolloutEvBest ?? null,
+        rolloutEvLlm: picked.rolloutEvLlm ?? null,
+        rolloutTimeMs: picked.rolloutTimeMs ?? null,
       },
     });
 
@@ -360,7 +445,13 @@ export async function runOneGame({
     state = s1;
   }
 
-  const term = isTerminal(state);
+  // If the watchdog fired, synthesize a term object so the summary still
+  // gets written (with reason='game_watchdog'). Downstream scoring/reflection
+  // can then treat it like any other game — just one that ran out of time
+  // before natural termination.
+  const term = watchdogFired
+    ? { done: true, winner: null, reason: 'game_watchdog' }
+    : isTerminal(state);
   const finalPlayers = state.players.map(p => ({
     playerNum: p.playerNum,
     characterKey: p.character.key,
@@ -426,6 +517,10 @@ function classifyErrorMessage(msg) {
   if (m.includes('aborted') || m.includes('abort')) return 'aborted';
   if (m.includes('json parse') || m.includes('missing message.content')) return 'parse_error';
   if (m.includes('out-of-range') || m.includes('invalid actionindex')) return 'out_of_range';
+  // Lite CPP tools-mode: after MAX_TOOL_RETRIES exhausted, the agent throws
+  // an error tagged 'invalid_tool' (via err.outcome, checked before this
+  // fallback classifier). Message-pattern fallback for defensive coverage.
+  if (m.includes('dispatch failed') || m.includes('invalid_tool')) return 'invalid_tool';
   if (m.includes('http ') && /\b[45]\d\d\b/.test(m)) return 'http_error';
   if (m.includes('network') || m.includes('econnrefused') || m.includes('fetch failed')) return 'network_error';
   return 'other_error';
@@ -458,8 +553,10 @@ export function createJsonlWriter(filePath) {
 
 // Only runs when invoked as `node sim/run-one-game.js`, not when imported.
 // Comparison via pathToFileURL handles relative vs absolute argv[1] and
-// cross-platform path separators.
-const invokedDirectly = import.meta.url === pathToFileURL(process.argv[1]).href;
+// cross-platform path separators. The `|| ''` fallback prevents a crash
+// when the module is imported via `node -e "import('...')"` (no argv[1]).
+const invokedDirectly = process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) {
   const args = parseArgs(process.argv);
   const seed = Number(args.seed ?? 1);

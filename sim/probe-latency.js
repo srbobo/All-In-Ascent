@@ -7,18 +7,18 @@
 //
 // USAGE:
 //   node sim/probe-latency.js
-//   node sim/probe-latency.js qwen2.5:7b-instruct 5
-//   node sim/probe-latency.js deepseek-r1:8b 10
+//   node sim/probe-latency.js deepseek-r1:7b 5
+//   node sim/probe-latency.js qwen2.5:7b-instruct 10
 //
-// Defaults: 5 decisions against qwen2.5:7b-instruct.
+// Defaults: 5 decisions against deepseek-r1:7b.
 
 import { createGame } from '../engine/state.js';
 import { getLegalActions } from '../engine/engine.js';
 import { createOllamaAgent } from './agents/ollama.js';
 
-const MODEL = process.argv[2] || 'qwen2.5:7b-instruct';
+const MODEL = process.argv[2] || 'deepseek-r1:7b';
 const N = Number(process.argv[3] || 5);
-const TIMEOUT_MS = 120_000; // generous for probe — we WANT slow responses to complete
+const TIMEOUT_MS = 240_000; // generous for probe — reasoning models can take 60-90s
 const HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
 
 console.log(`Latency probe: ${MODEL} @ ${HOST}`);

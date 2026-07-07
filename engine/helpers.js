@@ -662,3 +662,124 @@ export function applyLevelUpIfNeeded(char) {
     newMaxEndurance: char.maxEndurance,
   };
 }
+
+// =============================================================================
+// TOOL-CALL DISPATCH — Lite CPP action encoding
+// =============================================================================
+//
+// Maps a semantic tool call ({tool, args}) to a concrete engine action from
+// legalActions. Purpose: eliminate the "action_index" translation step where
+// LLM rationale ("train Strength") and executed action ("Grip Board / Focus")
+// have been observed to drift.
+//
+// This is a PURE function — no engine state coupling, no I/O. Callers pass
+// their pre-computed legalActions list; we scan and match. Returns either:
+//   { ok: true, action }        — dispatch succeeded; use `action` verbatim
+//   { ok: false, reason, detail } — well-formed but illegal (station occupied,
+//                                    route not in pool, unknown gear). The
+//                                    LLM can react to `reason` on a retry
+//                                    (see retry loop in sim/agents/ollama.js).
+//
+// Tool schema (advertised to the LLM in the tool-mode system prompt):
+//   train              args: { stat: strength|technique|focus|flexibility }
+//   rest               args: {}
+//   climb              args: { route_name: string }
+//   attempt_milestone  args: { tier:  beginner|intermediate|expert }
+//   buy_gear           args: { gear_name: string }
+//   end_turn           args: {}
+const TOOL_STATS = ['strength', 'technique', 'focus', 'flexibility'];
+const TOOL_TIERS = ['beginner', 'intermediate', 'expert'];
+
+// Reason codes are stable string enums so downstream analysis (drift script,
+// build-report) and the retry-error prompt can pattern-match without parsing.
+export function dispatchToolCall(legalActions, toolCall) {
+  if (!toolCall || typeof toolCall !== 'object') {
+    return { ok: false, reason: 'malformed_call', detail: 'toolCall must be an object with `tool` and `args`' };
+  }
+  const { tool } = toolCall;
+  // Accept both snake_case (args.route_name) and camelCase (args.routeName)
+  // since different LLMs / templates emit different keys.
+  const args = toolCall.args || {};
+  const get = (snake, camel) => args[snake] ?? args[camel];
+
+  switch (tool) {
+    case 'end_turn': {
+      const match = legalActions.find(a => a.type === 'endTurn');
+      return match
+        ? { ok: true, action: match }
+        : { ok: false, reason: 'end_turn_unavailable', detail: 'engine did not emit an endTurn action' };
+    }
+
+    case 'rest': {
+      const match = legalActions.find(a => a.type === 'rest');
+      return match
+        ? { ok: true, action: match }
+        : { ok: false, reason: 'no_time_for_rest', detail: 'rest requires at least 1 time; you may be out of time this turn' };
+    }
+
+    case 'train': {
+      const stat = String(get('stat', 'stat') || '').toLowerCase();
+      if (!TOOL_STATS.includes(stat)) {
+        return { ok: false, reason: 'invalid_stat', detail: `stat must be one of ${TOOL_STATS.join('|')} (got ${JSON.stringify(get('stat', 'stat'))})` };
+      }
+      const area = TRAINING_AREAS.find(a => a.stat === stat);
+      if (!area) {
+        // Defensive; TRAINING_AREAS covers all four stats.
+        return { ok: false, reason: 'no_area_for_stat', detail: stat };
+      }
+      const match = legalActions.find(a => a.type === 'train' && a.areaName === area.name);
+      return match
+        ? { ok: true, action: match }
+        : { ok: false, reason: 'train_station_unavailable',
+            detail: `${area.name} (${stat}) is not available — occupied by another player, or you lack time/endurance` };
+    }
+
+    case 'climb': {
+      const routeName = String(get('route_name', 'routeName') || '');
+      if (!routeName) {
+        return { ok: false, reason: 'missing_route_name', detail: 'climb requires args.route_name' };
+      }
+      const match = legalActions.find(a => a.type === 'climb' && a.routeName === routeName);
+      if (match) return { ok: true, action: match };
+      const climbable = legalActions.filter(a => a.type === 'climb').map(a => a.routeName);
+      return {
+        ok: false, reason: 'route_not_climbable',
+        detail: `route "${routeName}" is not climbable this turn (already attempted this round, or not in the accessible pool). Currently climbable: ${climbable.slice(0, 6).join(', ') || '(none)'}`,
+      };
+    }
+
+    case 'attempt_milestone': {
+      const tier = String(get('tier', 'tier') || '').toLowerCase();
+      if (!TOOL_TIERS.includes(tier)) {
+        return { ok: false, reason: 'invalid_tier', detail: `tier must be one of ${TOOL_TIERS.join('|')} (got ${JSON.stringify(get('tier', 'tier'))})` };
+      }
+      const match = legalActions.find(a => a.type === 'milestone' && a.difficulty === tier);
+      if (match) return { ok: true, action: match };
+      const attemptable = legalActions.filter(a => a.type === 'milestone').map(a => a.difficulty);
+      return {
+        ok: false, reason: 'milestone_not_attemptable',
+        detail: `${tier} milestone not attemptable — already completed, blocked by access cards, insufficient time/endurance, or another climber holds the belayer station. Attemptable now: ${attemptable.join(', ') || '(none)'}`,
+      };
+    }
+
+    case 'buy_gear': {
+      const gearName = String(get('gear_name', 'gearName') || '');
+      if (!gearName) {
+        return { ok: false, reason: 'missing_gear_name', detail: 'buy_gear requires args.gear_name' };
+      }
+      const match = legalActions.find(a => a.type === 'buyGear' && a.gearName === gearName);
+      if (match) return { ok: true, action: match };
+      const purchasable = legalActions.filter(a => a.type === 'buyGear').map(a => a.gearName);
+      return {
+        ok: false, reason: 'gear_not_buyable',
+        detail: `"${gearName}" is not purchasable this turn (not in the shop's rotation slots, missing prereqs, or insufficient XP/time). Currently purchasable: ${purchasable.join(', ') || '(none)'}`,
+      };
+    }
+
+    default:
+      return {
+        ok: false, reason: 'unknown_tool',
+        detail: `unknown tool "${tool}". Valid tools: train, rest, climb, attempt_milestone, buy_gear, end_turn`,
+      };
+  }
+}
