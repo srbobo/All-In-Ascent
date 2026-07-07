@@ -43,6 +43,12 @@ export function createOllamaAgent({
   // null = inherit `temperature` (legacy behavior, all prior baselines).
   decisionTemperature = null,
   timeoutMs = 15000,
+  // Reasoning-effort level for thinking models (gpt-oss: "low"|"medium"|"high").
+  // null = omit the field entirely (non-thinking models like qwen2.5 reject
+  // requests carrying `think`). gpt-oss:20b at "low" runs ~15s/decision on
+  // the M5 vs >120s at the default effort; Ollama routes the reasoning to
+  // message.thinking, so message.content stays clean JSON for our parser.
+  thinkLevel = null,
   rewardCreativity = true,  // include "prefer creative lines" in system prompt
   // 'index' (default, LEGAL ACTIONS numbered list + action_index),
   // 'tools' (semantic tool calls dispatched via dispatchToolCall), or
@@ -51,6 +57,9 @@ export function createOllamaAgent({
   agentMode = 'index',
 }) {
   const decisionTemp = decisionTemperature ?? temperature;
+  // Spread into every request body; empty object for non-thinking models so
+  // the field is absent entirely.
+  const thinkField = thinkLevel ? { think: thinkLevel } : {};
   if (!model) throw new Error('ollama agent: `model` is required (e.g. "deepseek-r1:7b" or "qwen2.5:7b-instruct")');
   if (agentMode !== 'index' && agentMode !== 'tools' && agentMode !== 'rollout') {
     throw new Error(`ollama agent: unknown agentMode "${agentMode}" (expected "index", "tools", or "rollout")`);
@@ -110,7 +119,7 @@ export function createOllamaAgent({
       // default unload. Avoids reload cost between decisions/iterations that
       // contributed to thermal accumulation → collapse observed in the first
       // tools-mode tournament run.
-      const body = { model, messages, stream: false, keep_alive: -1, options: { temperature: decisionTemp } };
+      const body = { model, messages, stream: false, keep_alive: -1, ...thinkField, options: { temperature: decisionTemp } };
 
       const res = await fetchWithTimeout(
         `${host}/api/chat`,
@@ -120,7 +129,7 @@ export function createOllamaAgent({
       );
       if (!res.ok) throw tagged('http_error', `ollama HTTP ${res.status}: ${await res.text().catch(() => '')}`);
 
-      const data = await res.json();
+      const data = await readBodyJson(res);
       const content = data?.message?.content;
       if (!content) throw tagged('parse_error', 'ollama response missing message.content');
 
@@ -265,6 +274,7 @@ export function createOllamaAgent({
         ],
         stream: false,
         keep_alive: -1,   // pin model in memory (avoid Ollama 5-min unload)
+        ...thinkField,
         options: { temperature },
       };
 
@@ -276,7 +286,7 @@ export function createOllamaAgent({
       );
       if (!res.ok) throw tagged('http_error', `ollama HTTP ${res.status}: ${await res.text().catch(() => '')}`);
 
-      const data = await res.json();
+      const data = await readBodyJson(res);
       const content = data?.message?.content;
       if (!content) throw tagged('parse_error', 'ollama response missing message.content');
 
@@ -333,6 +343,7 @@ export function createOllamaAgent({
         ],
         stream: false,
         keep_alive: -1,   // pin model in memory (avoid Ollama 5-min unload)
+        ...thinkField,
         options: { temperature },
       };
 
@@ -344,7 +355,7 @@ export function createOllamaAgent({
       );
       if (!res.ok) throw tagged('http_error', `ollama HTTP ${res.status}: ${await res.text().catch(() => '')}`);
 
-      const data = await res.json();
+      const data = await readBodyJson(res);
       const content = data?.message?.content;
       if (!content) throw tagged('parse_error', 'ollama reflection response missing content');
 
@@ -411,6 +422,7 @@ export function createOllamaAgent({
         ],
         stream: false,
         keep_alive: -1,   // pin model in memory (avoid Ollama 5-min unload)
+        ...thinkField,
         options: { temperature: decisionTemp },
       };
 
@@ -429,7 +441,7 @@ export function createOllamaAgent({
         throw tagged('http_error', `ollama HTTP ${res.status}: ${await res.text().catch(() => '')}`);
       }
 
-      const data = await res.json();
+      const data = await readBodyJson(res);
       const content = data?.message?.content;
       if (!content) throw tagged('parse_error', 'ollama response missing message.content');
 
@@ -1407,6 +1419,26 @@ function formatAction(a, state, player) {
 }
 
 // --- HTTP helper ---
+
+// Read a response body as JSON, coercing primitive rejection values into
+// tagged Errors. Companion to fetchWithTimeout's catch: when the abort fires
+// DURING the body read (headers arrived, body still streaming — common with
+// slow reasoning models), res.json() rejects with the raw abort reason
+// ('timeout'/'external'), bypassing fetchWithTimeout entirely. Discovered
+// via the gpt-oss:20b probe, where >120s thinking put every abort mid-body.
+async function readBodyJson(res) {
+  try {
+    return await res.json();
+  } catch (err) {
+    if (typeof err !== 'object' || err === null) {
+      const e = new Error(`ollama body read aborted (reason: ${String(err)})`);
+      e.outcome = err === 'external' ? 'aborted' : (err === 'timeout' ? 'timeout' : 'network_error');
+      throw e;
+    }
+    if (!err.outcome) err.outcome = err.name === 'AbortError' ? 'timeout' : 'parse_error';
+    throw err;
+  }
+}
 
 async function fetchWithTimeout(url, options, timeoutMs, externalSignal) {
   // Node 18+ has a global `fetch`. AbortSignal.timeout is a cleaner API but

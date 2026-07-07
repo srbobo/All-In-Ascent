@@ -68,6 +68,8 @@ function buildAgent(name, opts) {
       // Temp-ablation: near-greedy action decisions while planning keeps
       // its default. null = inherit (legacy baselines unchanged).
       decisionTemperature: opts.decisionTemperature ?? null,
+      // Reasoning-effort for thinking models (gpt-oss). null = field omitted.
+      thinkLevel: opts.thinkLevel ?? null,
     });
   }
   throw new Error(`unknown agent: ${name}. Available: random, heuristic, rollout, ollama:<model>`);
@@ -94,6 +96,8 @@ export async function runOneGame({
                                // baseline is unaffected. See sim/agents/ollama.js.
   decisionTemperature = null,  // Temp-ablation: per-turn decision temperature
                                // for ollama seats (null = model default 0.3).
+  thinkLevel = null,           // Reasoning effort for thinking models
+                               // (gpt-oss: low|medium|high). null = omitted.
 }) {
   // Basic input validation so misconfigs fail fast instead of silently running bad games.
   if (characterKeys.length !== agentNames.length) {
@@ -117,7 +121,7 @@ export async function runOneGame({
   // 15s default fires on ~50% of decisions. Plumbing the caller's value
   // through fixes the timeout-fallback explosion.
   const agents = agentNames.map((n, i) =>
-    buildAgent(n, { policySeed: policySeed + i * 1000, turnTimeoutMs, agentMode, decisionTemperature }));
+    buildAgent(n, { policySeed: policySeed + i * 1000, turnTimeoutMs, agentMode, decisionTemperature, thinkLevel }));
 
   // Write the run_meta record first. It's everything a future reader needs
   // to interpret the events without re-running the game.
@@ -132,6 +136,8 @@ export async function runOneGame({
     agentMode,
     // Temp-ablation marker: null = legacy 0.3 baseline.
     decisionTemperature,
+    // Reasoning-effort marker for thinking models (null for non-thinking).
+    thinkLevel,
     engineVersion: null, // filled in after createGame
   };
 

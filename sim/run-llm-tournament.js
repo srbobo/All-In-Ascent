@@ -70,6 +70,13 @@ if (DECISION_TEMP != null && !(DECISION_TEMP >= 0 && DECISION_TEMP <= 2)) {
   console.error(`--decision-temp must be a number in [0, 2] (got ${args['decision-temp']})`);
   process.exit(1);
 }
+// Reasoning-effort for thinking models (gpt-oss): --think=low|medium|high.
+// Omit for non-thinking models (qwen2.5 rejects requests carrying `think`).
+const THINK_LEVEL = args['think'] || null;
+if (THINK_LEVEL != null && !['low', 'medium', 'high'].includes(THINK_LEVEL)) {
+  console.error(`--think must be low | medium | high (got ${THINK_LEVEL})`);
+  process.exit(1);
+}
 // Thermal management: minutes to sleep between iterations. The M5 sustains
 // roughly 3 hours of continuous 7B inference before throttling collapses
 // latency 10x (observed twice: iters 4-5 died at ~950s/decision). Cooldowns
@@ -116,6 +123,7 @@ console.log(`  iterations:         ${ITERATIONS}`);
 console.log(`  model:              ${MODEL}`);
 console.log(`  agent mode:         ${AGENT_MODE}`);
 console.log(`  decision temp:      ${DECISION_TEMP ?? '(default 0.3)'}`);
+console.log(`  think level:        ${THINK_LEVEL ?? '(n/a — non-thinking model)'}`);
 console.log(`  cooldown:           ${COOLDOWN_MIN} min between iterations`);
 console.log(`  game watchdog:      ${GAME_TIMEOUT_MIN} min/iteration`);
 console.log(`  output dir:         ${OUT_DIR}`);
@@ -230,6 +238,7 @@ for (let iter = 1; iter <= ITERATIONS; iter++) {
       gameTimeoutMs: GAME_TIMEOUT_MIN * 60 * 1000,
       agentMode: AGENT_MODE,
       decisionTemperature: DECISION_TEMP,
+      thinkLevel: THINK_LEVEL,
       seatMemoryContexts,
       writer,
       onProgress,
