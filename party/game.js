@@ -30,6 +30,17 @@ import { createGame } from '../engine/state.js';
 import { getLegalActions, applyAction, isTerminal } from '../engine/engine.js';
 import { CHARACTERS } from '../engine/data.js';
 import { createHeuristicAgent } from '../sim/agents/heuristic.js';
+import { createRolloutAgent } from '../sim/agents/rollout.js';
+
+// CPU difficulty ladder. 'easy' is the legacy heuristic; medium/hard use the
+// rollout search (full-width action evaluation via simulated playouts — the
+// R2 agent that plays at deterministic breakthrough level). rolloutsPerAction
+// is the strength dial: more playouts = less noise in the action values.
+const BOT_LEVELS = {
+  easy:   { label: 'Easy',   make: () => createHeuristicAgent() },
+  medium: { label: 'Medium', make: () => createRolloutAgent({ rolloutsPerAction: 3, maxPlayoutSteps: 300 }) },
+  hard:   { label: 'Hard',   make: () => createRolloutAgent({ rolloutsPerAction: 8, maxPlayoutSteps: 300 }) },
+};
 
 const MAX_SEATS = 4;
 // Pause between bot moves so humans can read what happened. Overridable via
@@ -164,7 +175,7 @@ export default class GameRoom {
 
       case 'add_bot':
         if (!isHost || this.phase !== 'lobby') return;
-        this.addBot();
+        this.addBot(msg.difficulty);
         this.broadcastLobby();
         break;
 
@@ -196,16 +207,20 @@ export default class GameRoom {
   // Lobby helpers
   // ------------------------------------------------------------------
 
-  addBot() {
+  addBot(difficulty) {
     const seatIndex = this.seats.findIndex(s => s === null);
     if (seatIndex < 0) return;
+    // Unknown/missing difficulty falls back to 'easy' (legacy heuristic bot),
+    // so old clients that send bare {type:'add_bot'} keep working.
+    const level = BOT_LEVELS[difficulty] ? difficulty : 'easy';
     // Pick the first available character we haven't claimed yet.
     const taken = new Set(this.seats.filter(s => s).map(s => s.characterKey).filter(Boolean));
     const characterKey = Object.keys(CHARACTERS).find(k => !taken.has(k)) || null;
     this.seats[seatIndex] = {
       id: `bot:${seatIndex}`,
-      username: `Bot ${seatIndex + 1}`,
+      username: `Bot ${seatIndex + 1} (${BOT_LEVELS[level].label})`,
       isBot: true,
+      botDifficulty: level,
       characterKey,
       connected: true,
     };
@@ -271,14 +286,19 @@ export default class GameRoom {
       mode: 'online',
       seed,
       players: orderedSeats.map((s, i) => ({
-        seat: i, username: s.username, isBot: s.isBot, characterKey: s.characterKey,
+        seat: i, username: s.username, isBot: s.isBot,
+        botDifficulty: s.isBot ? (s.botDifficulty || 'easy') : null,
+        characterKey: s.characterKey,
       })),
     });
 
-    // Set up bot agents for bot seats.
+    // Set up bot agents for bot seats, by difficulty level.
     this.botAgents = {};
     for (let i = 0; i < orderedSeats.length; i++) {
-      if (orderedSeats[i].isBot) this.botAgents[i] = createHeuristicAgent();
+      if (orderedSeats[i].isBot) {
+        const level = BOT_LEVELS[orderedSeats[i].botDifficulty] ? orderedSeats[i].botDifficulty : 'easy';
+        this.botAgents[i] = BOT_LEVELS[level].make();
+      }
     }
 
     this.phase = 'in_progress';
@@ -361,7 +381,11 @@ export default class GameRoom {
       finalPlayers: this.state.players.map(p => ({
         playerNum: p.playerNum,
         characterKey: p.character.key,
-        milestonesDone: Object.keys(p.milestonesCompleted || {}).length,
+        // Count COMPLETED milestones (truthy values), not keys — the map is
+        // {beginner:bool, intermediate:bool, expert:bool}, so keys().length
+        // was always 3 and corrupted every recorded game's summary.
+        milestonesDone: Object.values(p.character?.milestonesCompleted || p.milestonesCompleted || {})
+          .filter(Boolean).length,
       })),
     });
 
@@ -399,6 +423,34 @@ export default class GameRoom {
     } catch (err) {
       console.error('log storage failed', err);
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Log retrieval over HTTP — lets the training pipeline harvest recorded
+  // games without a webhook:
+  //   GET /parties/main/<room>?logs=1      → JSON array of stored log keys
+  //   GET /parties/main/<room>?log=<ts>    → that game's JSONL event stream
+  // Auth-lite like the rest of the room: logs contain no secrets (game
+  // events only), so reads are open — same trust level as spectating.
+  // ------------------------------------------------------------------
+
+  async onRequest(req) {
+    const url = new URL(req.url);
+    if (req.method === 'GET' && url.searchParams.has('logs')) {
+      const list = await this.room.storage.list({ prefix: 'log:' });
+      const keys = [...list.keys()].map(k => k.slice('log:'.length));
+      return new Response(JSON.stringify(keys), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (req.method === 'GET' && url.searchParams.has('log')) {
+      const jsonl = await this.room.storage.get(`log:${url.searchParams.get('log')}`);
+      if (!jsonl) return new Response('log not found', { status: 404 });
+      return new Response(jsonl, {
+        headers: { 'content-type': 'application/x-ndjson' },
+      });
+    }
+    return new Response('All In Ascent game room', { status: 200 });
   }
 
   // ------------------------------------------------------------------
