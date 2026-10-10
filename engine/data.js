@@ -216,13 +216,13 @@ export const ROUTES = {
 // rerollOnTag — re-roll one die on tagged climbs
 // timeCostReduction — reduce time cost on tagged climbs by `value`
 // enduranceHalvedOnTag — endurance cost halved (round up) on tagged climbs
-// extraDieBestN — roll one extra die on tagged climbs, keep best N (`value`)
+// extraDieDiscardOne — roll `value` extra die on tagged climbs, then discard one (N dice → roll N+1, keep N)
 // ignoreFailPenalty — skip Iron Lung's −5 fail-endurance penalty AND general fail penalties
 // treatOneDieAsValue — on every climb, may treat one die as `value` (typically 1)
 // failBonusXp — every failed climb grants `value` extra XP
 // successHealEndurance — every successful climb restores `value` endurance
 // trainingBonusBoost — every training session grants `value` extra stat bonus
-// milestoneDiceBonus — every die on milestone climbs is +`value`
+// milestoneBuffDiceBonus — every buff die (modifier −1) on milestone climbs is +`value` (max 6)
 // negateOneNerfDie — on every climb, treat one nerf die (modifier +1) as 0
 export const GEAR_SHOP = [
  // ===== ACCESS CARDS (gate Lead climbing area; Top Rope is open to all) =====
@@ -236,7 +236,7 @@ export const GEAR_SHOP = [
  { name: "Crimp Sequence Decoder", cost: 130, category: "Strategy Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "rerollOnTag", tagFilter: "Pinch/Crimp", description: "Decode the puzzle of small holds — re-rolls give you a second chance", effectDisplay: "On Pinch/Crimp climbs, re-roll one die of your choice", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Trick Foot Manual", cost: 110, category: "Strategy Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "timeCostReduction", tagFilter: "Toe/Heel Hook", description: "Footwork techniques shave seconds off every move", effectDisplay: "Toe/Heel Hook climbs cost 1 less time (min 1)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Body Tension Belt", cost: 150, category: "Specialized Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "enduranceHalvedOnTag", tagFilter: "Roof/Sloper", description: "Core engagement on overhang and slopey holds", effectDisplay: "Roof/Sloper climbs cost half endurance (round up)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
- { name: "Power Tap Belt", cost: 120, category: "Specialized Gear", statEffect: "none", value: 2, routeFilter: [], holdFeatureFilter: [], effectKind: "extraDieBestN", tagFilter: "Dynamic", description: "Explosive feedback for dynamic moves", effectDisplay: "On Dynamic climbs, roll an extra die and use the best 2", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+ { name: "Power Tap Belt", cost: 120, category: "Specialized Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "extraDieDiscardOne", tagFilter: "Dynamic", description: "Explosive feedback for dynamic moves", effectDisplay: "On Dynamic climbs, roll 1 extra die, then discard any one die", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
 
  // ===== FIX + BOOST CARDS (F/B roles; permanent passives) =====
  { name: "Beta Reading Book", cost: 100, category: "Recovery Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], description: "Pre-climb visualization restores composure", effectDisplay: "Rest restores +10 endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 10 },
@@ -247,6 +247,6 @@ export const GEAR_SHOP = [
  { name: "Power Spotting", cost: 90, category: "Recovery Gear", statEffect: "none", value: 5, routeFilter: [], holdFeatureFilter: [], effectKind: "successHealEndurance", description: "A spotter's encouragement returns energy", effectDisplay: "Successful climbs restore +5 endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Approach Shoes", cost: 55, category: "Comfort Gear", statEffect: "timePerRound", value: 1, routeFilter: ["All"], holdFeatureFilter: [], description: "Ergonomic footwear keeps you fresh", effectDisplay: "+1 Time at round start", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Old Climbing Journal", cost: 100, category: "Training Equipment", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "trainingBonusBoost", description: "Track every session and pattern of progress", effectDisplay: "Training sessions give +6 instead of +5", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
- { name: "Climbing Coach", cost: 180, category: "Strategy Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "milestoneDiceBonus", description: "Expert guidance for the routes that matter most", effectDisplay: "On milestone climbs, every die is +1", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+ { name: "Climbing Coach", cost: 180, category: "Strategy Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "milestoneBuffDiceBonus", description: "Expert guidance for the routes that matter most", effectDisplay: "On milestone climbs, every buff die is +1 (max 6)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Mountain Mentor", cost: 200, category: "Strategy Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "negateOneNerfDie", description: "Years of wisdom in your ear", effectDisplay: "On every climb, treat one nerf die as 0", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
 ];

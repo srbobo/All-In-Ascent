@@ -32,15 +32,35 @@ const ACCESS_CARDS = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
 // Number of top-rope routes assigned to each belayer station.
 const ROUTES_PER_BELAYER = 2;
 
+// Number of Top Rope belayer stations for a game with `playerCount` players:
+// one fewer than the number of players, but never fewer than 1. A solo game
+// gets a single station (the "Auto-Belay") — without it, a solo player could
+// never attempt the Top Rope milestone every game includes.
+export function belayerCountFor(playerCount) {
+  return Math.max(1, playerCount - 1);
+}
+
+// The routes of `area` that may be dealt to the wall: the area's deck minus
+// this game's milestone routes. Milestone cards sit on the milestone board for
+// the whole game, so they never also appear as a regular route.
+export function regularRoutePool(milestoneRoutes, area) {
+  const milestoneNames = new Set(
+    Object.values(milestoneRoutes || {})
+      .filter(m => m && m.area === area)
+      .map(m => m.route.name),
+  );
+  return ROUTES[area].filter(r => !milestoneNames.has(r.name));
+}
+
 // Draw the Top Rope rotation as N belayer stations of ROUTES_PER_BELAYER routes
-// each, where N = belayerCount (number of players − 1). Returns a FLAT array of
-// 2×belayerCount routes, each tagged with a `belayer` index (0-based station).
-// Keeping a flat array (rather than nested arrays) preserves every existing
-// `.find/.forEach/.map` over availableRoutes.topRope; stations are derived from
-// the tag. A 1-player game yields belayerCount 0 → an empty Top Rope.
-export function drawTopRopeStations(rng, belayerCount) {
+// each, where N = belayerCount. Returns a FLAT array of 2×belayerCount routes,
+// each tagged with a `belayer` index (0-based station). Keeping a flat array
+// (rather than nested arrays) preserves every existing `.find/.forEach/.map`
+// over availableRoutes.topRope; stations are derived from the tag. `pool` is
+// the deck to draw from (regularRoutePool for topRope).
+export function drawTopRopeStations(rng, belayerCount, pool = ROUTES.topRope) {
   const count = Math.max(0, belayerCount) * ROUTES_PER_BELAYER;
-  const drawn = count > 0 ? rng.pickN(ROUTES.topRope, count) : [];
+  const drawn = count > 0 ? rng.pickN(pool, count) : [];
   return drawn.map((route, i) => ({ ...route, belayer: Math.floor(i / ROUTES_PER_BELAYER) }));
 }
 
@@ -69,9 +89,9 @@ export function createGame({ seed, characterKeys }) {
   // Build players.
   const players = characterKeys.map((key, i) => makePlayer(i + 1, key));
 
-  // Top Rope belayer stations: N − 1 belayers for N players (RuleModifications
-  // 2026-06-27). Fixed from round 1 — no time-based unlock ramp.
-  const belayerCount = players.length - 1;
+  // Top Rope belayer stations: N − 1 belayers for N players, minimum 1 (solo
+  // Auto-Belay). Fixed from round 1 — no time-based unlock ramp.
+  const belayerCount = belayerCountFor(players.length);
 
   // Pick milestone routes FIRST (matches game.js:773 ordering — milestones
   // are selected before the per-area route rotation is drawn).
@@ -79,10 +99,11 @@ export function createGame({ seed, characterKeys }) {
 
   // Draw the opening rotation. Bouldering and Lead keep a flat list of 5;
   // Top Rope is split into belayerCount stations of 2 routes each.
+  // Milestone routes are excluded from every wall's deck.
   const availableRoutes = {
-    bouldering: rng.pickN(ROUTES.bouldering, 5),
-    topRope: drawTopRopeStations(rng, belayerCount),
-    leadClimbing: rng.pickN(ROUTES.leadClimbing, 5),
+    bouldering: rng.pickN(regularRoutePool(milestones, 'bouldering'), 5),
+    topRope: drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope')),
+    leadClimbing: rng.pickN(regularRoutePool(milestones, 'leadClimbing'), 5),
   };
 
   // Draw 3 non-access-card items for the shop rotation.
@@ -107,8 +128,8 @@ export function createGame({ seed, characterKeys }) {
     //   2 → next end-of-round clear is Bouldering
     // Rotates 0 → 1 → 2 → 0 at end of each round.
     routeClearingPosition: 0,
-    // Top Rope belayer-station count = number of players − 1 (RuleModifications
-    // 2026-06-27). Fixed for the whole game. Each station holds 2 routes and
+    // Top Rope belayer-station count = number of players − 1, minimum 1
+    // (belayerCountFor). Fixed for the whole game. Each station holds 2 routes and
     // admits at most 1 climber. Lead Climbing is separately capped at 1 climber
     // and is no longer tied to this count.
     belayerCount,
