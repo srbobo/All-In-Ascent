@@ -31,6 +31,14 @@ const browserGlobals = {
   // Cross-file globals: the three classic scripts share one global scope at
   // runtime (index.html loads online-mode.js, effects.js, then game.js).
   renderGameBoard: 'readonly', // defined in game.js, called by online-mode.js
+  // Grit & Holds design system (design/*.js), loaded before game.js.
+  AIAArt: 'readonly',
+  AIACards: 'readonly',
+  AIAIcons: 'readonly',
+  getComputedStyle: 'readonly',
+  MutationObserver: 'readonly',
+  ResizeObserver: 'readonly',
+  module: 'readonly',
 };
 
 const nodeGlobals = {
@@ -80,7 +88,7 @@ export default [
   },
   {
     // Browser classic scripts — global scope, no modules.
-    files: ['game.js', 'effects.js', 'online-mode.js'],
+    files: ['game.js', 'effects.js', 'online-mode.js', 'design/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'script',
