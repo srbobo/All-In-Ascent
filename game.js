@@ -1,13 +1,9 @@
-// All In Ascent — browser game: game data + UI.
+// All In Ascent — browser game bundle.
 //
 // This file is the SINGLE SOURCE OF TRUTH for game data. The GAME DATA section
 // below is extracted into engine/data.js by `node engine/build-data.js` (run
 // automatically by the test/playtest npm scripts) so the Node engine, sim
 // harness, and analysis tools read the same values without hand-syncing.
-//
-// It holds NO game rules: local and online play both run the engine in
-// engine/ (loaded in the browser as engine/engine.browser.js). See the RULES
-// ENGINE BRIDGE section below and CLAUDE.md.
 // Rules version is kept in step with the Node engine (engine/version.js).
 const GAME_VERSION = '0.7.0';
 if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
@@ -309,84 +305,105 @@ function checkAreaAccess(area) {
  return AscentEngine.checkAreaAccess(gameState.players[gameState.currentPlayerIndex].character, area);
 }
 
-// ===== MILESTONE ROUTES =====
+// The current player's stats for a climb (base + training + gear), as the
+// engine computes them.
+function computeClimbStats(char, route, area) {
+ const player = gameState.players.find(p => p.character === char) || uiCurrent();
+ return AscentEngine.computeEffectiveStats(char, route, area, gameState.attemptedRoutes[player.playerNum]);
+}
+
+// ===== UI HELPERS (Grit & Holds v2 design system) =====
+// Rendering goes through design/cards.js (AIACards) and design/card-art.js
+// (AIAArt). These helpers compute what each card should say — including the
+// plain-language reason a card can't be played right now — so the board never
+// relies on colour or opacity alone to signal state.
+
+const UI_STATS = [
+ { key: 'strength', short: 'STR', name: 'Strength' },
+ { key: 'technique', short: 'TEC', name: 'Technique' },
+ { key: 'focus', short: 'FOC', name: 'Focus' },
+ { key: 'flexibility', short: 'FLX', name: 'Flexibility' },
+];
+const UI_PLAYER_COLORS = ['coral', 'teal', 'violet', 'marigold'];
+// Climber-rail <details> open state survives re-renders.
+const uiOpenDetails = new Set();
+
+function uiEsc(s) {
+ return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function uiIcon(name) {
+ return window.AIAArt ? window.AIAArt.icon(name) : '';
+}
+function uiPlayerColor(playerNum) {
+ return UI_PLAYER_COLORS[(playerNum - 1) % UI_PLAYER_COLORS.length];
+}
+function uiCurrent() {
+ return gameState.players[gameState.currentPlayerIndex];
+}
+
+// Why the current player can't take `wanted` (a partial engine action) right
+// now, in the board's short wording, or '' when they can. The engine decides
+// (getLegalActions / illegalActionReason); this only words its answer.
+function uiBlocker(wanted) {
+ if (isLegalNow(wanted)) return '';
+ const r = AscentEngine.illegalActionReason(gameState, wanted);
+ if (!r) return 'Not available right now';
+ const players = (nums) => nums.map(num => `P${num}`).join(', ');
+ switch (r.code) {
+ case 'gameOver': return 'The game is over';
+ case 'alreadyAttempted': return 'Already attempted this round';
+ case 'alreadyCompleted': return 'You already sent this project';
+ case 'alreadyOwned': return 'Already owned';
+ case 'needsGear': return `Locked · needs ${r.missing.join(', ')}`;
+ case 'needsItems': return `Needs ${r.missing.join(' + ')} first`;
+ case 'needsLevel': return `Requires level ${r.level}`;
+ case 'noFreeBelayer': return 'Every belayer is busy';
+ case 'belayerTaken': return `Belayer ${r.belayer + 1} is taken`;
+ case 'sectionFull': return `Wall is full (${players(r.occupants)})`;
+ case 'stationInUse': return `In use by ${players(r.occupants)}`;
+ case 'notEnoughTime':
+ return wanted.type === 'buyGear' ? `Needs ${r.need} time to visit the shop` : `Needs ${r.need} time · you have ${r.have}`;
+ case 'notEnoughEndurance': return `Needs ${r.need} END · you have ${r.have}`;
+ case 'notEnoughXp': return `Need ${r.need} XP · you have ${r.have}`;
+ case 'lifeOrDie': return 'Life or Die · stats must meet every requirement';
+ default: return r.message;
+ }
+}
 
 function renderMilestonePanel() {
  const container = document.getElementById('milestonePanel');
- if (!container) return;
+ if (!container || !window.AIACards) return;
+ container.innerHTML = '';
+ const char = uiCurrent().character;
 
- let html = `
- <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 14px 12px; border-radius: 12px; margin-bottom: 14px; box-shadow: 0 4px 10px rgba(102, 126, 234, 0.25);">
- <h2 style="margin: 0 0 8px 0; font-size: 1.05em; text-align: center; letter-spacing: 0.02em;">
- MILESTONE ROUTES — First to Complete All 3 Wins
- </h2>
- <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px;">
- `;
-
- const difficulties = ['beginner', 'intermediate', 'expert'];
- const colors = { beginner: '#4ade80', intermediate: '#fbbf24', expert: '#ef4444' };
-
- difficulties.forEach(difficulty => {
- const milestone = gameState.milestoneRoutes[difficulty];
- if (!milestone) return;
-
- const route = milestone.route;
- const area = milestone.area;
- const areaLabel = area === 'bouldering' ? 'Bouldering'
-                  : area === 'topRope'    ? 'Top Rope'
-                                          : 'Lead Climbing';
- const areaColors = { bouldering: '#ff6845', topRope: '#1fb8a6', leadClimbing: '#d8347d' };
- const areaColor = areaColors[area] || '#6c757d';
- const milestoneRouteTypeColors = { Slab: '#17a2b8', Vertical: '#28a745', Overhang: '#fd7e14', Traverse: '#6f42c1' };
- const milestoneRouteTypeColor = milestoneRouteTypeColors[route.routeType] || '#6c757d';
-
- html += `
- <div style="background: white; color: #2c3e50; padding: 8px 11px 9px; border-radius: 8px; border-left: 4px solid ${colors[difficulty]};">
- <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 5px; gap: 4px; flex-wrap: wrap;">
- <span style="font-weight: bold; font-size: 0.78em; letter-spacing: 0.04em;">${difficulty.toUpperCase()}</span>
- <span style="display: inline-block; background: ${areaColor}; color: white; padding: 1px 8px; border-radius: 10px; font-size: 0.65em; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase;">${areaLabel}</span>
- <span style="display: inline-block; background: ${milestoneRouteTypeColor}; color: white; padding: 1px 8px; border-radius: 10px; font-size: 0.65em; font-weight: bold;">${route.routeType || 'Unknown'}</span>
- </div>
- <div style="font-size: 0.98em; font-weight: bold; color: #667eea; margin-bottom: 3px; line-height: 1.15;">
- ${route.name}
- </div>
- <div style="font-size: 0.78em; color: #666; margin-bottom: 4px; font-family: 'Geist Mono', monospace;">
- ${route.grade} · Ti ${route.time} · E ${route.endurance}
- </div>
- <div style="font-size: 0.78em; margin-bottom: 6px; font-family: 'Geist Mono', monospace;">
- S ${route.strength} · T ${route.technique} · F ${route.focus} · X ${route.flexibility}
- </div>
- <div style="border-top: 1px solid #ddd; padding-top: 5px; margin-top: 4px;">
- `;
-
- gameState.players.forEach(player => {
- const completed = player.character.milestonesCompleted[difficulty];
- const statusText = completed ? 'COMPLETE': 'Not Complete';
- const statusColor = completed ? '#22c55e': '#6b7280';
-
- html += `
- <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 0.74em; font-family: 'Geist Mono', monospace;">
- <span>${player.character.name}</span>
- <span style="color: ${statusColor}; font-weight: bold;">${statusText.toUpperCase()}</span>
- </div>
- `;
+ ['beginner', 'intermediate', 'expert'].forEach(difficulty => {
+  const milestone = gameState.milestoneRoutes[difficulty];
+  if (!milestone) return;
+  const sent = char.milestonesCompleted[difficulty];
+  const roster = gameState.players.map(p => {
+   const done = p.character.milestonesCompleted[difficulty];
+   return `<li class="${done ? 'done' : ''}">P${p.playerNum}${done ? ' ✓' : ''}<span class="sr-only">${done ? ' has sent it' : ' has not sent it'}</span></li>`;
+  }).join('');
+  const reason = uiBlocker({ type: 'milestone', difficulty });
+  const card = AIACards.route(milestone.route, {
+   area: milestone.area,
+   costs: getClimbCosts(char, milestone.route),
+   milestone: difficulty,
+   stats: computeClimbStats(char, milestone.route, milestone.area),
+   status: sent ? 'Sent' : null,
+   tone: sent ? 'done' : null,
+   extra: `<ul class="ps-projects ms-roster" aria-label="Sent by">${roster}</ul>`,
+   action: {
+    label: sent ? 'Sent' : 'Attempt',
+    disabled: !!reason,
+    reason,
+    reasonIcon: sent ? 'check' : 'lock',
+    onClick: () => attemptMilestoneRoute(difficulty),
+   },
+  });
+  card.classList.add('milestone-card');
+  container.appendChild(card);
  });
-
- html += `
- </div>
- <button class="btn" onclick="attemptMilestoneRoute('${difficulty}')" style="width: 100%; margin-top: 6px; font-size: 0.78em; padding: 6px 10px;">
- Attempt ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Route
- </button>
- </div>
- `;
- });
-
- html += `
- </div>
- </div>
- `;
-
- container.innerHTML = html;
 }
 
 // ===== GAME INITIALIZATION =====
@@ -409,87 +426,85 @@ function startCharacterSelect() {
 
  // Lock the Continue button + player-count input so we can't re-trigger this
  // flow mid-selection. Re-running this function with characters already
- // chosen would reset the picks while leaving the Start Game button enabled
- // — that's how bug #3 ("start without character") used to fire. Both
- // controls re-enable themselves only after the game ends (via the page
- // reload that happens on "New Game" / win screen close).
+ // chosen would reset the picks while leaving the Start
+ // Game button enabled — that's how bug #3 ("start without character") used
+ // to fire. Both controls re-enable themselves only after the game ends
+ // (via the page reload that happens on "New Game" / win screen close).
  const continueBtn = document.getElementById('continueBtn');
  if (continueBtn) continueBtn.disabled = true;
  numPlayersInput.disabled = true;
 
  charSelectionDiv.style.display = 'block';
  renderCharacterSelect();
+
+ // Move focus to the new step so keyboard and screen-reader users follow along.
+ const title = document.getElementById('pickTitle');
+ if (title) {
+  title.setAttribute('tabindex', '-1');
+  title.focus({ preventScroll: true });
+  charSelectionDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+ }
 }
 
 function renderCharacterSelect() {
  const container = document.getElementById('characterSelect');
- if (!container) return;
+ if (!container || !window.AIACards) return;
  container.innerHTML = '';
- // Defense in depth: any re-entry into this render path must NOT inherit a
- // previously-enabled Start Game button. The button only re-enables once
- // every player slot has a character (see selectCharacter()).
+ // Defense in depth: the Start button is only enabled when every player slot
+ // has a character — never inherited from a previous render.
+ const allChosen = setupPlayerCount > 0 && setupCharacterKeys.length === setupPlayerCount;
  const startBtn = document.getElementById('startGameBtn');
- if (startBtn) startBtn.disabled = true;
+ if (startBtn) startBtn.disabled = !allChosen;
+
+ const takenBy = new Map(setupCharacterKeys.map((key, i) => [key, i + 1]));
+ const next = allChosen ? null : { playerNum: setupCharacterKeys.length + 1 };
 
  Object.keys(CHARACTERS).forEach(charKey => {
- const char = CHARACTERS[charKey];
- const card = document.createElement('div');
- card.className = 'character-card';
- card.onclick = () => selectCharacter(charKey);
-
- card.innerHTML = `
- <div class="character-name">${char.name}</div>
- <div class="character-archetype">${char.archetype}</div>
- <div class="character-description">${char.description}</div>
- <div class="stats-grid">
- <div class="stat-item">
- <div class="stat-label">Strength</div>
- <div class="stat-value">${char.startingStats.strength}</div>
- </div>
- <div class="stat-item">
- <div class="stat-label">Technique</div>
- <div class="stat-value">${char.startingStats.technique}</div>
- </div>
- <div class="stat-item">
- <div class="stat-label">Focus</div>
- <div class="stat-value">${char.startingStats.focus}</div>
- </div>
- <div class="stat-item">
- <div class="stat-label">Flexibility</div>
- <div class="stat-value">${char.startingStats.flexibility}</div>
- </div>
- </div>
- <div class="stat-item" style="margin-top: 10px;">
- <div class="stat-label">Endurance</div>
- <div class="stat-value">${char.startingEndurance}</div>
- </div>
- <div class="special-ability">
- <div class="ability-name"> ${char.specialAbility.name}</div>
- <div class="ability-desc">${char.specialAbility.description}</div>
- </div>
- `;
-
- container.appendChild(card);
+  const char = CHARACTERS[charKey];
+  const by = takenBy.get(charKey);
+  const card = AIACards.climber(charKey, char, {
+   status: by ? `Player ${by}` : null,
+   tone: by ? 'done' : null,
+   action: {
+    label: by ? `Player ${by}` : 'Choose',
+    disabled: !!by || !next,
+    reason: by ? `Chosen by Player ${by}` : (!next ? 'Every player has a climber' : ''),
+    reasonIcon: 'check',
+    ariaLabel: !by && next ? `Choose ${char.name} for Player ${next.playerNum}` : undefined,
+    onClick: () => selectCharacter(charKey),
+   },
+  });
+  card.classList.add('character-card');
+  card.dataset.charKey = charKey;
+  container.appendChild(card);
  });
+
+ // Step status + roster of picks so far.
+ const status = document.getElementById('pickStatus');
+ if (status) {
+  status.textContent = next
+   ? `Player ${next.playerNum} of ${setupPlayerCount}, choose your climber.`
+   : 'Everyone is roped in. Start climbing when ready.';
+ }
+ const roster = document.getElementById('pickRoster');
+ if (roster) {
+  roster.innerHTML = setupCharacterKeys.map((key, i) =>
+   `<li><span class="aia-chip" style="background: var(--${uiPlayerColor(i + 1)}); color: var(--on-${uiPlayerColor(i + 1)});">P${i + 1}</span>${uiEsc(CHARACTERS[key].name)}</li>`).join('');
+ }
 }
 
 function selectCharacter(charKey) {
  if (setupCharacterKeys.length >= setupPlayerCount || setupCharacterKeys.includes(charKey)) return;
  setupCharacterKeys.push(charKey);
 
- // Mark character as selected
- document.querySelectorAll('.character-card').forEach((card, idx) => {
- if (Object.keys(CHARACTERS)[idx] === charKey) {
- card.classList.add('selected');
- card.style.opacity = '0.5';
- card.onclick = null;
- }
- });
-
- // Check if all players have selected
- if (setupCharacterKeys.length === setupPlayerCount) {
- document.getElementById('startGameBtn').disabled = false;
- }
+ // Re-render the picker (chosen cards become disabled with the player's
+ // name), then keep keyboard focus somewhere sensible.
+ renderCharacterSelect();
+ const allChosen = setupCharacterKeys.length === setupPlayerCount;
+ const focusTarget = allChosen
+  ? document.getElementById('startGameBtn')
+  : document.querySelector('#characterSelect .aia-card__action:not([aria-disabled="true"])');
+ if (focusTarget) focusTarget.focus();
 }
 
 function startGame() {
@@ -550,8 +565,10 @@ function renderGameBoard() {
  renderPlayers();
  renderRoutes();
  renderTraining();
- renderStore();
+ // Pills first: renderStore() adds the "affordable" hint into the gear-shop
+ // pill host, which renderSectionStatusPills() would otherwise wipe.
  renderSectionStatusPills();
+ renderStore();
  updateTurnIndicator();
 }
 
@@ -560,27 +577,18 @@ function renderGameBoard() {
 // during a UI cleanup pass; full panels are now always visible.
 
 function renderGameInfo() {
-
- // B2: dropped the redundant "Current Player" info-box.
- // B3: belayers info-box shows the fixed Top Rope belayer-station count.
- // C3: Rest is an inline button here, not its own panel.
- // The route-clearing token is now rendered as a pill on the area-title
- // of the climbing area that will be cleared next (see renderSectionStatusPills).
+ // Round tape, fixed Top Rope belayer count, and Rest as an inline action.
+ // The route-clearing token is a pill on the area that clears next (see
+ // renderSectionStatusPills).
  const canRest = isLegalNow({ type: 'rest' });
- const restBtn = `<button class="info-rest-btn" onclick="restAction()" ${canRest ? '' : 'disabled'}>Rest (Ti 1)</button>`;
+ const belayerLabel = gameState.players.length === 1 ? 'Auto-Belay' : 'Belayers';
 
  document.getElementById('gameInfo').innerHTML = `
- <div class="info-box">
- <div class="info-label">Round</div>
- <div class="info-value">${gameState.round}</div>
- </div>
- ${gameState.belayerCount >= 1 ? `
- <div class="info-box">
- <div class="info-label">Belayers</div>
- <div class="info-value">${gameState.belayerCount}</div>
- </div>
- ` : ''}
- <div class="info-rest-wrap">${restBtn}</div>
+ <span class="tape tape--marigold tape--straight info-round">Round ${gameState.round}</span>
+ <span class="info-box"><span class="info-label">${belayerLabel}</span><span class="info-value">${gameState.belayerCount}</span></span>
+ <button class="btn btn--lime btn--sm info-rest-btn" type="button" onclick="restAction()" ${canRest ? '' : 'disabled'}>
+  ${uiIcon('rest')}Rest<span aria-hidden="true"> · 1 time</span><span class="sr-only"> (costs 1 time, refills endurance)</span>
+ </button>
  `;
 }
 
@@ -603,9 +611,11 @@ function renderSectionStatusPills() {
   const occPill = document.createElement('span');
   occPill.className = 'at-pill occupancy';
   if (occupants.length >= capacity) occPill.classList.add('full');
-  const occLabel = occupants.length === 0
-   ? `${occupants.length}/${capacity}`
-   : `${occupants.length}/${capacity} · ${occupants.map(p => `P${p.playerNum}`).join(' ')}`;
+  // Sections with effectively unlimited room (capacity 10) read as "Open".
+  const who = occupants.map(p => `P${p.playerNum}`).join(' ');
+  const occLabel = capacity >= 10
+   ? (occupants.length ? `Here: ${who}` : 'Open')
+   : (occupants.length ? `${occupants.length}/${capacity} · ${who}` : `${occupants.length}/${capacity} open`);
   occPill.textContent = occLabel;
   occPill.title = occupants.length > 0
    ? `Occupants: ${occupants.map(p => 'P' + p.playerNum + ' ' + p.character.name).join(', ')}`
@@ -623,29 +633,25 @@ function renderSectionStatusPills() {
 }
 
 function updateTurnIndicator() {
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+ const currentPlayer = uiCurrent();
  const char = currentPlayer.character;
- let timeDisplay;
- if (char.timeRemaining <= 0) {
- timeDisplay = `<span class="time-out"> OUT OF TIME</span>`;
- } else if (char.timeRemaining === 1) {
- timeDisplay = `<span class="time-warning"> ${char.timeRemaining} unit remaining — Last action!</span>`;
- } else {
- timeDisplay = `${char.timeRemaining} units remaining`;
- }
+ const n = currentPlayer.playerNum;
+ const t = char.timeRemaining;
+ const pips = Array.from({ length: Math.max(10, t) }, (_, i) => `<i class="${i < t ? 'on' : ''}"></i>`).join('');
+ const timeText = t <= 0
+  ? '<span class="ti-warn">Out of time</span>'
+  : t === 1 ? '<span class="ti-warn">1 time left · last action</span>' : `${t} time left`;
  document.getElementById('turnIndicator').innerHTML = `
- Player ${currentPlayer.playerNum}'s Turn — ${char.name}
- <br> Time: ${timeDisplay}
- `;
+  <span class="hold hold--label hold--${uiPlayerColor(n)} ti-token" aria-hidden="true">P${n}</span>
+  <div class="ti-text">
+   <div class="ti-who">Player ${n}'s turn · ${uiEsc(char.name)}</div>
+   <div class="ti-time"><span class="aia-pips${t <= 1 ? ' aia-pips--warn' : ''}" aria-hidden="true">${pips}</span><span>${timeText}</span></div>
+  </div>`;
 }
 
-// CLIMBER TOKEN renderer — design #1: one horizontal row per player.
-// Compact at-a-glance state; click anywhere on a row to expand the detail
-// drawer with equipment, ability, archetype, training bonuses.
-//
-// Keeps the same data hooks (data-player, data-endurance-bar, data-xp-bar,
-// data-inventory) so effects.js's chalk puffs / floating numbers / inventory
-// fly-in animations all still anchor correctly.
+// Player sheets in the climber rail. Keeps the data hooks effects.js anchors
+// to (data-player, data-endurance-bar, data-xp-bar, data-inventory) — the
+// inventory is now the visible gear-chip row, so purchased gear flies there.
 function renderPlayers() {
  const container = document.getElementById('playersContainer');
  if (!container) return;
@@ -654,10 +660,10 @@ function renderPlayers() {
  gameState.players.forEach((player, idx) => {
   const char = player.character;
   if (!char.gearBonuses) char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
-
+  const n = player.playerNum;
+  const color = uiPlayerColor(n);
   const isCurrent = idx === gameState.currentPlayerIndex;
   const exhausted = char.timeRemaining <= 0;
-  const lowTime = char.timeRemaining === 1;
   const endPct = Math.max(0, Math.min(100, (char.currentEndurance / char.maxEndurance) * 100));
   const xpForLevel = XP_TABLE[char.level - 1];
   const xpPct = char.level < 15
@@ -665,126 +671,84 @@ function renderPlayers() {
    : 100;
   const spendableXP = AscentEngine.getSpendableXp(char);
   const xpToGo = getXPToNextLevel(char);
+  const beta = char.betaBoostActive ? 3 : 0;
 
-  const trBonus = (s) => (char.trainingBonuses[s] || 0) + (char.gearBonuses[s] || 0);
-  const statCell = (key, glyph) => {
-   const bonus = trBonus(key);
-   const beta  = char.betaBoostActive ? 3 : 0;
-   const extra = bonus + beta;
-   return `<span class="tok-stat ${key}">
-            <span class="glyph">${glyph}</span>&nbsp;<b>${char.stats[key]}</b>${extra > 0 ? `<span class="bonus">+${extra}</span>` : ''}
-           </span>`;
-  };
+  const stats = UI_STATS.map(s => {
+   const extra = (char.trainingBonuses[s.key] || 0) + (char.gearBonuses[s.key] || 0) + beta;
+   const extraTxt = extra ? `${extra > 0 ? '+' : ''}${extra}` : '';
+   return `<div class="aia-req aia-req--${s.key}">
+    <dt>${uiIcon(s.key)}<span class="aia-req__label">${s.short}</span><span class="sr-only">${s.name}</span></dt>
+    <dd>${char.stats[s.key]}${extra ? `<span class="bonus" aria-hidden="true">${extraTxt}</span><span class="sr-only"> ${extraTxt} bonus</span>` : ''}</dd>
+   </div>`;
+  }).join('');
 
+  const t = char.timeRemaining;
+  const pips = Array.from({ length: Math.max(10, t) }, (_, i) => `<i class="${i < t ? 'on' : ''}"></i>`).join('');
   const ms = char.milestonesCompleted;
-  const milestoneDots = `
-   <span class="dot ${ms.beginner    ? 'filled beg' : ''}" title="Beginner"></span>
-   <span class="dot ${ms.intermediate? 'filled int' : ''}" title="Intermediate"></span>
-   <span class="dot ${ms.expert      ? 'filled exp' : ''}" title="Expert"></span>`;
+  const project = (key, cls, label) => `<li class="${ms[key] ? `done ${cls}` : ''}">${label}${ms[key] ? ' ✓' : ''}<span class="sr-only">${ms[key] ? ' sent' : ' not yet'}</span></li>`;
+  const stateClass = exhausted ? 'out' : char.betaBoostActive ? 'beta' : char.abilityUsed ? 'used' : 'ready';
+  const stateText = exhausted ? 'Out of time' : char.betaBoostActive ? 'Beta Boost active' : char.abilityUsed ? 'Ability used' : 'Ability ready';
+  const bonuses = UI_STATS.map(s => {
+   const tr = char.trainingBonuses[s.key] || 0, gr = char.gearBonuses[s.key] || 0;
+   if (!tr && !gr) return '';
+   return `<li>${s.name}: ${[tr ? `+${tr} training` : '', gr ? `${gr > 0 ? '+' : ''}${gr} gear` : ''].filter(Boolean).join(' · ')}</li>`;
+  }).join('');
 
-  // State indicator — a colored dot (no glyph) communicates ability/turn state.
-  // Hover title carries the meaning for accessibility.
-  const stateClass = exhausted ? 'out'
-                   : char.betaBoostActive ? 'beta'
-                   : char.abilityUsed ? 'used'
-                   : 'ready';
-  const stateTitle = exhausted ? 'Out of time'
-                   : char.betaBoostActive ? 'Beta Boost active'
-                   : char.abilityUsed ? 'Ability used'
-                   : 'Ability available';
-  const stateIcon = `<span class="tok-state ${stateClass}" title="${stateTitle}"></span>`;
-
-  const token = document.createElement('div');
-  token.className = 'climber-token' + (isCurrent ? ' active' : '') + (exhausted ? ' exhausted' : '') + (lowTime ? ' low-time' : '');
-  token.setAttribute('data-player', player.playerNum);
-  token.id = `player-${player.playerNum}-panel`;
-
-  token.innerHTML = `
-   <div class="tok-id">
-    <div class="num">P${player.playerNum}</div>
-    <div class="name">${char.name}</div>
-    <div class="level">L${char.level}</div>
-   </div>
-   <div class="tok-stats">
-    ${statCell('strength','S')}
-    ${statCell('technique','T')}
-    ${statCell('focus','F')}
-    ${statCell('flexibility','X')}
-   </div>
-   <div class="tok-end">
-    <span class="label">END</span>
-    <div class="bar">
-     <div class="fill" data-endurance-bar="${player.playerNum}" id="endurance-bar-${player.playerNum}" style="width: ${endPct}%;"></div>
+  const sheet = document.createElement('article');
+  sheet.className = 'player-sheet' + (isCurrent ? ' active' : '') + (exhausted ? ' exhausted' : '');
+  sheet.setAttribute('data-player', n);
+  sheet.id = `player-${n}-panel`;
+  sheet.setAttribute('aria-labelledby', `ps-name-${n}`);
+  sheet.innerHTML = `
+   ${isCurrent ? '<span class="tape ps-now" aria-hidden="true">On the wall</span>' : ''}
+   <div class="ps-head">
+    <div class="ps-portrait">${window.AIAArt ? AIAArt.climber(char.key) : ''}</div>
+    <div>
+     <h3 class="ps-name" id="ps-name-${n}"><span class="ps-num">P${n}</span>${uiEsc(char.name)}${isCurrent ? '<span class="sr-only"> (current turn)</span>' : ''}</h3>
+     <div class="ps-meta"><span>${uiEsc(char.archetype)}</span><span>${uiIcon('location')} ${uiEsc(formatLocationName(char.location))}</span></div>
     </div>
-    <span class="nums">${char.currentEndurance}/${char.maxEndurance}</span>
+    <span class="hold hold--label hold--${color} ps-level"><span class="sr-only">Level </span>${char.level}<small aria-hidden="true">LVL</small></span>
    </div>
-   <div class="tok-xp">
-    <span class="label">XP</span>
-    <div class="bar">
-     <div class="fill" data-xp-bar="${player.playerNum}" id="xp-bar-${player.playerNum}" style="width: ${xpPct}%;"></div>
+   <dl class="aia-reqs ps-stats">${stats}</dl>
+   <div class="ps-meter">
+    <span class="label">${uiIcon('endurance')}END</span>
+    <div class="aia-meter aia-meter--endurance" role="meter" aria-label="Endurance" aria-valuemin="0" aria-valuemax="${char.maxEndurance}" aria-valuenow="${char.currentEndurance}" aria-valuetext="${char.currentEndurance} of ${char.maxEndurance}">
+     <div class="aia-meter__fill" data-endurance-bar="${n}" id="endurance-bar-${n}" style="--w: ${endPct}%;"></div>
     </div>
-    <span class="nums">${spendableXP}</span>
+    <span class="nums">${char.currentEndurance}<small>/${char.maxEndurance}</small></span>
    </div>
-   <div class="tok-time">Ti&nbsp;<b>${char.timeRemaining}</b></div>
-   <div class="tok-ms">${milestoneDots}</div>
-   <div class="tok-loc">${formatLocationName(char.location)}</div>
-   ${stateIcon}
-   <button class="tok-expand" aria-label="Expand details" title="Show full details">+</button>
-   <!-- Hidden anchor for inventory animation destination -->
-   <div class="equipment-list" data-inventory="${player.playerNum}" id="inventory-${player.playerNum}" style="display:none;"></div>
-  `;
-
-  // Detail drawer — hidden by default, opens on click.
-  const drawer = document.createElement('div');
-  drawer.className = 'climber-drawer';
-  drawer.id = `player-${player.playerNum}-drawer`;
-  drawer.innerHTML = `
-   <div class="drawer-grid">
-    <div class="drawer-section">
-     <h5>${char.archetype}</h5>
-     <div class="drawer-line">
-      <strong>${char.specialAbility.name}</strong>
-      <span class="ability-status ${char.abilityUsed ? 'used' : 'avail'}">${char.abilityUsed ? 'Used' : 'Available'}</span>
-     </div>
-     <div class="drawer-desc">${char.specialAbility.description}</div>
-     ${char.betaBoostActive ? `<div class="beta-note">Beta Boost active — +3 to all stats on next climb</div>` : ''}
+   <div class="ps-meter">
+    <span class="label">${uiIcon('xp')}XP</span>
+    <div class="aia-meter aia-meter--xp" role="meter" aria-label="Progress to next level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(xpPct)}" aria-valuetext="${spendableXP} XP to spend, ${char.level < 15 ? `${xpToGo} to level ${char.level + 1}` : 'max level'}">
+     <div class="aia-meter__fill" data-xp-bar="${n}" id="xp-bar-${n}" style="--w: ${xpPct}%;"></div>
     </div>
-    <div class="drawer-section">
-     <h5>Bonuses</h5>
-     <div class="drawer-bonuses">
-      ${['strength','technique','focus','flexibility'].map(s => {
-       const tr = char.trainingBonuses[s] || 0;
-       const gr = char.gearBonuses[s] || 0;
-       if (tr === 0 && gr === 0) return '';
-       return `<div class="bonus-row"><span>${s}</span><span>${tr > 0 ? `+${tr} train` : ''}${tr > 0 && gr > 0 ? ' · ' : ''}${gr > 0 ? `+${gr} gear` : ''}</span></div>`;
-      }).join('') || '<div class="muted">No training or gear bonuses yet.</div>'}
-     </div>
-     <div class="drawer-line muted">Total XP ${char.xp} · ${char.level < 15 ? `${xpToGo} to L${char.level+1}` : 'MAX'}</div>
-    </div>
-    <div class="drawer-section">
-     <h5>Equipment <span class="muted">(${char.equipment.length})</span></h5>
-     <div class="drawer-equipment">
-      ${char.equipment.length ? char.equipment.map(e => `<span class="badge">${e}</span>`).join('') : '<span class="muted">None yet.</span>'}
-     </div>
-    </div>
+    <span class="nums">${spendableXP}<small> xp</small></span>
    </div>
-  `;
-  drawer.style.display = 'none';
-
-  // Click anywhere on the row toggles the drawer. Update the expand-button
-  // glyph to `+` (collapsed) / `−` (expanded) so the affordance is obvious
-  // without relying on a chevron Unicode that reads as an emoji to some
-  // browsers.
-  token.addEventListener('click', () => {
-   const isOpen = drawer.style.display !== 'none';
-   drawer.style.display = isOpen ? 'none' : 'block';
-   token.classList.toggle('expanded', !isOpen);
-   const expandBtn = token.querySelector('.tok-expand');
-   if (expandBtn) expandBtn.textContent = isOpen ? '+' : '−'; // − minus sign
+   <div class="ps-meter">
+    <span class="label">${uiIcon('time')}Time</span>
+    <span class="aia-pips${t <= 1 ? ' aia-pips--warn' : ''}" aria-hidden="true">${pips}</span>
+    <span class="nums">${t}<span class="sr-only"> time left</span></span>
+   </div>
+   <div class="ps-row">
+    <ul class="ps-projects" aria-label="Milestone projects">${project('beginner', 'beg', 'Beg')}${project('intermediate', 'int', 'Int')}${project('expert', 'exp', 'Exp')}</ul>
+    <span class="ps-state ${stateClass}">${stateText}</span>
+   </div>
+   <div class="ps-gear equipment-list" data-inventory="${n}" id="inventory-${n}" aria-label="Gear owned">
+    ${char.equipment.length ? char.equipment.map(e => `<span class="aia-chip">${uiEsc(e)}</span>`).join('') : '<span class="muted">No gear yet</span>'}
+   </div>
+   <details class="ps-details"${uiOpenDetails.has(n) ? ' open' : ''}>
+    <summary>${uiEsc(char.specialAbility.name)} · ability &amp; bonuses</summary>
+    <div class="drawer">
+     <p>${uiEsc(char.specialAbility.description)}</p>
+     ${char.betaBoostActive ? '<p class="beta-note">Beta Boost active · +3 to all stats on your next climb</p>' : ''}
+     ${bonuses ? `<ul>${bonuses}</ul>` : '<p>No training or gear bonuses yet.</p>'}
+     <p>Total XP ${char.xp} · ${char.level < 15 ? `${xpToGo} to level ${char.level + 1}` : 'max level'}</p>
+    </div>
+   </details>`;
+  sheet.querySelector('details').addEventListener('toggle', (e) => {
+   if (e.target.open) uiOpenDetails.add(n); else uiOpenDetails.delete(n);
   });
-
-  container.appendChild(token);
-  container.appendChild(drawer);
+  container.appendChild(sheet);
  });
 }
 
@@ -797,6 +761,7 @@ function renderRoutes() {
 function renderBoulderingRoutes() {
  const container = document.getElementById('boulderingRoutes');
  container.innerHTML = '';
+ container.dataset.empty = 'No routes set on the wall right now.';
  // Occupancy and "clearing next" are surfaced as pills on the area title
  // by renderSectionStatusPills() — no inline duplicate.
  gameState.availableRoutes.bouldering.forEach((route, idx) => {
@@ -812,12 +777,13 @@ function renderTopRopeRoutes() {
  // 2 routes each; each station holds ONE climber. A station an opponent holds
  // blocks both its routes until routes clear (RuleModifications).
  if (gameState.belayerCount <= 0) {
- container.innerHTML = '<p style="color: #666;">Top Rope needs at least 2 players (no belayers in a solo game).</p>';
+ container.innerHTML = '<p class="area-sub">Top Rope needs a belayer station this game.</p>';
  return;
  }
 
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+ const currentPlayer = uiCurrent();
  const routes = gameState.availableRoutes.topRope;
+ const solo = gameState.players.length === 1;
 
  // Group routes by belayer-station index.
  const stations = [];
@@ -836,28 +802,29 @@ function renderTopRopeRoutes() {
  const youHere = currentPlayer.character.location === 'topRope' &&
  currentPlayer.character.belayerStation === b;
  const blocked = occupied.has(b);
-
- // Station header spans the full width of the 2-column route grid.
- const header = document.createElement('div');
- header.className = 'belayer-station-header'
- + (blocked ? ' blocked' : '') + (youHere ? ' you' : '');
+ const label = solo ? 'Auto-Belay' : `Belayer ${b + 1}`;
  const status = blocked
- ? `occupied by Player ${holder ? holder.playerNum : '?'}`
- : (youHere ? 'you are here' : 'open');
- header.innerHTML = `<span class="bsh-name">Belayer ${b + 1}</span>`
- + `<span class="bsh-status">${status}</span>`;
- container.appendChild(header);
+ ? `Taken by Player ${holder ? holder.playerNum : '?'}`
+ : (youHere ? 'You are here' : 'Open');
 
+ const station = document.createElement('div');
+ station.className = 'station' + (blocked ? ' blocked' : '') + (youHere ? ' you' : '');
+ station.setAttribute('role', 'group');
+ station.setAttribute('aria-labelledby', `station-${b}`);
+ station.innerHTML = `<div class="station-head">
+  <span class="bsh-name" id="station-${b}">${uiIcon('topRope')}${label}</span>
+  <span class="at-pill${blocked ? ' full' : ''}">${status}</span>
+ </div>`;
+ const row = document.createElement('div');
+ row.className = 'card-row';
  stationRoutes.forEach((route) => {
  const idx = routes.indexOf(route);
- const card = createRouteCard(route, 'topRope', idx);
- if (blocked) {
- card.style.opacity = '0.3';
- card.style.pointerEvents = 'none';
- card.style.filter = 'grayscale(80%)';
- }
- container.appendChild(card);
+ row.appendChild(createRouteCard(route, 'topRope', idx, {
+  blockedReason: blocked ? `${label} is taken by P${holder ? holder.playerNum : '?'}` : '',
+ }));
  });
+ station.appendChild(row);
+ container.appendChild(station);
  });
 }
 
@@ -865,321 +832,131 @@ function renderLeadClimbingRoutes() {
  const container = document.getElementById('leadClimbingRoutes');
  container.innerHTML = '';
 
- // Check if player has access to this area
+ // Lead needs the full Lead system (Free Solo bypasses). When locked, say
+ // exactly which gear is missing; the cards stay visible but unplayable.
  const accessCheck = checkAreaAccess('leadClimbing');
-
  if (!accessCheck.hasAccess) {
  const lockedDiv = document.createElement('div');
  lockedDiv.className = 'area-locked-banner';
- lockedDiv.innerHTML = `<strong>Area Locked.</strong> Required gear: ${accessCheck.missingItems.join(', ')}`;
+ lockedDiv.setAttribute('role', 'note');
+ lockedDiv.innerHTML = `${uiIcon('lock')}<strong>Lead is locked.</strong><span>Buy the Lead system in the Gear Shop:</span>
+  ${accessCheck.missingItems.map(i => `<span class="aia-chip">${uiEsc(i)}</span>`).join('')}`;
  container.appendChild(lockedDiv);
  }
- // Occupancy + "clearing next" surfaced as title pills — no inline duplicate.
 
- // Always show routes, but disable if locked
- const isLocked = !accessCheck.hasAccess;
+ const row = document.createElement('div');
+ row.className = 'card-row';
+ row.dataset.empty = 'No lead routes set right now.';
  gameState.availableRoutes.leadClimbing.forEach((route, idx) => {
- const card = createRouteCard(route, 'leadClimbing', idx);
- if (isLocked) {
- card.style.opacity = '0.3';
- card.style.pointerEvents = 'none';
- card.style.filter = 'grayscale(80%)';
- }
- container.appendChild(card);
+ row.appendChild(createRouteCard(route, 'leadClimbing', idx, { locked: !accessCheck.hasAccess }));
  });
+ container.appendChild(row);
 }
 
-function createRouteCard(route, area, idx) {
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+function createRouteCard(route, area, idx, opts = {}) {
+ const currentPlayer = uiCurrent();
  const char = currentPlayer.character;
-
- // Ensure gearBonuses exists
  if (!char.gearBonuses) {
  char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
  }
 
- const totalStats = {
- strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength,
- technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique,
- focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus,
- flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility
- };
-
- // Check if route already attempted
  const routeKey = `${area}:${route.name}`;
  const alreadyAttempted = !!gameState.attemptedRoutes[currentPlayer.playerNum]?.[routeKey];
+ const reason = opts.blockedReason || uiBlocker({ type: 'climb', area, routeName: route.name });
+ const ownedGear = (route.gearModifiers || []).filter(g => char.equipment.includes(g));
 
- const costs = getClimbCosts(char, route);
- const canAttempt = isLegalNow({ type: 'climb', area, routeName: route.name });
-
- // Check if player has any applicable gear
- const playerHasGear = route.gearModifiers && route.gearModifiers.length > 0
- ? route.gearModifiers.filter(gear => char.equipment.includes(gear))
-: [];
-
- // Build dice roll effects display
- const statNames = {
- strength: 'Str',
- technique: 'Tech',
- focus: 'Focus',
- flexibility: 'Flex'
- };
-
- const routeTypeColors = { Slab: '#17a2b8', Vertical: '#28a745', Overhang: '#fd7e14', Traverse: '#6f42c1' };
- const routeTypeColor = routeTypeColors[route.routeType] || '#6c757d';
-
- // Compact 2-row card layout (B1).
- // Row 1: name + grade + type + cost(Ti/E) + (optional) gear-bonus chip
- // Row 2: 4 requirement chips + XP outcomes
- // Mini line: dice-effects breakdown, if present (full info, not collapsed)
- let diceEffectsHTML = '';
- if (route.rollEffect && route.rollEffect.length > 0) {
- const parts = route.rollEffect.map((effect, index) => {
-  const statName = statNames[effect.stat];
-  const isBuff = effect.modifier === -1;
-  const sign = isBuff ? '-' : '+';
-  const label = isBuff ? 'easier' : 'harder';
-  const color = isBuff ? '#28a745' : '#dc3545';
-  return `<span style="color:${color};font-weight:700;">d${index + 1}: ${sign}1d6 ${statName} ${label}</span>`;
- }).join('  •  ');
- diceEffectsHTML = `<div class="rc-dice">Dice: ${parts}</div>`;
- }
-
- const card = document.createElement('div');
- card.className = 'route-card';
- card.style.position = 'relative';
- if (!canAttempt) card.style.opacity = '0.5';
- if (alreadyAttempted) {
- card.style.border = '2px solid #ffc107';
- card.style.background = '#fff3cd';
- }
-
- card.onclick = () => canAttempt && attemptClimb(route, area);
-
- const gearBonusChip = playerHasGear.length > 0
-  ? `<span class="rc-gearbonus" title="Gear bonus: ${playerHasGear.join(', ')}">+GEAR</span>`
-  : '';
-
- const attemptedBadge = alreadyAttempted ? `<span class="rc-attempted-badge">Attempted</span>` : '';
-
- card.innerHTML = `
-  ${attemptedBadge}
-  <div class="rc-row-top">
-   <span class="route-name">${route.name}</span>
-   <span class="route-grade">${route.grade}</span>
-   <span class="rc-type" style="background:${routeTypeColor};">${route.routeType || 'Unknown'}</span>
-   <span class="rc-cost">Ti ${costs.time} · E ${costs.endurance}</span>
-   ${gearBonusChip}
-  </div>
-  <div class="rc-row-bottom">
-   <div class="route-requirements">
-    <div class="requirement ${totalStats.strength    >= route.strength    ? 'met': 'unmet'}">S ${route.strength}</div>
-    <div class="requirement ${totalStats.technique   >= route.technique   ? 'met': 'unmet'}">T ${route.technique}</div>
-    <div class="requirement ${totalStats.focus       >= route.focus       ? 'met': 'unmet'}">F ${route.focus}</div>
-    <div class="requirement ${totalStats.flexibility >= route.flexibility ? 'met': 'unmet'}">X ${route.flexibility}</div>
-   </div>
-   <div class="rc-xp"><span class="succ">+${route.xpSuccess}</span><span class="fail">/${route.xpFail}</span></div>
-  </div>
-  ${diceEffectsHTML}
- `;
-
+ const card = AIACards.route(route, {
+ area,
+ costs: getClimbCosts(char, route),
+ stats: computeClimbStats(char, route, area),
+ status: alreadyAttempted ? 'Attempted' : (ownedGear.length ? '+Gear' : null),
+ tone: alreadyAttempted ? 'done' : (opts.locked ? 'locked' : null),
+ action: {
+  label: 'Climb',
+  disabled: !!reason,
+  reason,
+  reasonIcon: alreadyAttempted ? 'check' : 'lock',
+  onClick: () => attemptClimb(route, area),
+ },
+ });
+ card.classList.add('route-card');
+ card.dataset.route = route.name;
  return card;
 }
 
 function renderTraining() {
  const container = document.getElementById('trainingAreas');
  container.innerHTML = '';
-
- // Stat -> chip color, mirroring the climber-token stat-pill palette.
- const statChipColor = {
-  strength:    '#ff6845', // coral
-  technique:   '#1fb8a6', // teal
-  focus:       '#8857d4', // violet
-  flexibility: '#b6d62d', // lime
- };
- const statShort = {
-  strength: 'STR', technique: 'TEC', focus: 'FOC', flexibility: 'FLX',
- };
+ const currentPlayer = uiCurrent();
 
  TRAINING_AREAS.forEach(area => {
-  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const playersHere = getPlayersInSection(area.name);
-  const isOccupied = playersHere.length > 0;
-  const occupyingPlayer = isOccupied ? playersHere[0] : null;
-  const isMine = isOccupied && occupyingPlayer.playerNum === currentPlayer.playerNum;
-  const canTrain = isLegalNow({ type: 'train', areaName: area.name });
+  const occupant = playersHere[0] || null;
+  const isMine = !!occupant && occupant.playerNum === currentPlayer.playerNum;
+  const reason = uiBlocker({ type: 'train', areaName: area.name });
 
-  const card = document.createElement('div');
-  card.className = 'training-area compact-card';
-  if (!canTrain) card.style.opacity = '0.5';
-  if (isOccupied && !isMine) card.classList.add('locked-station');
-
-  card.onclick = () => canTrain && trainAction(area);
-
-  const occChip = isMine
-   ? `<span class="rc-gearbonus" style="background:#28a745;">YOU</span>`
-   : (isOccupied
-      ? `<span class="rc-type" style="background:#dc3545;">P${occupyingPlayer.playerNum}</span>`
-      : '');
-
-  const bonusChip = `<span class="rc-type" style="background:${statChipColor[area.stat] || '#6c757d'};">+${area.bonus} ${statShort[area.stat] || area.stat.toUpperCase()}</span>`;
-
-  card.innerHTML = `
-    <div class="rc-row-top">
-     <span class="route-name">${area.name}</span>
-     ${bonusChip}
-     <span class="rc-cost">Ti ${area.time} · E ${area.endurance}</span>
-     ${occChip}
-    </div>
-    ${area.description ? `<div class="rc-row-bottom training-desc">${area.description}</div>` : ''}
-  `;
-
+  const card = AIACards.training(area, {
+   status: isMine ? 'You' : (occupant ? `P${occupant.playerNum}` : null),
+   action: { label: 'Train', disabled: !!reason, reason, onClick: () => trainAction(area) },
+  });
+  card.classList.add('training-area');
   container.appendChild(card);
  });
 }
 
-// Compact gear-card template — same row-pattern as the climbing route cards
-// and training stations. Preserves all info: name, cost, category, effect,
-// description, access-grant (when applicable), and prerequisite hints.
-function buildCompactGearCardHTML(gear, owned, prerequisiteText) {
- const ownedTag = owned
-  ? `<span class="rc-gearbonus" style="background:#28a745;">OWNED</span>`
-  : '';
- const costChip = `<span class="rc-cost">${gear.cost} XP</span>`;
- const categoryChip = gear.category
-  ? `<span class="rc-type" style="background:#5a4530;">${gear.category}</span>`
-  : '';
- const accessChip = gear.accessRequirement
-  ? `<span class="rc-gearbonus" style="background:#155724;">+${gear.accessRequirement} ACCESS</span>`
-  : '';
- return `
-  <div class="rc-row-top">
-   <span class="route-name">${gear.name}</span>
-   ${categoryChip}
-   ${costChip}
-   ${accessChip}
-   ${ownedTag}
-  </div>
-  <div class="rc-row-bottom gear-detail-row">
-   <div class="gear-effect-line">${gear.effectDisplay}</div>
-   <div class="gear-desc-line">${gear.description}</div>
-   ${prerequisiteText}
-  </div>
- `;
+// Gear-card state for the current player: owned? + why it can't be bought
+// right now ('' when it can), from the engine.
+function uiGearState(gear, char) {
+ return { owned: char.equipment.includes(gear.name), reason: uiBlocker({ type: 'buyGear', gearName: gear.name }) };
 }
 
 function renderStore() {
  const container = document.getElementById('gearShop');
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
+ const char = uiCurrent().character;
  const spendableXP = AscentEngine.getSpendableXp(char);
  const xpToGo = getXPToNextLevel(char);
 
- // Affordability badge on the area-title (no longer collapses the panel).
+ // Affordability badge on the area title.
  syncShopCollapseState();
 
- // Occupancy is on the area-title pill — no inline duplicate. Header line
- // keeps the spendable / XP-to-next info that drives buy decisions.
- container.innerHTML = `<p class="store-xp-info">
- <strong style="color: #28a745;">Spendable: ${spendableXP} XP</strong> ·
- <strong style="color: #ff9800;">${xpToGo} XP to next level</strong>
- </p>`;
+ container.innerHTML = `<div class="shop-head">
+  <p class="store-xp-info">
+   <span class="aia-chip aia-chip--ok">${uiIcon('xp')}${spendableXP} XP to spend</span>
+   <span class="aia-chip">${char.level < 15 ? `${xpToGo} XP to level ${char.level + 1}` : 'Max level'}</span>
+  </p>
+  <p class="area-sub" style="margin:0">Gear costs XP earned this level and 1 time.</p>
+ </div>`;
 
- // Two-column wrapper: essential gear on the left, rotating gear on the right.
- const columnsWrapper = document.createElement('div');
- columnsWrapper.className = 'gear-shop-columns';
+ const gearCard = (gear) => {
+  const { owned, reason } = uiGearState(gear, char);
+  const card = AIACards.gear(gear, {
+   status: owned ? 'Owned' : null,
+   tone: owned ? 'done' : null,
+   action: { label: owned ? 'Owned' : 'Buy', disabled: !!reason, reason, reasonIcon: owned ? 'check' : 'lock', onClick: () => purchaseGear(gear) },
+  });
+  card.classList.add('gear-card');
+  card.setAttribute('data-gear-slot', gear.name);
+  return card;
+ };
+ const group = (title, sub, gears, id) => {
+  const section = document.createElement('section');
+  section.className = 'shop-group';
+  section.setAttribute('aria-labelledby', id);
+  section.innerHTML = `<h3 id="${id}">${title}</h3><p>${sub}</p>`;
+  const row = document.createElement('div');
+  row.className = 'card-row';
+  row.dataset.empty = 'Sold out.';
+  gears.forEach(g => row.appendChild(gearCard(g)));
+  section.appendChild(row);
+  return section;
+ };
 
- // ===== LEFT COLUMN: ESSENTIAL ACCESS GEAR =====
- const accessGearSection = document.createElement('div');
- accessGearSection.className = 'essential-col';
- accessGearSection.innerHTML = `
-   <h3 class="column-header">Required Equipment</h3>
-   <div class="column-subhead">Gates access to Lead Climbing (Top Rope is open)</div>
- `;
-
- // The 3 essential access cards (Harness removed in RuleModifications)
- const accessCards = GEAR_SHOP.filter(g => AscentEngine.ACCESS_CARDS.includes(g.name));
-
- accessCards.forEach(gear => {
- const owned = char.equipment.includes(gear.name);
- const canAfford = isLegalNow({ type: 'buyGear', gearName: gear.name });
-
- // Check prerequisites
- let prerequisitesMet = true;
- let prerequisiteText = '';
-
- if (gear.prerequisiteLevel && char.level < gear.prerequisiteLevel) {
- prerequisitesMet = false;
- prerequisiteText += `<div style="color: #dc3545; font-size: 0.85em; margin-top: 5px;"> Requires Level ${gear.prerequisiteLevel}</div>`;
- }
-
- if (gear.prerequisiteItems && gear.prerequisiteItems.length > 0) {
- const missingItems = gear.prerequisiteItems.filter(item => !char.equipment.includes(item));
- if (missingItems.length > 0) {
- prerequisitesMet = false;
- prerequisiteText += `<div style="color: #dc3545; font-size: 0.85em; margin-top: 5px;"> Requires: ${missingItems.join(', ')}</div>`;
- }
- }
-
- const card = document.createElement('div');
- card.className = 'gear-card access-gear-card' + (owned ? ' owned': '') + (!prerequisitesMet ? ' locked': '');
- card.setAttribute('data-gear-slot', gear.name);
- if (!owned && (!canAfford || !prerequisitesMet)) card.style.opacity = '0.5';
-
- card.onclick = () => !owned && canAfford && prerequisitesMet && purchaseGear(gear);
-
- card.classList.add('compact-card');
- card.innerHTML = buildCompactGearCardHTML(gear, owned, prerequisiteText);
-
- accessGearSection.appendChild(card);
- });
-
- columnsWrapper.appendChild(accessGearSection);
-
- // ===== RIGHT COLUMN: AVAILABLE GEAR (Rotating selection) =====
- const availableGearSection = document.createElement('div');
- availableGearSection.className = 'available-col';
- availableGearSection.innerHTML = `
-   <h3 class="column-header">Available Gear</h3>
-   <div class="column-subhead">Rotating selection — refills when purchased</div>
- `;
-
- gameState.availableGear.forEach(gear => {
- const owned = char.equipment.includes(gear.name);
- const canAfford = isLegalNow({ type: 'buyGear', gearName: gear.name });
-
- // Check prerequisites
- let prerequisitesMet = true;
- let prerequisiteText = '';
-
- if (gear.prerequisiteLevel && char.level < gear.prerequisiteLevel) {
- prerequisitesMet = false;
- prerequisiteText += `<div style="color: #dc3545; font-size: 0.85em; margin-top: 5px;"> Requires Level ${gear.prerequisiteLevel}</div>`;
- }
-
- if (gear.prerequisiteItems && gear.prerequisiteItems.length > 0) {
- const missingItems = gear.prerequisiteItems.filter(item => !char.equipment.includes(item));
- if (missingItems.length > 0) {
- prerequisitesMet = false;
- prerequisiteText += `<div style="color: #dc3545; font-size: 0.85em; margin-top: 5px;"> Requires: ${missingItems.join(', ')}</div>`;
- }
- }
-
- const card = document.createElement('div');
- card.className = 'gear-card' + (owned ? ' owned': '') + (!prerequisitesMet ? ' locked': '');
- card.setAttribute('data-gear-slot', gear.name);
- if (!owned && (!canAfford || !prerequisitesMet)) card.style.opacity = '0.5';
-
- card.onclick = () => !owned && canAfford && prerequisitesMet && purchaseGear(gear);
-
- card.classList.add('compact-card');
- card.innerHTML = buildCompactGearCardHTML(gear, owned, prerequisiteText);
-
- availableGearSection.appendChild(card);
- });
-
- columnsWrapper.appendChild(availableGearSection);
- container.appendChild(columnsWrapper);
+ // The 3 Lead-system access cards (Harness removed in RuleModifications) are
+ // always on the shelf; the rest of the shop is a rotating selection.
+ container.appendChild(group('Lead system', 'All three unlock Lead Climbing (Top Rope is open to everyone).',
+  GEAR_SHOP.filter(g => AscentEngine.ACCESS_CARDS.includes(g.name)), 'shop-lead'));
+ container.appendChild(group('On the shelf', 'Rotating stock — a new card is drawn when one sells.',
+  gameState.availableGear, 'shop-rotating'));
 }
 
 // ===== RULES ENGINE BRIDGE =====
@@ -1192,17 +969,14 @@ function renderStore() {
 // which runs the same engine. game.js only renders state, turns clicks into
 // engine actions, and presents the events the engine emits.
 
-const STAT_KEYS = ['strength', 'technique', 'focus', 'flexibility'];
-const STAT_LABELS = { strength: 'Strength', technique: 'Technique', focus: 'Focus', flexibility: 'Flexibility' };
+const STAT_KEYS = UI_STATS.map(st => st.key);
+const STAT_LABELS = Object.fromEntries(UI_STATS.map(st => [st.key, st.name]));
 const AREA_LABELS = { bouldering: 'Bouldering', topRope: 'Top Rope', leadClimbing: 'Lead Climbing' };
 
 function isOnline() {
  return !!(window.OnlineMode && window.OnlineMode.active);
 }
 
-function currentPlayer() {
- return gameState.players[gameState.currentPlayerIndex];
-}
 
 // The current player's legal actions: the server's menu online, the engine's
 // locally (the same getLegalActions either way).
@@ -1318,7 +1092,7 @@ function chooseStatShift(route, stats, suggested) {
 // Resolves { shift } (possibly null) or null if the player cancelled.
 async function maybeChooseStatShift(char, route, area) {
  if (!AscentEngine.canUseStatShift(char, false)) return { shift: null };
- const attempted = gameState.attemptedRoutes[currentPlayer().playerNum];
+ const attempted = gameState.attemptedRoutes[uiCurrent().playerNum];
  const suggested = AscentEngine.bestRouteReaderShift(char, route, area, attempted);
  if (!suggested) return { shift: null };
  // Stats as the climb will see them, including an unspent Beta Boost (applied
@@ -1335,7 +1109,7 @@ async function attemptClimb(route, area) {
  // Not legal: let dispatchAction explain why (an alert locally, a toast online).
  if (!isLegalNow(wanted)) return dispatchAction(wanted);
  // A Route Reader picks a stat shift first. Cancelling costs nothing.
- const choice = await maybeChooseStatShift(currentPlayer().character, route, area);
+ const choice = await maybeChooseStatShift(uiCurrent().character, route, area);
  if (!choice) return;
  dispatchAction(choice.shift ? { ...wanted, shift: choice.shift } : wanted);
 }
@@ -1618,95 +1392,64 @@ function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffec
  const title = document.getElementById('modalTitle');
  const body = document.getElementById('modalBody');
 
- title.textContent = route.name + ' - ' + route.grade;
+ title.textContent = `${route.name} · ${route.grade}`;
 
- const statIcons = {
- strength: '',
- technique: '',
- focus: '',
- flexibility: ''
- };
+ const statNames = { strength: 'Strength', technique: 'Technique', focus: 'Focus', flexibility: 'Flexibility' };
+ const statShort = { strength: 'STR', technique: 'TEC', focus: 'FOC', flexibility: 'FLX' };
 
- const statNames = {
- strength: 'Strength',
- technique: 'Technique',
- focus: 'Focus',
- flexibility: 'Flexibility'
- };
-
- // Build dice effects display
- let diceEffectsHTML = '';
+ let effectsHTML = '';
  if (diceEffects && diceEffects.length > 0) {
- diceEffectsHTML = diceEffects.map((effect, index) => {
- const icon = statIcons[effect.stat];
- const statName = statNames[effect.stat];
- let sign = effect.modifier === -1 ? '-': '+';
- let color = effect.modifier === -1 ? '#28a745': '#dc3545';
-
- // Handle neutralized dice
- if (effect.modifier === 0 && (effect.abilityNeutralized || effect.gearNeutralized)) {
- sign = '~';
- color = '#6c757d';
- } else if (effect.modifier === 0) {
- sign = '±';
- color = '#6c757d';
- }
-
- const neutralizedText = effect.abilityNeutralized ? ' <span style="color: #ffc107;">(Neutralized by Ability)</span>'
- : effect.gearNeutralized ? ` <span style="color: #ffc107;">(Neutralized by ${effect.gearNeutralized})</span>` : '';
- return `<div style="margin: 5px 0; color: ${color}; font-weight: bold;">
- Die ${index + 1}: ${effect.die} → ${sign}${effect.die} ${icon} ${statName}${neutralizedText}
- </div>`;
+ effectsHTML = diceEffects.map((effect, index) => {
+  const name = statNames[effect.stat];
+  let chip, text;
+  if (effect.modifier === 0) {
+   chip = `<span class="aia-die-chip" style="background: var(--paper-deep);">${uiIcon('die')}±${statShort[effect.stat]}</span>`;
+   text = effect.abilityNeutralized ? `Die ${index + 1} rolled ${effect.die} — neutralised by an ability`
+    : effect.gearNeutralized ? `Die ${index + 1} rolled ${effect.die} — neutralised by ${uiEsc(effect.gearNeutralized)}`
+    : `Die ${index + 1} rolled ${effect.die} — no effect`;
+  } else {
+   const buff = effect.modifier === -1;
+   chip = `<span class="aia-die-chip ${buff ? 'is-buff' : 'is-nerf'}">${uiIcon('die')}${buff ? '−' : '+'}${effect.die} ${statShort[effect.stat]}</span>`;
+   text = `Die ${index + 1} rolled ${effect.die}: ${name} requirement ${buff ? 'lowered' : 'raised'} by ${effect.die}`;
+  }
+  return `<li>${chip}<span>${text}</span></li>`;
  }).join('');
  }
 
+ const reqRows = UI_STATS.map(s => {
+  const met = stats[s.key] >= effectiveReqs[s.key];
+  return `<tr>
+   <th scope="row">${s.name}</th>
+   <td>${effectiveReqs[s.key]}</td>
+   <td>${stats[s.key]}</td>
+   <td class="res ${met ? 'met' : 'unmet'}">${uiIcon(met ? 'check' : 'cross')} ${met ? 'Met' : `Short by ${effectiveReqs[s.key] - stats[s.key]}`}</td>
+  </tr>`;
+ }).join('');
+
  body.innerHTML = `
- <div class="result-box ${success ? 'result-success': 'result-failure'}">
- <div class="result-text">
- ${success ? ' CLIMB SUCCESSFUL!': ' CLIMB FAILED'}
- </div>
- <div class="result-details">
- <strong>XP Gained: ${xpGained}</strong>
- </div>
+ <div class="result-box ${success ? 'result-success' : 'result-failure'}">
+  <p class="result-text">${uiIcon(success ? 'check' : 'cross')}${success ? 'Sent it!' : 'Fell off'}</p>
+  <p class="result-details">+${xpGained} XP</p>
  </div>
 
- <h3>Dice Rolls:</h3>
- <div class="dice-container">
- ${rolls.map((r, i) => `
- <div class="die" style="${i < diceUsed.length ? '': 'opacity: 0.3;'}">
- ${r}
- </div>
- `).join('')}
- </div>
- ${rolls.length > diceUsed.length ? `<p style="text-align: center; margin-top: 10px; font-size: 0.9em; color: #666;">
- (Rolled ${rolls.length} dice, used best ${diceUsed.length})
- </p>`: ''}
+ <section class="result-section" aria-labelledby="res-dice">
+  <h3 id="res-dice">Dice</h3>
+  <div class="dice-container">
+  ${rolls.map((r, i) => `<span class="die${i < diceUsed.length ? '' : ' unused'}" role="img" aria-label="Rolled ${r}${i < diceUsed.length ? '' : ', discarded'}">${r}</span>`).join('')}
+  </div>
+  ${rolls.length > diceUsed.length ? `<p class="dice-note">Rolled ${rolls.length} dice, kept the best ${diceUsed.length}.</p>` : ''}
+ </section>
 
- <h3 style="margin-top: 20px;">Dice Effects:</h3>
- <div style="display: grid; gap: 10px; margin-bottom: 20px;">
- ${diceEffectsHTML}
- </div>
- ${gearNotes.length ? `
- <h3 style="margin-top: 20px;">Gear Effects:</h3>
- <ul class="gear-effects" style="margin: 0 0 20px; padding-left: 20px;">
- ${gearNotes.map(note => `<li style="margin: 4px 0; color: #6f42c1; font-weight: bold;">${note}</li>`).join('')}
- </ul>` : ''}
+ ${effectsHTML ? `<section class="result-section" aria-labelledby="res-fx"><h3 id="res-fx">Dice effects</h3><ul class="effect-list">${effectsHTML}</ul></section>` : ''}
+ ${gearNotes.length ? `<section class="result-section" aria-labelledby="res-gear"><h3 id="res-gear">Gear effects</h3><ul class="effect-list gear-effects">${gearNotes.map(n => `<li>${uiIcon('gear')}<span>${uiEsc(n)}</span></li>`).join('')}</ul></section>` : ''}
 
- <h3 style="margin-top: 20px;">Requirements Check:</h3>
- <div class="route-requirements">
- <div class="requirement ${stats.strength >= effectiveReqs.strength ? 'met': 'unmet'}">
- Strength: ${stats.strength} vs ${effectiveReqs.strength} required
- </div>
- <div class="requirement ${stats.technique >= effectiveReqs.technique ? 'met': 'unmet'}">
- Technique: ${stats.technique} vs ${effectiveReqs.technique} required
- </div>
- <div class="requirement ${stats.focus >= effectiveReqs.focus ? 'met': 'unmet'}">
- Focus: ${stats.focus} vs ${effectiveReqs.focus} required
- </div>
- <div class="requirement ${stats.flexibility >= effectiveReqs.flexibility ? 'met': 'unmet'}">
- Flexibility: ${stats.flexibility} vs ${effectiveReqs.flexibility} required
- </div>
- </div>
+ <section class="result-section" aria-labelledby="res-req">
+  <h3 id="res-req">Requirements check</h3>
+  <table class="req-table">
+   <thead><tr><th scope="col">Stat</th><th scope="col">Needed</th><th scope="col">You</th><th scope="col">Result</th></tr></thead>
+   <tbody>${reqRows}</tbody>
+  </table>
+ </section>
  `;
 
  modal.classList.add('show');
@@ -1715,54 +1458,33 @@ function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffec
 function showVictoryScreen(winner) {
  const modal = document.getElementById('victoryModal');
  const modalBody = document.getElementById('victoryModalBody');
+ const c = winner.character;
+ const color = uiPlayerColor(winner.playerNum);
 
- let html = `
- <div style="text-align: center;">
- <h1 style="font-size: 3em; margin-bottom: 20px;"> GAME OVER! </h1>
- <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
- <h2 style="font-size: 2.5em; margin: 0 0 10px 0;"> WINNER </h2>
- <h3 style="font-size: 2em; margin: 0;">Player ${winner.playerNum}</h3>
- <p style="font-size: 1.5em; margin: 10px 0 0 0;">${winner.character.name}</p>
- </div>
+ const standings = gameState.players.map(player => {
+  const count = Object.values(player.character.milestonesCompleted).filter(Boolean).length;
+  return `<li><span><strong>Player ${player.playerNum}</strong> · ${uiEsc(player.character.name)}</span><span>${count}/3 projects · Level ${player.character.level} · ${player.character.xp} XP</span></li>`;
+ }).join('');
 
- <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
- <h3 style="margin-top: 0;">Final Stats</h3>
- <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; text-align: left;">
- <div><strong> Milestones:</strong> 3/3 Complete</div>
- <div><strong> Level:</strong> ${winner.character.level}</div>
- <div><strong> Total XP:</strong> ${winner.character.xp}</div>
- <div><strong> Strength:</strong> ${winner.character.stats.strength}</div>
- <div><strong> Technique:</strong> ${winner.character.stats.technique}</div>
- <div><strong> Focus:</strong> ${winner.character.stats.focus}</div>
- <div><strong> Flexibility:</strong> ${winner.character.stats.flexibility}</div>
- <div><strong> Endurance:</strong> ${winner.character.maxEndurance}</div>
- </div>
- </div>
-
- <div style="background: #fff3cd; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
- <h4 style="margin-top: 0;">All Players - Final Standings</h4>
- `;
-
- gameState.players.forEach(player => {
- const milestonesCount = Object.values(player.character.milestonesCompleted).filter(Boolean).length;
- html += `
- <div style="padding: 10px; margin: 5px 0; background: white; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
- <span><strong>Player ${player.playerNum}:</strong> ${player.character.name}</span>
- <span> ${milestonesCount}/3 | Level ${player.character.level} | ${player.character.xp} XP</span>
+ modalBody.innerHTML = `
+ <div class="victory">
+  <p class="eyebrow">Game over</p>
+  <h2 id="victoryTitle">Top out!</h2>
+  <div class="victory-banner" style="background: var(--${color}); color: var(--on-${color});">
+   <p class="who">Player ${winner.playerNum} · ${uiEsc(c.name)}</p>
+   <p>Sent all three milestone projects.</p>
+  </div>
+  <div class="final-stats">
+   <div><span>Level</span><strong>${c.level}</strong></div>
+   <div><span>Total XP</span><strong>${c.xp}</strong></div>
+   ${UI_STATS.map(s => `<div><span>${s.name}</span><strong>${c.stats[s.key]}</strong></div>`).join('')}
+   <div><span>Endurance</span><strong>${c.maxEndurance}</strong></div>
+  </div>
+  <h3>Final standings</h3>
+  <ol class="final-standings">${standings}</ol>
+  <button class="btn btn--lime" type="button" data-autofocus onclick="location.reload()">Play again ▸</button>
  </div>
  `;
- });
-
- html += `
- </div>
-
- <button class="btn btn-success" onclick="location.reload()" style="font-size: 1.2em; padding: 15px 40px;">
- Play Again
- </button>
- </div>
- `;
-
- modalBody.innerHTML = html;
  modal.classList.add('show');
 }
 
@@ -1790,9 +1512,9 @@ function showLevelUpPopup(levelUp) {
  { name: 'Max Endurance', old: p.oldMaxEndurance, now: p.newMaxEndurance },
  ].map(row => {
  const diff = row.now - row.old;
- const diffStr = diff > 0 ? `<span class="stat-up">+${diff}</span>`: `<span>${diff}</span>`;
+ const diffStr = diff > 0 ? `<span class="stat-up">+${diff}</span>` : `<span>${diff}</span>`;
  return `<tr>
- <td> ${row.name}</td>
+ <th scope="row">${row.name}</th>
  <td>${row.old}</td>
  <td>${row.now}</td>
  <td>${diffStr}</td>
@@ -1800,29 +1522,16 @@ function showLevelUpPopup(levelUp) {
  }).join('');
 
  document.getElementById('levelUpBody').innerHTML = `
- <div class="level-up-headline"> LEVEL UP! </div>
- <div style="font-size: 1.1em; color: #2c3e50; margin-bottom: 5px;">
- Player ${p.playerNum} — ${playerName(gameState, p.playerNum)}
- </div>
- <div class="level-badge">${p.newLevel}</div>
+ <h2 class="level-up-headline" id="levelUpTitle">Level up!</h2>
+ <p>Player ${p.playerNum} · ${uiEsc(playerName(gameState, p.playerNum))}</p>
+ <span class="hold hold--label hold--marigold level-badge"><span class="sr-only">Now level </span>${p.newLevel}</span>
  <table class="stat-table">
  <thead>
- <tr>
- <th>Stat</th>
- <th>Before</th>
- <th>After</th>
- <th>Change</th>
- </tr>
+ <tr><th scope="col">Stat</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Change</th></tr>
  </thead>
  <tbody>${statRows}</tbody>
  </table>
  `;
-
- // Force animation restart on the modal content
- const content = document.querySelector('#levelUpModal .level-up-modal-content');
- content.style.animation = 'none';
- content.offsetHeight; // reflow
- content.style.animation = '';
 
  document.getElementById('levelUpModal').classList.add('show');
 }
@@ -1836,12 +1545,15 @@ function closeLevelUpModal() {
 // Collapsible panels (Stack 2 — A3 log, C1 gear shop with auto-open).
 // ---------------------------------------------------------------------------
 
-function toggleLogPanel() {
+function toggleLogPanel(forceOpen) {
  const panel = document.getElementById('gameLog');
  if (!panel) return;
- const collapsed = panel.classList.toggle('collapsed');
- const btn = panel.querySelector('.log-toggle-btn');
- if (btn) btn.textContent = collapsed ? '+' : '−';
+ const collapsed = forceOpen === true ? false : !panel.classList.contains('collapsed');
+ panel.classList.toggle('collapsed', collapsed);
+ const header = panel.querySelector('.log-header');
+ if (header) header.setAttribute('aria-expanded', String(!collapsed));
+ const glyph = panel.querySelector('.log-toggle-btn');
+ if (glyph) glyph.textContent = collapsed ? '+' : '−';
 }
 
 // The shop is always-visible per the latest design pass — the previous

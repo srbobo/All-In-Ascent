@@ -38,7 +38,7 @@ import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';
 import { ACCESS_CARDS, drawTopRopeStations, regularRoutePool } from './state.js';
 import {
-  checkAreaAccess, canEnterSection, computeEffectiveStats,
+  checkAreaAccess, canEnterSection, computeEffectiveStats, getPlayersInSection,
   canClimbTopRopeRoute, pickFreeBelayerStation,
   getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost,
   getGearPurchaseTimeCost, getEffectiveGearCost,
@@ -185,104 +185,147 @@ export function findLegalAction(legalActions, wanted) {
 const AREA_LABELS = { bouldering: 'Bouldering', topRope: 'Top Rope', leadClimbing: 'Lead Climbing' };
 
 // Why `wanted` (a partial action, as for findLegalAction) is not legal for the
-// current player right now, as a short player-facing sentence, or null if it
-// is legal. getLegalActions alone decides legality; this only explains a
-// refusal, re-checking the same conditions in the same order.
-export function explainIllegalAction(state, wanted) {
-  if (state.gameEnded) return 'The game has ended.';
+// current player right now, or null if it is legal. getLegalActions alone
+// decides legality; this only explains a refusal, re-checking the same
+// conditions. Returns { code, message, ...details } so a UI can word it its
+// own way: `message` is a full player-facing sentence, `code` is one of
+//   gameOver, noSuchRoute, noSuchMilestone, noSuchStation, noSuchGear,
+//   unknownAction, unavailable,
+//   alreadyAttempted, alreadyCompleted, alreadyOwned, notInShop,
+//   needsGear {missing}, needsItems {missing}, needsLevel {level},
+//   belayerTaken {belayer}, noFreeBelayer, sectionFull {occupants},
+//   stationInUse {occupants}, notEnoughTime {need, have},
+//   notEnoughEndurance {need, have}, notEnoughXp {need, have}, lifeOrDie,
+//   shiftNotAllowed, shiftMalformed
+// (occupants are playerNums).
+export function illegalActionReason(state, wanted) {
+  const reason = (code, message, details = {}) => ({ code, message, ...details });
+  if (state.gameEnded) return reason('gameOver', 'The game has ended.');
   const legal = getLegalActions(state);
   const match = findLegalAction(legal, wanted);
   const player = state.players[state.currentPlayerIndex];
   const char = player.character;
   if (match) {
     if (wanted.shift && (match.type !== 'climb' || !canUseStatShift(char, false))) {
-      return 'Versatility can be used once per round, by the Route Reader, on a regular route.';
+      return reason('shiftNotAllowed', 'Versatility can be used once per round, by the Route Reader, on a regular route.');
     }
     if (wanted.shift && !isWellFormedStatShift(wanted.shift)) {
-      return `A stat shift moves 1 to ${MAX_STAT_SHIFT} points between two different stats.`;
+      return reason('shiftMalformed', `A stat shift moves 1 to ${MAX_STAT_SHIFT} points between two different stats.`);
     }
     return null;
   }
-  const notEnough = (what, need, have) => `Not enough ${what}: this costs ${need} and you have ${have}.`;
-  const lifeOrDie = 'Life or Die: Free Solo can only attempt routes whose base requirements your stats already meet.';
+  const notEnough = (code, what, need, have) =>
+    reason(code, `Not enough ${what}: this costs ${need} and you have ${have}.`, { need, have });
+  const occupantsOf = (section) => getPlayersInSection(state.players, section).map(p => p.playerNum);
+  const lifeOrDie = () =>
+    reason('lifeOrDie', 'Life or Die: Free Solo can only attempt routes whose base requirements your stats already meet.');
   const areaGate = (area) => {
     const access = checkAreaAccess(char, area);
-    if (!access.hasAccess) return `You need ${access.missingItems.join(', ')} to climb ${AREA_LABELS[area] || area}.`;
-    return null;
+    if (access.hasAccess) return null;
+    return reason('needsGear', `You need ${access.missingItems.join(', ')} to climb ${AREA_LABELS[area] || area}.`,
+      { missing: access.missingItems });
+  };
+  const sectionGate = (area) => {
+    const sec = canEnterSection(area, player.playerNum, state);
+    if (sec.canEnter) return null;
+    return reason('sectionFull', `You can't climb here right now: ${sec.reason}.`, { occupants: occupantsOf(area) });
   };
   const costGate = (route) => {
     const t = getEffectiveClimbTimeCost(char, route.time, route);
     const e = getEffectiveClimbEnduranceCost(char, route, route.endurance);
-    if (char.timeRemaining < t) return notEnough('time', t, char.timeRemaining);
-    if (char.currentEndurance < e) return notEnough('endurance', e, char.currentEndurance);
+    if (char.timeRemaining < t) return notEnough('notEnoughTime', 'time', t, char.timeRemaining);
+    if (char.currentEndurance < e) return notEnough('notEnoughEndurance', 'endurance', e, char.currentEndurance);
     return null;
   };
 
   switch (wanted.type) {
     case 'climb': {
       const route = (state.availableRoutes[wanted.area] || []).find(r => r.name === wanted.routeName);
-      if (!route) return 'That route is not on the wall right now.';
+      if (!route) return reason('noSuchRoute', 'That route is not on the wall right now.');
+      if (state.attemptedRoutes[player.playerNum]?.[`${wanted.area}:${route.name}`]) {
+        return reason('alreadyAttempted', 'You have already attempted this route this round. Try it again next round.');
+      }
       const gate = areaGate(wanted.area);
       if (gate) return gate;
       if (wanted.area === 'topRope') {
         if (!canClimbTopRopeRoute(state, player.playerNum, route)) {
-          return `Belayer ${route.belayer + 1} is in use by another climber. Pick a route at a free belayer or wait for the wall to clear.`;
+          return reason('belayerTaken',
+            `Belayer ${route.belayer + 1} is in use by another climber. Pick a route at a free belayer or wait for the wall to clear.`,
+            { belayer: route.belayer });
         }
       } else {
-        const sec = canEnterSection(wanted.area, player.playerNum, state);
-        if (!sec.canEnter) return `You can't climb here right now: ${sec.reason}.`;
+        const full = sectionGate(wanted.area);
+        if (full) return full;
       }
-      if (state.attemptedRoutes[player.playerNum]?.[`${wanted.area}:${route.name}`]) {
-        return 'You have already attempted this route this round. Try it again next round.';
-      }
-      return costGate(route) || (!freeSoloCanAttempt(char, route) ? lifeOrDie : null) || 'That climb is not available right now.';
+      return costGate(route) || (!freeSoloCanAttempt(char, route) ? lifeOrDie() : null)
+        || reason('unavailable', 'That climb is not available right now.');
     }
     case 'milestone': {
       const m = state.milestoneRoutes[wanted.difficulty];
-      if (!m) return 'There is no milestone route at that tier.';
-      if (char.milestonesCompleted[wanted.difficulty]) return `You have already completed the ${wanted.difficulty} milestone.`;
+      if (!m) return reason('noSuchMilestone', 'There is no milestone route at that tier.');
+      if (char.milestonesCompleted[wanted.difficulty]) {
+        return reason('alreadyCompleted', `You have already completed the ${wanted.difficulty} milestone.`);
+      }
       const gate = areaGate(m.area);
       if (gate) return gate;
       if (m.area === 'topRope') {
-        if (pickFreeBelayerStation(state, player.playerNum) === null) return 'Every belayer is in use right now. Wait for one to free up.';
+        if (pickFreeBelayerStation(state, player.playerNum) === null) {
+          return reason('noFreeBelayer', 'Every belayer is in use right now. Wait for one to free up.');
+        }
       } else {
-        const sec = canEnterSection(m.area, player.playerNum, state);
-        if (!sec.canEnter) return `You can't climb here right now: ${sec.reason}.`;
+        const full = sectionGate(m.area);
+        if (full) return full;
       }
-      return costGate(m.route) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie : null) || 'That milestone is not available right now.';
+      return costGate(m.route) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie() : null)
+        || reason('unavailable', 'That milestone is not available right now.');
     }
     case 'train': {
       const area = TRAINING_AREAS.find(a => a.name === wanted.areaName);
-      if (!area) return 'There is no such training station.';
-      if (char.timeRemaining < area.time) return notEnough('time', area.time, char.timeRemaining);
-      if (char.currentEndurance < area.endurance) return notEnough('endurance', area.endurance, char.currentEndurance);
+      if (!area) return reason('noSuchStation', 'There is no such training station.');
       const sec = canEnterSection(area.name, player.playerNum, state);
-      if (!sec.canEnter) return `You can't train here right now: ${sec.reason}.`;
-      return 'That training station is not available right now.';
+      if (!sec.canEnter) {
+        return reason('stationInUse', `You can't train here right now: ${sec.reason}.`, { occupants: occupantsOf(area.name) });
+      }
+      if (char.timeRemaining < area.time) return notEnough('notEnoughTime', 'time', area.time, char.timeRemaining);
+      if (char.currentEndurance < area.endurance) {
+        return notEnough('notEnoughEndurance', 'endurance', area.endurance, char.currentEndurance);
+      }
+      return reason('unavailable', 'That training station is not available right now.');
     }
     case 'rest':
-      return 'Not enough time to rest.';
+      return reason('notEnoughTime', 'Not enough time to rest.', { need: 1, have: char.timeRemaining });
     case 'buyGear': {
       const gear = GEAR_SHOP.find(g => g.name === wanted.gearName);
-      if (!gear) return 'There is no such gear.';
-      if (char.equipment.includes(gear.name)) return `You already own ${gear.name}.`;
+      if (!gear) return reason('noSuchGear', 'There is no such gear.');
+      if (char.equipment.includes(gear.name)) return reason('alreadyOwned', `You already own ${gear.name}.`);
       const inShop = state.availableGear.some(g => g.name === gear.name) || ACCESS_CARDS.includes(gear.name);
-      if (!inShop) return `${gear.name} is not in the shop right now.`;
+      if (!inShop) return reason('notInShop', `${gear.name} is not in the shop right now.`);
+      const missing = (gear.prerequisiteItems || []).filter(n => !char.equipment.includes(n));
+      if (missing.length) return reason('needsItems', `${gear.name} requires ${missing.join(', ')} first.`, { missing });
+      if (char.level < (gear.prerequisiteLevel || 1)) {
+        return reason('needsLevel', `${gear.name} requires Level ${gear.prerequisiteLevel}.`, { level: gear.prerequisiteLevel });
+      }
       const timeCost = getGearPurchaseTimeCost(char);
-      if (char.timeRemaining < timeCost) return notEnough('time', timeCost, char.timeRemaining);
+      if (char.timeRemaining < timeCost) return notEnough('notEnoughTime', 'time', timeCost, char.timeRemaining);
       const cost = getEffectiveGearCost(char, gear);
       const spendable = getSpendableXp(char);
-      if (spendable < cost) return `Not enough spendable XP: ${gear.name} costs ${cost} and you have ${spendable} XP earned this level.`;
-      if (char.level < (gear.prerequisiteLevel || 1)) return `${gear.name} requires Level ${gear.prerequisiteLevel}.`;
-      const missing = (gear.prerequisiteItems || []).filter(n => !char.equipment.includes(n));
-      if (missing.length) return `${gear.name} requires ${missing.join(', ')} first.`;
-      return `${gear.name} can't be bought right now.`;
+      if (spendable < cost) {
+        return reason('notEnoughXp', `Not enough spendable XP: ${gear.name} costs ${cost} and you have ${spendable} XP earned this level.`,
+          { need: cost, have: spendable });
+      }
+      return reason('unavailable', `${gear.name} can't be bought right now.`);
     }
     case 'endTurn':
-      return 'You cannot end your turn right now.';
+      return reason('unavailable', 'You cannot end your turn right now.');
     default:
-      return `Unknown action "${wanted.type}".`;
+      return reason('unknownAction', `Unknown action "${wanted.type}".`);
   }
+}
+
+// illegalActionReason's player-facing sentence, or null if `wanted` is legal.
+export function explainIllegalAction(state, wanted) {
+  const r = illegalActionReason(state, wanted);
+  return r ? r.message : null;
 }
 
 // =============================================================================

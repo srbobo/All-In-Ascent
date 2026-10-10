@@ -34,6 +34,14 @@ const browserGlobals = {
   // The rules engine, loaded after game.js as engine/engine.browser.js.
   AscentEngine: 'readonly',
   structuredClone: 'readonly',
+  // Grit & Holds design system (design/*.js), loaded before game.js.
+  AIAArt: 'readonly',
+  AIACards: 'readonly',
+  AIAIcons: 'readonly',
+  getComputedStyle: 'readonly',
+  MutationObserver: 'readonly',
+  ResizeObserver: 'readonly',
+  module: 'readonly',
 };
 
 const nodeGlobals = {
@@ -85,7 +93,7 @@ export default [
   },
   {
     // Browser classic scripts — global scope, no modules.
-    files: ['game.js', 'effects.js', 'online-mode.js'],
+    files: ['game.js', 'effects.js', 'online-mode.js', 'design/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'script',

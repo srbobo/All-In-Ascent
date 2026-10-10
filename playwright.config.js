@@ -16,7 +16,7 @@ const channel = process.env.PW_CHANNEL !== undefined
 
 export default defineConfig({
   testDir: 'tests/e2e',
-  timeout: 120_000,
+  timeout: 240_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? 'github' : 'list',

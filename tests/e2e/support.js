@@ -43,21 +43,27 @@ export async function fastEffects(page) {
   await page.evaluate(() => { window.Effects.diceAnticipation = () => Promise.resolve(); });
 }
 
+// The action button on a board card (route, milestone, training, gear,
+// climber) whose text includes `name`, inside `scope`.
+export function cardAction(page, scope, name) {
+  return page.locator(`${scope} .aia-card`, { hasText: name }).first().locator('.aia-card__action');
+}
+
 // Set up and start a local hot-seat game through the setup screen.
 export async function startLocalGame(page, characterNames) {
-  await page.fill('#numPlayers', String(characterNames.length));
+  await page.locator(`#playerCount input[value="${characterNames.length}"]`).check({ force: true });
   await page.click('#continueBtn');
   for (const name of characterNames) {
-    await page.locator('.character-card', { hasText: name }).click();
+    await cardAction(page, '#characterSelect', name).click();
   }
   await page.click('#startGameBtn');
-  await expect(page.locator('#turnIndicator')).toContainText("Player 1's Turn");
+  await expect(page.locator('#turnIndicator')).toContainText("Player 1's turn");
   await fastEffects(page);
 }
 
 // One step of a random player, run INSIDE the page: dismiss whatever dialog
 // is open, otherwise click one of the controls the UI shows as available
-// (route cards, training stations, shop cards, Rest, a milestone button).
+// (the action button on a route, milestone, training or gear card, or Rest).
 // Returns a short description of what it did.
 export function uiStep() {
   const shown = id => document.getElementById(id)?.classList.contains('show');
@@ -67,22 +73,24 @@ export function uiStep() {
     (Math.random() < 0.6 && !apply.disabled ? apply : document.getElementById('statShiftSkip')).click();
     return 'stat-shift';
   }
-  if (shown('climbModal')) { document.querySelector('#climbModal button').click(); return 'close-climb'; }
-  if (shown('levelUpModal')) { document.querySelector('#levelUpModal button').click(); return 'close-level-up'; }
+  if (shown('climbModal')) { document.querySelector('#climbModal .action-buttons button').click(); return 'close-climb'; }
+  if (shown('levelUpModal')) { document.querySelector('#levelUpModal .action-buttons button').click(); return 'close-level-up'; }
 
-  const enabled = el => el.style.opacity !== '0.5' && el.style.pointerEvents !== 'none';
-  const routes = [...document.querySelectorAll('.route-card')].filter(enabled);
+  const actions = (sel) => [...document.querySelectorAll(`${sel} .aia-card__action`)]
+    .filter(b => b.getAttribute('aria-disabled') !== 'true');
+  const routes = actions('.route-card');
   const options = [
     ...routes, ...routes, ...routes, // favour climbing
-    ...[...document.querySelectorAll('.training-area')].filter(enabled),
-    ...[...document.querySelectorAll('.gear-card')].filter(el => enabled(el) && !el.classList.contains('owned')),
+    ...actions('.milestone-card'),
+    ...actions('.training-area'),
+    ...actions('.gear-card'),
     ...[...document.querySelectorAll('.info-rest-btn')].filter(b => !b.disabled),
-    ...[...document.querySelectorAll('#milestonePanel button')],
   ];
   if (!options.length) return 'none';
   const pick = options[Math.floor(Math.random() * options.length)];
   pick.click();
-  return `click: ${pick.className} ${(pick.querySelector('.route-name')?.textContent || pick.textContent).trim().slice(0, 40)}`;
+  const card = pick.closest('.aia-card');
+  return `click: ${card ? card.className.split(' ')[0] : pick.className} ${(card || pick).textContent.trim().replace(/\s+/g, ' ').slice(0, 40)}`;
 }
 
 // Play `steps` random UI steps.

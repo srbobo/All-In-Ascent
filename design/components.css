@@ -1,0 +1,642 @@
+/* ==========================================================================
+   GRIT & HOLDS v2 · COMPONENTS
+   ==========================================================================
+   Reusable UI parts. Depends on tokens.css + surfaces.css.
+
+     Base ............ reset, type, links, .sr-only, .skip-link, focus ring
+     .btn ............ hold-shaped buttons (+ --ghost, --ink, --sm, colours)
+     .aia-chip ....... small label chips
+     .aia-meter ...... endurance / XP bars (tape-strip fill)
+     .aia-pips ....... time track (10 tick holds)
+     .aia-icon ....... inline SVG icon sizing
+     .aia-card ....... the printed-card anatomy for routes, gear, climbers,
+                       training (5 : 7, scales with its own width)
+     .aia-reqs ....... the 4-stat requirement block
+     .aia-dice ....... buff / nerf dice chips
+     .aia-costs ...... time · endurance · XP row
+     .modal .......... accessible dialog shell
+     .eyebrow, .display-title ... type helpers
+   ========================================================================== */
+
+/* ---------- Base ---------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--ink);
+  background: var(--wall-base);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+img, svg { display: block; max-width: 100%; }
+.aia-icon { display: inline-block; width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.2em; }
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--cobalt-text); text-underline-offset: 0.18em; }
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: var(--lh-snug); letter-spacing: -0.01em; }
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+.skip-link {
+  position: absolute; left: var(--sp-4); top: -100px; z-index: 5000;
+  background: var(--ink); color: var(--chalk);
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
+  font-weight: 700; text-decoration: none;
+}
+.skip-link:focus { top: var(--sp-4); }
+
+/* One focus ring everywhere: cobalt ring + chalk halo reads on wall, paper and ink. */
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--focus-halo);
+}
+/* Programmatic focus targets (headings, turn status) don't need a ring. */
+[tabindex="-1"]:focus { outline: none; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.eyebrow::before { content: "▸ "; color: var(--coral-text); }
+.display-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-2xl);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.03em;
+  font-variation-settings: "wdth" 105, "opsz" 96;
+}
+.display-title em { font-style: italic; font-weight: 500; color: var(--coral-text); }
+
+/* ---------- Buttons — hand-shaped holds ---------------------------------- */
+.btn {
+  --c: var(--coral);
+  --c-on: var(--on-coral);
+  --c-light: color-mix(in srgb, var(--c) 70%, white);
+  --c-deep: color-mix(in srgb, var(--c) 60%, #1a0a05);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5em;
+  min-height: 44px;                       /* WCAG 2.5.5 target size */
+  padding: 0.7em 1.4em;
+  border: 0;
+  border-radius: var(--r-btn);
+  background: radial-gradient(ellipse at 30% 25%, var(--c-light), var(--c) 50%, var(--c-deep) 115%);
+  color: var(--c-on);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-md);
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-press);
+  transition: transform var(--dur-2) var(--ease-grip), box-shadow var(--dur-2), filter var(--dur-2);
+}
+.btn::before {
+  content: "";
+  position: absolute; inset: 0; z-index: -1;
+  border-radius: inherit;
+  background-image: var(--tex-poly);
+  mix-blend-mode: overlay;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.btn:hover:not(:disabled):not([aria-disabled="true"]) { transform: translateY(-2px); }
+.btn:active:not(:disabled):not([aria-disabled="true"]) { transform: translateY(1px); box-shadow: inset 2px 4px 8px rgba(255,255,255,0.25), inset -2px -3px 8px rgba(0,0,0,0.35), 2px 2px 4px rgba(40,20,10,0.35); }
+.btn:disabled, .btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  filter: saturate(0.25);
+  box-shadow: inset 0 0 0 2px rgba(42,29,18,0.35);
+}
+.btn--lime      { --c: var(--lime);      --c-on: var(--on-lime); }
+.btn--marigold  { --c: var(--marigold);  --c-on: var(--on-marigold); }
+.btn--teal      { --c: var(--teal);      --c-on: var(--on-teal); }
+.btn--cobalt    { --c: var(--cobalt);    --c-on: var(--on-cobalt); }
+.btn--raspberry { --c: var(--raspberry); --c-on: var(--on-raspberry); }
+.btn--violet    { --c: var(--violet);    --c-on: var(--on-violet); }
+.btn--ink {
+  background: var(--ink); color: var(--chalk);
+  box-shadow: 2px 3px 0 rgba(0,0,0,0.35);
+}
+.btn--ink::before { display: none; }
+.btn--ghost {
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--r-pill);
+  box-shadow: 2px 3px 0 var(--ink);
+}
+.btn--ghost::before { display: none; }
+.btn--ghost:hover:not(:disabled) { background: var(--ink); color: var(--chalk); }
+.btn--sm { min-height: 40px; padding: 0.45em 1em; font-size: var(--fs-sm); }
+.btn--block { width: 100%; }
+
+/* ---------- Chips ---------------------------------------------------------- */
+.aia-chip {
+  display: inline-flex; align-items: center; gap: 0.3em;
+  padding: 0.15em 0.55em;
+  border-radius: var(--r-pill);
+  background: rgba(248,240,220,0.92);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--t-meta, var(--fs-2xs));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(40,20,10,0.25);
+}
+.aia-chip--ink    { background: var(--ink); color: var(--chalk); }
+.aia-chip--access { background: var(--cobalt); color: var(--on-cobalt); }
+.aia-chip--ok     { background: var(--lime); color: var(--on-lime); }
+.aia-chip--bad    { background: var(--raspberry); color: var(--on-raspberry); }
+.aia-chip--warn   { background: var(--marigold); color: var(--on-marigold); }
+
+/* ---------- Meters — tape-strip fills in a recessed track ------------------ */
+.aia-meter {
+  --c: var(--marigold);
+  position: relative;
+  height: 0.85rem;
+  border-radius: var(--r-pill);
+  background: rgba(90,60,40,0.16);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);
+  overflow: hidden;
+}
+.aia-meter__fill {
+  position: absolute; inset: 2px auto 2px 2px;
+  width: calc(var(--w, 50%) - 4px);
+  min-width: 0;
+  border-radius: var(--r-pill);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 75%, white), var(--c) 55%, color-mix(in srgb, var(--c) 70%, black));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.2);
+  transition: width var(--dur-3) var(--ease-grip);
+}
+.aia-meter--xp { --c: var(--cobalt); }
+.aia-meter--endurance { --c: var(--marigold); }
+
+/* ---------- Pips — the 10-unit time track --------------------------------- */
+.aia-pips { display: inline-flex; gap: 3px; align-items: center; }
+.aia-pips i {
+  width: 0.62rem; height: 0.62rem;
+  border-radius: 58% 42% 50% 50% / 50% 55% 45% 50%;
+  background: rgba(90,60,40,0.22);
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.3);
+}
+.aia-pips i.on {
+  background: radial-gradient(ellipse at 30% 28%, color-mix(in srgb, var(--cobalt) 65%, white), var(--cobalt) 60%);
+  box-shadow: inset -1px -1px 2px rgba(0,0,0,0.35), 0 1px 1px rgba(0,0,0,0.25);
+}
+.aia-pips--warn i.on { background: radial-gradient(ellipse at 30% 28%, color-mix(in srgb, var(--raspberry) 65%, white), var(--raspberry) 60%); }
+
+/* ==========================================================================
+   CARD — printed poker-size card (63.5 × 88.9 mm, 5 : 7)
+   The card is a size container; everything inside is measured in cqi/em so
+   the face scales like a physical card at any width. Text has rem floors so
+   it never drops below a readable size — the card grows taller instead.
+   ========================================================================== */
+.aia-card {
+  --frame: var(--coral);
+  --frame-on: var(--on-coral);
+  container-type: inline-size;
+  position: relative;
+  display: grid;
+  aspect-ratio: var(--card-ratio);
+  min-width: 0;
+  transition: transform var(--dur-2) var(--ease-grip), filter var(--dur-2);
+}
+.aia-card__face {
+  --t-meta:  max(0.6875rem, 0.74em);   /* ≥ 11px set codes, kind labels   */
+  --t-small: max(0.75rem, 0.86em);     /* ≥ 12px rules & flavour text      */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.34em;
+  min-width: 0;
+  padding: 0.5em 0.55em 0.4em;
+  font-size: clamp(0.75rem, 5.6cqi, 1.4rem);
+  line-height: 1.25;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3.2cqi solid var(--frame);
+  border-radius: 5.4cqi;
+  box-shadow: var(--shadow-card);
+  isolation: isolate;
+}
+/* card-stock texture + inner keyline like a printed border */
+.aia-card__face::before {
+  content: "";
+  position: absolute; inset: 0; z-index: -1;
+  border-radius: 2.4cqi;
+  background-image: var(--tex-paper);
+  mix-blend-mode: multiply;
+  opacity: 0.45;
+  pointer-events: none;
+}
+.aia-card__face::after {
+  content: "";
+  position: absolute; inset: 0.22em;
+  border: 1px solid color-mix(in srgb, var(--frame) 55%, transparent);
+  border-radius: 3.6cqi;
+  pointer-events: none;
+}
+
+.aia-card__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.4em;
+  min-height: 1.5em;
+}
+.aia-card__kind {
+  display: inline-flex; align-items: center; gap: 0.35em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--t-meta);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.aia-card__kind .aia-icon { color: var(--frame); width: 1.35em; height: 1.35em; filter: drop-shadow(0 0 0.5px rgba(42,29,18,0.6)); }
+.aia-card__kind.tape { color: var(--t-on); --tilt: 0deg; padding: 0.2em 0.6em; }
+.aia-card__kind.tape .aia-icon { color: inherit; filter: none; }
+.aia-card__status {
+  flex: none;
+  padding: 0.12em 0.5em;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--chalk);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--t-meta);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.aia-card__name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.16em;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 1.02em;
+}
+
+/* Art window */
+.aia-card__art {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 0.45em;
+  overflow: hidden;
+  background: var(--art-sand);
+  box-shadow: inset 0 0 0 1px rgba(42,29,18,0.22), 0 1px 0 rgba(255,255,255,0.6);
+  flex: none;
+}
+.aia-card__art > .aia-art { width: 100%; height: 100%; }
+.aia-card__art::after {             /* printed grit specks over the illustration */
+  content: "";
+  position: absolute; inset: 0;
+  background-image: var(--tex-speck), var(--tex-speck-light);
+  background-size: 260px, 210px;
+  opacity: 0.75;
+  pointer-events: none;
+}
+.aia-card__grade {
+  --size: 2.7em;
+  position: absolute; top: 0.3em; right: 0.3em; z-index: 1;
+  font-size: 0.95em;
+  letter-spacing: -0.02em;
+}
+.aia-card__grade[data-len="4"] { font-size: 0.9em; --size: 2.9em; width: calc(var(--size) * 1.18); }
+.aia-card__grade[data-len="5"] { font-size: 0.86em; --size: 2.9em; width: calc(var(--size) * 1.38); letter-spacing: -0.03em; }
+.aia-card__art-chips {
+  position: absolute; left: 0.3em; bottom: 0.3em; right: 30%;
+  z-index: 1;
+  display: flex; flex-wrap: wrap; gap: 0.2em;
+}
+.aia-card__art-chips .aia-chip { font-size: max(0.6875rem, 0.66em); }
+.aia-card__area-flag {
+  position: absolute; left: 0.3em; top: 0.3em; z-index: 1;
+  display: inline-flex; align-items: center; gap: 0.25em;
+  padding: 0.12em 0.45em;
+  border-radius: var(--r-pill);
+  background: var(--ink); color: var(--chalk);
+  font-family: var(--font-mono); font-weight: 700;
+  font-size: max(0.6875rem, 0.66em); letter-spacing: 0.08em; text-transform: uppercase;
+}
+.aia-card__price, .aia-card__endurance {
+  position: absolute; top: 0.3em; right: 0.3em; z-index: 1;
+  display: inline-flex; align-items: baseline; gap: 0.2em;
+  padding: 0.2em 0.55em;
+  border-radius: var(--r-btn);
+  background: var(--ink); color: var(--chalk);
+  font-family: var(--font-display);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.aia-card__price b, .aia-card__endurance b { font-size: 1.15em; font-weight: 800; }
+.aia-card__price span { font-family: var(--font-mono); font-size: var(--t-meta); letter-spacing: 0.08em; }
+.aia-card__price .aia-icon, .aia-card__endurance .aia-icon { align-self: center; color: var(--marigold); }
+.aia-card__bonus {
+  --size: 2.9em;
+  position: absolute; top: 0.3em; right: 0.3em; z-index: 1;
+  flex-direction: column;
+  font-size: 0.95em;
+  line-height: 0.9;
+}
+.aia-card__bonus small { font-family: var(--font-mono); font-size: 0.55em; letter-spacing: 0.06em; }
+
+/* Requirement block — four hold-tinted stat wells */
+.aia-reqs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.25em;
+}
+.aia-req {
+  --s: var(--coral);
+  --s-text: var(--coral-text);
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0.2em 0.1em 0.18em;
+  border-radius: 0.45em;
+  background: color-mix(in srgb, var(--s) 16%, var(--paper));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--s) 45%, transparent);
+}
+.aia-req dt {
+  display: inline-flex; align-items: center; gap: 0.15em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--t-meta);
+  letter-spacing: 0.04em;
+  color: var(--s-text);
+}
+.aia-req dt .aia-icon { width: 1.1em; height: 1.1em; }
+.aia-req dd {
+  display: inline-flex; align-items: center; gap: 0.1em;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.22em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.aia-req__mark { display: inline-flex; }
+.aia-req__mark .aia-icon { width: 0.7em; height: 0.7em; stroke-width: 3.5; }
+.aia-req.is-met { background: color-mix(in srgb, var(--lime) 30%, var(--paper)); box-shadow: inset 0 0 0 1.5px var(--lime-text); }
+.aia-req.is-met .aia-req__mark { color: var(--lime-text); }
+.aia-req.is-unmet { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--raspberry) 12%, var(--paper)) 0 4px, var(--paper) 4px 8px); box-shadow: inset 0 0 0 1.5px var(--raspberry-text); }
+.aia-req.is-unmet .aia-req__mark, .aia-req.is-unmet dd { color: var(--raspberry-text); }
+.aia-req--strength    { --s: var(--coral);  --s-text: var(--coral-text); }
+.aia-req--technique   { --s: var(--teal);   --s-text: var(--teal-text); }
+.aia-req--focus       { --s: var(--violet); --s-text: var(--violet-text); }
+.aia-req--flexibility { --s: var(--lime);   --s-text: var(--lime-text); }
+
+/* Dice chips */
+.aia-dice { display: flex; flex-wrap: wrap; gap: 0.22em; list-style: none; min-height: 1.4em; align-items: center; }
+.aia-dice--none {
+  display: flex; align-items: center; gap: 0.3em;
+  font-size: var(--t-meta); font-family: var(--font-mono); font-weight: 500;
+  color: var(--ink-muted); letter-spacing: 0.04em;
+}
+.aia-die-chip {
+  display: inline-flex; align-items: center; gap: 0.25em;
+  padding: 0.1em 0.45em 0.1em 0.3em;
+  border-radius: 0.4em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--t-meta);
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+}
+.aia-die-chip .aia-icon { width: 1.15em; height: 1.15em; }
+.aia-die-chip.is-buff { background: var(--lime); color: var(--on-lime); }
+.aia-die-chip.is-nerf { background: var(--raspberry); color: var(--on-raspberry); }
+
+/* Costs row */
+.aia-costs {
+  display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap;
+  padding-top: 0.25em;
+  border-top: 1.5px dashed var(--rule);
+  margin-top: auto;
+}
+.aia-cost { display: inline-flex; align-items: center; gap: 0.2em; font-family: var(--font-display); }
+.aia-cost b { font-weight: 800; font-size: 1.08em; font-variant-numeric: tabular-nums; }
+.aia-cost .aia-icon { width: 1.15em; height: 1.15em; }
+.aia-cost--time .aia-icon      { color: var(--cobalt-text); }
+.aia-cost--endurance .aia-icon { color: var(--marigold-text); }
+/* cost changed by the climber's passives or gear: printed with a marker */
+.aia-cost.is-adjusted b { text-decoration: underline dotted 0.12em; text-underline-offset: 0.18em; }
+.aia-cost.is-adjusted b::after { content: "*"; font-size: 0.7em; vertical-align: super; }
+.aia-cost--xp { margin-left: auto; }
+.aia-cost--xp .aia-icon        { color: var(--cobalt-text); }
+.aia-cost__fail { font-family: var(--font-mono); font-size: var(--t-meta); color: var(--ink-muted); font-weight: 700; }
+.aia-cost--stat { margin-left: auto; }
+.aia-cost--stat .aia-icon { color: var(--ink-soft); }
+
+/* Rules text box (gear, climbers, training) */
+.aia-rules {
+  display: flex; flex-direction: column; gap: 0.25em;
+  padding: 0.4em 0.5em;
+  border-radius: 0.4em;
+  background: var(--paper-deep);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-size: var(--t-small);
+  line-height: 1.3;
+}
+.aia-rules__title {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.4em;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.05em;
+}
+.aia-rules__title .aia-chip { font-size: max(0.6875rem, 0.7em); }
+.aia-rules__effect { font-weight: 600; }
+.aia-rules__flavor { font-style: italic; color: var(--ink-soft); font-size: 0.95em; }
+.aia-card__prereq {
+  display: flex; align-items: flex-start; gap: 0.3em;
+  font-size: var(--t-meta);
+  font-family: var(--font-mono); font-weight: 500;
+  color: var(--ink-soft);
+}
+.aia-card__prereq .aia-icon { flex: none; margin-top: 0.05em; }
+
+.aia-card__foot {
+  display: flex; justify-content: space-between; gap: 0.4em;
+  font-family: var(--font-mono);
+  font-size: var(--t-meta);
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.aia-card__foot > span:last-child { overflow: hidden; text-overflow: ellipsis; text-align: right; }
+/* gear / climber text boxes fill the card like a printed rules box */
+.aia-card--gear .aia-rules, .aia-card--climber .aia-rules { flex: 1 0 auto; }
+
+/* ---- Card action: one real button stretched over the whole card ---------- */
+.aia-card:has(> .aia-card__action) { margin-bottom: 1.9rem; }
+.aia-card__action {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 0;
+  border: 0;
+  border-radius: 5.4cqi;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.aia-card__action-label {
+  /* visible CTA tab that hangs from the bottom edge of the card */
+  position: absolute; right: 8%; top: calc(100% - 0.2em);
+  padding: 0.3em 0.85em 0.34em;
+  border-radius: 0 0 0.5em 0.5em;
+  background: var(--ink);
+  color: var(--chalk);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(0.75rem, 5cqi, 1.15rem);
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  box-shadow: 0 3px 5px rgba(0,0,0,0.22);
+  transition: transform var(--dur-2) var(--ease-grip), background var(--dur-2);
+}
+.aia-card__action-label::after { content: " ▸"; }
+.aia-card__action[aria-disabled="true"] { cursor: not-allowed; }
+.aia-card__action[aria-disabled="true"] .aia-card__action-label {
+  background: var(--paper-deep); color: var(--ink-soft);
+  box-shadow: inset 0 0 0 1.5px var(--ink-muted);
+}
+.aia-card__action[aria-disabled="true"] .aia-card__action-label::after { content: ""; }
+.aia-card__action:focus-visible { outline-offset: 4px; }
+
+.aia-card:has(.aia-card__action:not([aria-disabled="true"]):hover) {
+  transform: translateY(-4px) rotate(-0.5deg);
+}
+.aia-card:has(.aia-card__action:not([aria-disabled="true"]):hover) .aia-card__face { box-shadow: var(--shadow-lift); }
+.aia-card:has(.aia-card__action:not([aria-disabled="true"]):hover) .aia-card__action-label { background: var(--frame); color: var(--frame-on); transform: translateY(2px); }
+.aia-card:has(.aia-card__action:not([aria-disabled="true"]):active) { transform: translateY(-1px); }
+
+.aia-card__reason {
+  position: absolute; left: 6%; right: 6%; top: 50%; z-index: 1;
+  translate: 0 -50%;
+  display: flex; align-items: center; justify-content: center; gap: 0.35em;
+  padding: 0.35em 0.6em;
+  border-radius: 0.5em;
+  background: var(--ink);
+  color: var(--chalk);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(0.75rem, 4.6cqi, 1rem);
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.25;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  pointer-events: none;
+  transform: rotate(-2deg);
+}
+
+/* ---- Card states ---------------------------------------------------------- */
+.aia-card.is-disabled .aia-card__art > svg,
+.aia-card.is-locked .aia-card__art > svg { filter: saturate(0.25) brightness(0.92); }
+.aia-card.is-disabled .aia-card__art::before,
+.aia-card.is-locked .aia-card__art::before {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: repeating-linear-gradient(135deg, rgba(42,29,18,0.22) 0 6px, transparent 6px 12px);
+}
+.aia-card.is-done .aia-card__face { border-color: color-mix(in srgb, var(--frame) 45%, var(--paper-deep)); }
+.aia-card.is-current .aia-card__face { box-shadow: 0 0 0 3px var(--ink), 0 0 0 7px var(--marigold), var(--shadow-lift); }
+
+/* Card-type frames */
+.aia-card--climber .aia-card__face { background: var(--paper); }
+.aia-card--climber .aia-card__kind .aia-icon { color: var(--accent); }
+.aia-card--climber .aia-card__art { box-shadow: inset 0 0 0 2px var(--accent), 0 1px 0 rgba(255,255,255,0.6); }
+.aia-card--climber .aia-rules { border-left: 0.3em solid var(--accent); }
+.aia-card--training .aia-card__face { background: color-mix(in srgb, var(--wood) 14%, var(--paper)); }
+.aia-card--milestone .aia-card__face {
+  border-image: linear-gradient(135deg, var(--marigold), color-mix(in srgb, var(--marigold) 60%, white) 40%, var(--coral) 70%, var(--marigold)) 1;
+  border-radius: 0;
+  border-style: solid;
+}
+.aia-card--milestone .aia-card__face::after { border-radius: 0; border-color: var(--marigold-text); border-style: double; border-width: 3px; }
+
+/* ---------- Modal (dialog shell; see design/a11y.js for focus management) -- */
+.modal {
+  position: fixed; inset: 0; z-index: 1500;
+  display: none;
+  align-items: center; justify-content: center;
+  padding: var(--gutter);
+  background: rgba(26,15,6,0.62);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+.modal.show { display: flex; }
+.modal-content {
+  position: relative;
+  isolation: isolate;
+  width: min(42rem, 100%);
+  max-height: calc(100vh - 2 * var(--gutter));
+  overflow-y: auto;
+  padding: var(--sp-6);
+  background: var(--paper);
+  border-radius: var(--r-lg);
+  border: 6px solid var(--ink);
+  box-shadow: var(--shadow-panel);
+  animation: modal-in var(--dur-3) var(--ease-dyno);
+}
+.modal-content::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background-image: var(--tex-paper); mix-blend-mode: multiply; opacity: 0.4;
+  pointer-events: none;
+}
+.modal-header {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-xl);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--sp-4);
+  padding-right: 2.5rem;
+}
+.modal-close {
+  position: absolute; top: var(--sp-3); right: var(--sp-3);
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  border: 2px solid var(--ink); border-radius: 50%;
+  background: var(--paper); cursor: pointer;
+}
+.modal-close:hover { background: var(--ink); color: var(--chalk); }
+.action-buttons { display: flex; flex-wrap: wrap; gap: var(--sp-3); justify-content: flex-end; margin-top: var(--sp-5); }
+@keyframes modal-in {
+  from { transform: translateY(16px) scale(0.97); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* ---------- Reduced motion & forced colours ------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .aia-card:has(.aia-card__action:hover), .btn:hover { transform: none !important; }
+}
+@media (forced-colors: active) {
+  .aia-card__face { border-color: CanvasText; forced-color-adjust: auto; }
+  .aia-card__action-label, .aia-card__status, .aia-card__reason, .aia-chip, .aia-die-chip { border: 1px solid CanvasText; }
+  .btn { border: 2px solid ButtonText; }
+  .aia-meter { border: 1px solid CanvasText; }
+  .aia-meter__fill { background: Highlight; forced-color-adjust: none; }
+  .aia-req.is-met, .aia-req.is-unmet { border: 2px solid CanvasText; }
+}

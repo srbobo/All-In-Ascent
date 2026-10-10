@@ -9,7 +9,7 @@
 // Run:  npm run test:engine
 
 import { createGame } from './state.js';
-import { getLegalActions, applyAction, findLegalAction, explainIllegalAction } from './engine.js';
+import { getLegalActions, applyAction, findLegalAction, explainIllegalAction, illegalActionReason } from './engine.js';
 import { applySuccessHeal } from './helpers.js';
 import { createRng } from './rng.js';
 import { ROUTES, GEAR_SHOP, TRAINING_AREAS } from './data.js';
@@ -90,6 +90,26 @@ const climbEvents = (events) => ({
 }
 
 // =============================================================================
+// illegalActionReason — codes and details for UIs to word
+// =============================================================================
+{
+  const base = soloGame('ironLung');
+  const lead = base.availableRoutes.leadClimbing[0];
+  const r = illegalActionReason(base, { type: 'climb', area: 'leadClimbing', routeName: lead.name });
+  check('needsGear lists the missing cards', r.code === 'needsGear' && r.missing.length === 3, JSON.stringify(r));
+  const tired = soloGame('ironLung', (s, c) => { c.currentEndurance = 1; });
+  const e = illegalActionReason(tired, { type: 'climb', area: 'bouldering', routeName: tired.availableRoutes.bouldering[0].name });
+  check('notEnoughEndurance carries need/have', e.code === 'notEnoughEndurance' && e.have === 1 && e.need > 1, JSON.stringify(e));
+  const rope = illegalActionReason(soloGame('ironLung', (s, c) => { c.xp = 500; }), { type: 'buyGear', gearName: 'Lead Rope' });
+  check('needsItems lists prerequisites', rope.code === 'needsItems' && rope.missing.includes('Belay Device'), JSON.stringify(rope));
+  check('legal action → null reason', illegalActionReason(base, { type: 'rest' }) === null);
+  const two = createGame({ seed: 3, characterKeys: ['ironLung', 'sprinter'] }).state;
+  two.players[1].character.location = TRAINING_AREAS[0].name;
+  const busy = illegalActionReason(two, { type: 'train', areaName: TRAINING_AREAS[0].name });
+  check('stationInUse names the occupant', busy.code === 'stationInUse' && busy.occupants[0] === 2, JSON.stringify(busy));
+}
+
+// =============================================================================
 // explainIllegalAction agrees with getLegalActions everywhere
 // =============================================================================
 {
@@ -113,8 +133,10 @@ const climbEvents = (events) => ({
       for (const wanted of candidates(state)) {
         const isLegal = !!findLegalAction(legal, wanted);
         const reason = explainIllegalAction(state, wanted);
+        const structured = illegalActionReason(state, wanted);
         checked++;
-        if (isLegal !== (reason === null) || (!isLegal && typeof reason !== 'string')) {
+        if (isLegal !== (reason === null) || (!isLegal && typeof reason !== 'string')
+            || (!isLegal && (typeof structured.code !== 'string' || structured.message !== reason))) {
           disagreement = `game ${g} step ${i}: ${JSON.stringify(wanted)} legal=${isLegal} reason=${reason}`;
           break;
         }
