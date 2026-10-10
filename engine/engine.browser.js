@@ -199,8 +199,9 @@ const __version = (function () {
 //     Tension Belt); dice_rolled reports discardedDice.
 //   - Local hot-seat play runs this engine (engine/engine.browser.js, built by
 //     engine/build-browser.js) instead of game.js's own copy of the rules, so
-//     local and online play can no longer drift apart. findLegalAction and
-//     explainIllegalAction back the UIs' click handling.
+//     local and online play can no longer drift apart. findLegalAction,
+//     illegalActionReason ({code, message, ...}) and explainIllegalAction back
+//     the UIs' click handling and the reasons shown on unavailable cards.
 //   - Route Reader Versatility stat shift is now in the engine: a climb action
 //     may carry shift {from, to, amount ≤ 10}, once per round, regular routes
 //     only. getLegalActions adds one suggested-shift variant per climb when it
