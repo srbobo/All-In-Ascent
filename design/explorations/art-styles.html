@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Art Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../surfaces.css">
+<link rel="stylesheet" href="../components.css">
+<style>
+  body { background: var(--paper); }
+  body > header { padding: var(--sp-6) var(--gutter) var(--sp-4); max-width: 80rem; margin: 0 auto; }
+  body > header h1 { font-size: var(--fs-2xl); font-weight: 800; letter-spacing: -0.03em; line-height: 1; margin: var(--sp-2) 0 var(--sp-3); }
+  body > header p { max-width: 64ch; color: var(--ink-soft); }
+  main { max-width: 80rem; margin: 0 auto; padding: 0 var(--gutter) var(--sp-7); display: grid; gap: var(--sp-6); }
+  .style { display: grid; grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr); gap: var(--sp-5); align-items: start; padding: var(--sp-5); border-radius: var(--r-lg); background: #fffaf0; box-shadow: var(--shadow-card); }
+  .style h2 { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.02em; display: flex; gap: var(--sp-3); align-items: baseline; }
+  .style h2 .letter { font-family: var(--font-mono); font-size: var(--fs-sm); padding: 0.2em 0.6em; border-radius: var(--r-pill); background: var(--ink); color: var(--chalk); }
+  .plates { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+  .plates svg { width: 100%; height: auto; border-radius: var(--r-md); box-shadow: inset 0 0 0 1px var(--rule), 0 2px 6px rgba(40,20,10,0.2); }
+  .notes dl { display: grid; gap: var(--sp-2); margin-top: var(--sp-3); font-size: var(--fs-sm); }
+  .notes dt { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
+  .notes dd { margin-bottom: var(--sp-2); }
+  .notes .refs { font-style: italic; color: var(--ink-soft); }
+  .mocks { display: grid; grid-template-columns: repeat(2, minmax(0, 17rem)); gap: var(--sp-4); margin-top: var(--sp-4); }
+  .round { font-family: var(--font-mono); font-size: var(--fs-sm); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
+  @media (max-width: 52rem) { .style { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Card art · direction study</p>
+  <h1>Card art directions</h1>
+  <p>Each row shows the same two subjects — <b>Dyno Dilemma</b> (an overhang dyno route) and the <b>Locking Carabiner</b> — so the only variable is the style. All four drop the stick figure for an anatomically proportioned climber and keep the gym's hold colours. They can still be generated from game data like the current art.</p>
+</header>
+<main id="plates"></main>
+
+<script>
+(() => {
+  // ---------- shared geometry ----------------------------------------------
+  const r = n => Math.round(n * 10) / 10;
+  // Anatomical figure from tapered limb segments (not a stick figure).
+  const J = { hip:[92,90], chest:[104,64], neck:[108,56], head:[111,46], sh:[105,60],
+    e1:[121,41], h1:[135,25], e2:[113,39], h2:[123,22],
+    k1:[79,106], f1:[70,127], k2:[96,112], f2:[88,132] };
+  function seg(a, b, wa, wb) {
+    const [x1,y1]=a,[x2,y2]=b, dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
+    return `M${r(x1+nx*wa/2)} ${r(y1+ny*wa/2)}L${r(x2+nx*wb/2)} ${r(y2+ny*wb/2)}A${wb/2} ${wb/2} 0 0 0 ${r(x2-nx*wb/2)} ${r(y2-ny*wb/2)}L${r(x1-nx*wa/2)} ${r(y1-ny*wa/2)}A${wa/2} ${wa/2} 0 0 0 ${r(x1+nx*wa/2)} ${r(y1+ny*wa/2)}Z`;
+  }
+  function figurePath() {
+    return [
+      seg(J.hip, J.chest, 15, 17), seg(J.chest, J.neck, 9, 6),
+      seg(J.sh, J.e1, 7, 5.6), seg(J.e1, J.h1, 5.4, 3.8),
+      seg(J.sh, J.e2, 6.6, 5.2), seg(J.e2, J.h2, 5, 3.6),
+      seg(J.hip, J.k1, 10, 7), seg(J.k1, J.f1, 6.6, 4.4),
+      seg(J.hip, J.k2, 9.6, 6.8), seg(J.k2, J.f2, 6.4, 4.2),
+      joint(J.hip, 7.6), joint(J.chest, 8.4), joint(J.e1, 2.8), joint(J.e2, 2.6), joint(J.k1, 3.6), joint(J.k2, 3.5), joint(J.sh, 4),
+    ].join('"/><path d="'); // separate subpaths so opposite windings never punch holes
+  }
+  const joint = ([x, y], rad) => `M${r(x - rad)} ${y}a${rad} ${rad} 0 1 0 ${r(rad * 2)} 0a${rad} ${rad} 0 1 0 ${r(-rad * 2)} 0Z`;
+  const headC = () => `<ellipse cx="${J.head[0]}" cy="${J.head[1]}" rx="6" ry="6.8" transform="rotate(20 ${J.head[0]} ${J.head[1]})"/>`;
+  const feet = () => `<ellipse cx="${J.f1[0]-2}" cy="${J.f1[1]+1}" rx="5.6" ry="2.6" transform="rotate(-30 ${J.f1[0]} ${J.f1[1]})"/><ellipse cx="${J.f2[0]-2}" cy="${J.f2[1]+1}" rx="5.4" ry="2.5" transform="rotate(-20 ${J.f2[0]} ${J.f2[1]})"/>`;
+  const WALL = '0,0 200,0 186,150 14,150';
+  const HOLDS = [[56,128,13,9,-10],[80,106,12,5,8],[62,86,15,9,-20],[103,98,5,4,0],[124,18,13,9,10],[142,22,14,10,-8],[160,48,7,13,15],[86,134,5,4,0],[118,72,10,6,25]];
+  function blob(cx, cy, rx, ry, rot, k=0.16, seed=1) {
+    let s = seed*9301; const rnd = () => ((s = (s*9301+49297)%233280)/233280);
+    const n=7, pts=[]; for (let i=0;i<n;i++){const a=i/n*Math.PI*2, f=1+(rnd()-0.5)*2*k; pts.push([cx+Math.cos(a)*rx*f, cy+Math.sin(a)*ry*f]);}
+    let d=`M${r(pts[0][0])} ${r(pts[0][1])}`;
+    for (let i=0;i<n;i++){const p0=pts[(i-1+n)%n],p1=pts[i],p2=pts[(i+1)%n],p3=pts[(i+2)%n];
+      d+=`C${r(p1[0]+(p2[0]-p0[0])/6)} ${r(p1[1]+(p2[1]-p0[1])/6)} ${r(p2[0]-(p3[0]-p1[0])/6)} ${r(p2[1]-(p3[1]-p1[1])/6)} ${r(p2[0])} ${r(p2[1])}`;}
+    return `<path d="${d}Z" transform="rotate(${rot} ${cx} ${cy})"/>`;
+  }
+  const holdsMarkup = (attrs, dx=0, dy=0) => HOLDS.map(([x,y,rx,ry,rot],i)=>`<g ${attrs}>${blob(x+dx,y+dy,rx/1.6,ry/1.6,rot,0.16,i+3)}</g>`).join('');
+  const BINER = 'M84 28H112A28 28 0 0 1 140 56V84A38 38 0 0 1 102 122H90A26 26 0 0 1 64 96V48A20 20 0 0 1 84 28Z';
+  const svg = (inner, label) => `<svg viewBox="0 0 200 150" role="img" aria-label="${label}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+  let uid = 0; const id = p => `${p}${++uid}`;
+
+  // ---------- A · Guidebook topo -------------------------------------------
+  function topoRoute() {
+    const hatch = id('h');
+    return svg(`<defs><pattern id="${hatch}" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V4" stroke="#2a1d12" stroke-width="0.7"/></pattern></defs>
+      <rect width="200" height="150" fill="#f3ecdc"/>
+      <polygon points="${WALL}" fill="none" stroke="#2a1d12" stroke-width="1.2"/>
+      <path d="M0 0L14 150M200 0L186 150" stroke="#2a1d12" stroke-width="0.6"/>
+      <path d="M4 50H196M9 100H191M66 0L70 150M133 0L130 150" stroke="#2a1d12" stroke-opacity="0.25" stroke-width="0.5"/>
+      <polygon points="0,0 200,0 196,30 4,30" fill="url(#${hatch})" opacity="0.35"/>
+      ${holdsMarkup('fill="#fffaf0" stroke="#2a1d12" stroke-width="1"')}
+      <path d="M56 128L80 106L62 86L118 72L142 22" fill="none" stroke="#c4286c" stroke-width="1.4" stroke-dasharray="3 2.4"/>
+      ${[[56,128,1],[80,106,2],[62,86,3],[118,72,4],[142,22,5]].map(([x,y,n])=>`<circle cx="${x+12}" cy="${y+6}" r="4.2" fill="#fffaf0" stroke="#2a1d12" stroke-width="0.8"/><text x="${x+12}" y="${y+7.8}" text-anchor="middle" font-family="Geist Mono" font-size="5" font-weight="700" fill="#2a1d12">${n}</text>`).join('')}
+      <g fill="#2a1d12"><path d="${figurePath()}"/>${headC()}${feet()}</g>
+      <text x="8" y="144" font-family="Geist Mono" font-size="6" font-weight="700" fill="#2a1d12">DYNO DILEMMA  V5  ★★</text>
+      <text x="192" y="12" text-anchor="end" font-family="Geist Mono" font-size="5" fill="#2a1d12">35° OVERHANG</text>`, 'Topo-style route drawing');
+  }
+  function topoBiner() {
+    return svg(`<rect width="200" height="150" fill="#f3ecdc"/>
+      <g transform="rotate(-16 100 76)"><path d="${BINER}" fill="none" stroke="#2a1d12" stroke-width="7"/><path d="${BINER}" fill="none" stroke="#f3ecdc" stroke-width="4.4"/>
+      <rect x="57" y="62" width="14" height="34" rx="3" fill="#f3ecdc" stroke="#2a1d12" stroke-width="1.2"/><path d="M57 68h14M57 74h14M57 80h14M57 86h14" stroke="#2a1d12" stroke-width="0.6"/></g>
+      <path d="M150 34L172 24M164 96L182 104M48 104L22 116" stroke="#2a1d12" stroke-width="0.7"/>
+      <text x="174" y="22" font-family="Geist Mono" font-size="5.5" fill="#2a1d12">SPINE</text>
+      <text x="150" y="112" font-family="Geist Mono" font-size="5.5" fill="#2a1d12">BASKET</text>
+      <text x="6" y="124" font-family="Geist Mono" font-size="5.5" fill="#2a1d12">SCREW GATE</text>
+      <path d="M40 140H160M40 136V144M160 136V144" stroke="#2a1d12" stroke-width="0.7"/>
+      <text x="100" y="137" text-anchor="middle" font-family="Geist Mono" font-size="5.5" fill="#2a1d12">108 mm · 24 kN</text>`, 'Technical drawing of a locking carabiner');
+  }
+
+  // ---------- B · Risograph -------------------------------------------------
+  function risoDefs() {
+    const g = id('g'), dots = id('d'), dots2 = id('e');
+    return { g, dots, dots2, defs: `<defs>
+      <filter id="${g}"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.45 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+      <pattern id="${dots}" width="3.2" height="3.2" patternUnits="userSpaceOnUse" patternTransform="rotate(15)"><circle cx="1.6" cy="1.6" r="0.9" fill="#ffd400"/></pattern>
+      <pattern id="${dots2}" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(75)"><circle cx="1.3" cy="1.3" r="0.75" fill="#0078bf"/></pattern></defs>` };
+  }
+  function risoRoute() {
+    const d = risoDefs();
+    return svg(`${d.defs}<rect width="200" height="150" fill="#f4ecdd"/>
+      <g style="mix-blend-mode:multiply">
+        <polygon points="${WALL}" fill="url(#${d.dots})"/>
+        <polygon points="0,0 200,0 194,40 6,40" fill="#ffd400" opacity="0.8"/>
+        ${holdsMarkup('fill="#ff48b0"', 1.2, 0.8)}
+        <g fill="#0078bf" transform="translate(-0.8 0.4)"><path d="${figurePath()}"/>${headC()}${feet()}</g>
+        <g fill="url(#${d.dots2})" transform="translate(9 6)" opacity="0.9"><path d="${figurePath()}"/>${headC()}</g>
+        <path d="M30 70q6-10 4-20M38 80q8-12 6-24" stroke="#ff48b0" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </g>
+      <rect width="200" height="150" filter="url(#${d.g})" opacity="0.6"/>`, 'Risograph-style route print');
+  }
+  function risoBiner() {
+    const d = risoDefs();
+    return svg(`${d.defs}<rect width="200" height="150" fill="#f4ecdd"/>
+      <g style="mix-blend-mode:multiply">
+        <circle cx="104" cy="74" r="56" fill="url(#${d.dots})"/>
+        <g transform="rotate(-16 100 76) translate(1.6 1)"><path d="${BINER}" fill="none" stroke="#ff48b0" stroke-width="13"/></g>
+        <g transform="rotate(-16 100 76)"><path d="${BINER}" fill="none" stroke="#0078bf" stroke-width="3" stroke-dasharray="0.1 5" stroke-linecap="round"/><rect x="55" y="62" width="18" height="34" rx="4" fill="#0078bf"/></g>
+      </g>
+      <rect width="200" height="150" filter="url(#${d.g})" opacity="0.6"/>`, 'Risograph-style carabiner print');
+  }
+
+  // ---------- C · Screenprint poster (national-park poster lighting) ---------
+  function posterRoute() {
+    const g = id('pg');
+    return svg(`<defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1f1a"/><stop offset="1" stop-color="#4a3326"/></linearGradient></defs>
+      <rect width="200" height="150" fill="url(#${g})"/>
+      <polygon points="${WALL}" fill="#7d5636"/>
+      <polygon points="70,0 200,0 186,150 40,150" fill="#b0784a"/>
+      <polygon points="110,0 200,0 186,150 96,150" fill="#d39a5d"/>
+      <polygon points="0,0 200,0 196,26 4,26" fill="#3b2a20" opacity="0.7"/>
+      ${HOLDS.map(([x,y,rx,ry,rot],i)=>`<g>${blob(x+2.5,y+3,rx/1.6,ry/1.6,rot,0.16,i+3).replace('<path','<path fill="#2b1f1a" opacity="0.45"')}${blob(x,y,rx/1.6,ry/1.6,rot,0.16,i+3).replace('<path','<path fill="#1e7f86"')}${blob(x-1.2,y-1.4,rx/2.4,ry/2.6,rot,0.16,i+3).replace('<path','<path fill="#5fc0bb"')}</g>`).join('')}
+      <g fill="#2b1f1a" opacity="0.38" transform="translate(16 10) skewX(-12)"><path d="${figurePath()}"/>${headC()}</g>
+      <g fill="#1b1411"><path d="${figurePath()}"/>${headC()}${feet()}</g>
+      <path d="M128 34L136 24" stroke="#f1d9a8" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M104 64L109 57" stroke="#f1d9a8" stroke-width="1.4" stroke-linecap="round"/>
+      <rect x="0" y="140" width="200" height="10" fill="#1b1411"/>`, 'Screenprint poster-style route');
+  }
+  function posterBiner() {
+    return svg(`<rect width="200" height="150" fill="#2b1f1a"/>
+      <circle cx="100" cy="74" r="62" fill="#3d2c22"/><circle cx="100" cy="74" r="46" fill="#4f3a2c"/>
+      <g transform="rotate(-16 100 76)"><g transform="translate(5 6)"><path d="${BINER}" fill="none" stroke="#1b1411" stroke-width="12" opacity="0.7"/></g>
+      <path d="${BINER}" fill="none" stroke="#e2a24f" stroke-width="12"/>
+      <path d="M84 28H112A28 28 0 0 1 140 56V84" fill="none" stroke="#f6d18a" stroke-width="5"/>
+      <rect x="55" y="62" width="18" height="34" rx="4" fill="#1e7f86"/><rect x="55" y="62" width="7" height="34" rx="3" fill="#5fc0bb"/></g>`, 'Screenprint poster-style carabiner');
+  }
+
+  // ---------- D · Soft-lit matte render ------------------------------------
+  function renderDefs() {
+    const a = id('ao'), w = id('wg'), b = id('bl'), m = id('mn'), n = id('nz'), hg = id('hg');
+    return { a, w, b, m, n, hg, defs: `<defs>
+      <filter id="${a}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2"/></filter>
+      <filter id="${b}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter>
+      <filter id="${n}"><feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="3"/><feColorMatrix values="0 0 0 0 0.2 0 0 0 0 0.15 0 0 0 0 0.1 0 0 0 0.35 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+      <linearGradient id="${w}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9c2a0"/><stop offset="1" stop-color="#8f6d4c"/></linearGradient>
+      <linearGradient id="${m}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6b6f75"/><stop offset="0.5" stop-color="#3c3f44"/><stop offset="1" stop-color="#1e2024"/></linearGradient>
+      <radialGradient id="${hg}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#7fe0d4"/><stop offset="0.5" stop-color="#1fb8a6"/><stop offset="1" stop-color="#0b5a50"/></radialGradient></defs>` };
+  }
+  function renderRoute() {
+    const d = renderDefs();
+    return svg(`${d.defs}<rect width="200" height="150" fill="#2a2018"/>
+      <polygon points="${WALL}" fill="url(#${d.w})"/>
+      <polygon points="${WALL}" fill="#000" filter="url(#${d.n})"/>
+      <polygon points="0,0 200,0 196,34 4,34" fill="#000" opacity="0.28" filter="url(#${d.b})"/>
+      ${HOLDS.map(([x,y,rx,ry,rot],i)=>`<g fill="#1a0f06" opacity="0.5" filter="url(#${d.a})">${blob(x+2,y+3,rx/1.6,ry/1.6,rot,0.16,i+3)}</g><g fill="url(#${d.hg})">${blob(x,y,rx/1.6,ry/1.6,rot,0.16,i+3)}</g>`).join('')}
+      <g fill="#1a0f06" opacity="0.4" filter="url(#${d.b})" transform="translate(10 8)"><path d="${figurePath()}"/>${headC()}</g>
+      <g fill="url(#${d.m})"><path d="${figurePath()}"/>${headC()}${feet()}</g>
+      <path d="M100 66q4-6 8-8" stroke="#9aa0a6" stroke-width="1.2" fill="none" opacity="0.6"/>
+      <circle cx="137" cy="24" r="10" fill="#fff" opacity="0.18" filter="url(#${d.a})"/>`, 'Soft-lit matte render of a route');
+  }
+  function renderBiner() {
+    const d = renderDefs(); const mg = id('mg');
+    return svg(`${d.defs}<defs><linearGradient id="${mg}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b08cf0"/><stop offset="0.45" stop-color="#7a48cc"/><stop offset="1" stop-color="#3a1f6e"/></linearGradient></defs>
+      <rect width="200" height="150" fill="#e9e2d6"/><ellipse cx="100" cy="130" rx="60" ry="8" fill="#2a2018" opacity="0.35" filter="url(#${d.b})"/>
+      <g transform="rotate(-16 100 76)"><path d="${BINER}" fill="none" stroke="url(#${mg})" stroke-width="12"/>
+      <path d="M86 31H112A25 25 0 0 1 137 56" fill="none" stroke="#fff" stroke-opacity="0.55" stroke-width="2.4" stroke-linecap="round"/>
+      <rect x="55" y="62" width="18" height="34" rx="4" fill="#c99a2e"/><rect x="57" y="62" width="5" height="34" rx="2" fill="#f2d27a"/></g>`, 'Soft-lit matte render of a carabiner');
+  }
+
+  const STYLES = [
+    { k: 'A', name: 'Guidebook topo', route: topoRoute, gear: topoBiner,
+      look: 'Ink line drawing on paper, hatched shading, numbered route line, one accent colour for the route tape. Gear drawn as annotated technical plates.',
+      refs: 'Climbing guidebooks & topos, Black Diamond tech sheets, field-guide plates.',
+      pros: 'Most "authentic climber" feel; prints beautifully in one colour; very legible small.',
+      cons: 'Quiet on screen — colour comes mostly from the card frames and grade holds.' },
+    { k: 'B', name: 'Risograph print', route: risoRoute, gear: risoBiner,
+      look: 'Two or three fluorescent spot inks overprinted, halftone shading, paper grain and slight misregistration.',
+      refs: 'Indie zines, climbing-festival posters, Patagonia/Arc’teryx event prints.',
+      pros: 'Distinctive, crafted, energetic; keeps the hold-colour vibrancy without looking childish.',
+      cons: 'Busier texture; needs care so small text overlays stay legible.' },
+    { k: 'C', name: 'Screenprint poster', route: posterRoute, gear: posterBiner,
+      look: 'Flat layered tones, dramatic spotlight and long cast shadows, no outlines, warm limited palette.',
+      refs: 'WPA national-park posters, Banff Mountain Film Festival art, vintage outdoor brand ads.',
+      pros: 'Cinematic and premium; strong silhouettes read at any size; great for climber portraits.',
+      cons: 'Darker cards; every hold circuit colour must be re-tuned for the moody lighting.' },
+    { k: 'D', name: 'Soft-lit matte render', route: renderRoute, gear: renderBiner,
+      look: 'Gradient-lit holds and a matte mannequin climber with blurred ambient shadows on a textured wall — closest to realistic.',
+      refs: 'Product renders, Moon/Kilter board app art, gym marketing 3D.',
+      pros: 'Most realistic and modern; holds look like real polyurethane.',
+      cons: 'Least "printed card" feel; heaviest to render with many cards on screen.' },
+  ];
+  // ======================= ROUND 2 =======================================
+  // Shared filters: rough printed edge, outline extraction, dry-chalk breakup.
+  function fx() {
+    const rough = id('rf'), outline = id('of'), chalk = id('cf'), wash = id('wf'), paper = id('pf');
+    return { rough, outline, chalk, wash, paper, defs: `
+      <filter id="${rough}" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="1.8"/></filter>
+      <filter id="${outline}" x="-10%" y="-10%" width="120%" height="120%"><feMorphology in="SourceAlpha" operator="dilate" radius="1.1" result="d"/><feComposite in="d" in2="SourceAlpha" operator="out" result="o"/><feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="8" result="t"/><feDisplacementMap in="o" in2="t" scale="1.6" result="w"/><feFlood flood-color="#3a2a1c"/><feComposite in2="w" operator="in"/></filter>
+      <filter id="${outline}c" x="-10%" y="-10%" width="120%" height="120%"><feMorphology in="SourceAlpha" operator="dilate" radius="1" result="d"/><feComposite in="d" in2="SourceAlpha" operator="out" result="o"/><feFlood flood-color="#f4ede0"/><feComposite in2="o" operator="in"/></filter>
+      <filter id="${chalk}" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="1.8" numOctaves="2" seed="5" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.7 -0.3" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in" result="c"/><feTurbulence type="fractalNoise" baseFrequency="0.6" seed="2" result="t"/><feDisplacementMap in="c" in2="t" scale="1.4"/></filter>
+      <filter id="${wash}" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" seed="11" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="9" result="d"/><feGaussianBlur in="d" stdDeviation="0.8" result="b"/><feMorphology in="b" operator="erode" radius="0.8" result="e"/><feComposite in="b" in2="e" operator="arithmetic" k1="0" k2="1.25" k3="-0.35" k4="0"/></filter>
+      <filter id="${paper}"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="9"/><feColorMatrix values="0 0 0 0 0.35  0 0 0 0 0.28  0 0 0 0 0.2  0 0 0 0.16 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>` };
+  }
+  const fig = (attrs) => `<g ${attrs}><path d="${figurePath()}"/>${headC()}${feet()}</g>`;
+  const holdsAt = (attrs, scale = 1) => HOLDS.map(([x,y,rx,ry,rot],i)=>`<g ${attrs}>${blob(x,y,rx/1.6*scale,ry/1.6*scale,rot,0.16,i+3)}</g>`).join('');
+
+  // ---------- E · Linocut ---------------------------------------------------
+  function linoRoute() {
+    const f = fx();
+    const gouges = Array.from({length: 22}, (_, i) => `<path d="M${-10 + i * 3} ${150}Q${40 + i * 4} ${90 - i} ${20 + i * 9} ${-4}" fill="none" stroke="#efe6d2" stroke-width="${i % 3 ? 0.7 : 1.3}" stroke-linecap="round"/>`).join('');
+    return svg(`<defs>${f.defs}</defs><rect width="200" height="150" fill="#efe6d2"/>
+      <g filter="url(#${f.rough})">
+        <polygon points="${WALL}" fill="#1c1612"/>
+        <g opacity="0.85">${gouges}</g>
+        ${holdsAt('fill="#c4462a" transform="translate(1.4 1)"')}
+        ${holdsAt('fill="#efe6d2"', 0.82)}
+        ${fig('fill="#efe6d2"')}
+        <path d="M96 84L103 68M120 47l8-11M83 103l-7 13M93 100l-4 12" stroke="#1c1612" stroke-width="1.1" stroke-linecap="round"/>
+      </g>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.paper})"/>`, 'Linocut-style route');
+  }
+  function linoBiner() {
+    const f = fx();
+    return svg(`<defs>${f.defs}</defs><rect width="200" height="150" fill="#efe6d2"/>
+      <g filter="url(#${f.rough})">
+        <circle cx="104" cy="76" r="58" fill="#c4462a"/>
+        ${Array.from({length: 9}, (_, i) => `<path d="M${50 + i * 12} 30q8 46 0 92" stroke="#efe6d2" stroke-width="0.9" fill="none" opacity="0.7"/>`).join('')}
+        <g transform="rotate(-16 100 76)"><path d="${BINER}" fill="none" stroke="#1c1612" stroke-width="13"/>
+        <path d="M86 32H112A24 24 0 0 1 136 56V82" fill="none" stroke="#efe6d2" stroke-width="1.4" stroke-dasharray="7 3"/>
+        <rect x="55" y="62" width="18" height="34" rx="3" fill="#1c1612"/><path d="M58 68h12M58 74h12M58 80h12M58 86h12" stroke="#efe6d2" stroke-width="1"/></g>
+      </g>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.paper})"/>`, 'Linocut-style carabiner');
+  }
+
+  // ---------- F · Watercolour field sketch ----------------------------------
+  function waterRoute() {
+    const f = fx();
+    return svg(`<defs>${f.defs}</defs><rect width="200" height="150" fill="#f7f1e4"/>
+      <g style="mix-blend-mode:multiply">
+        <polygon points="${WALL}" fill="#d9b98c" opacity="0.55" filter="url(#${f.wash})"/>
+        <polygon points="2,0 198,0 194,34 6,34" fill="#8a6440" opacity="0.4" filter="url(#${f.wash})"/>
+        ${holdsAt('fill="#1fb8a6" opacity="0.75" filter="url(#' + f.wash + ')"', 1.05)}
+        ${fig('fill="#6b7a8a" opacity="0.5" filter="url(#' + f.wash + ')"')}
+      </g>
+      ${fig('fill="#000" filter="url(#' + f.outline + ')"')}
+      ${holdsAt('fill="#000" filter="url(#' + f.outline + ')"')}
+      <path d="M0 0L14 150M200 0L186 150" stroke="#3a2a1c" stroke-width="0.7" opacity="0.7" filter="url(#${f.rough})"/>
+      <text x="10" y="143" font-family="Hanken Grotesk" font-style="italic" font-size="7" fill="#3a2a1c">dyno to the lip — V5</text>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.paper})"/>`, 'Watercolour field-sketch route');
+  }
+  function waterBiner() {
+    const f = fx();
+    return svg(`<defs>${f.defs}</defs><rect width="200" height="150" fill="#f7f1e4"/>
+      <g style="mix-blend-mode:multiply" transform="rotate(-16 100 76)">
+        <path d="${BINER}" fill="none" stroke="#7a48cc" stroke-width="14" opacity="0.6" filter="url(#${f.wash})"/>
+        <rect x="55" y="62" width="18" height="34" rx="4" fill="#d99a2b" opacity="0.7" filter="url(#${f.wash})"/>
+      </g>
+      <g transform="rotate(-16 100 76)" filter="url(#${f.rough})"><path d="${BINER}" fill="none" stroke="#3a2a1c" stroke-width="0.9"/><path d="M84 40H112A18 18 0 0 1 130 58V82A30 30 0 0 1 100 112H92A18 18 0 0 1 74 94V50" fill="none" stroke="#3a2a1c" stroke-width="0.7"/><rect x="55" y="62" width="18" height="34" rx="4" fill="none" stroke="#3a2a1c" stroke-width="0.8"/></g>
+      <text x="140" y="138" font-family="Hanken Grotesk" font-style="italic" font-size="7" fill="#3a2a1c">screwgate, 24kN</text>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.paper})"/>`, 'Watercolour sketch of a carabiner');
+  }
+
+  // ---------- G · Chalk on slate (route-setter's board) ---------------------
+  function chalkRoute() {
+    const f = fx(), hatch = id('ch');
+    return svg(`<defs>${f.defs}<pattern id="${hatch}" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)"><path d="M0 0V3" stroke="#f4ede0" stroke-width="0.9"/></pattern></defs>
+      <rect width="200" height="150" fill="#2c3133"/>
+      <ellipse cx="70" cy="60" rx="90" ry="50" fill="#f4ede0" opacity="0.05"/>
+      <g filter="url(#${f.chalk})">
+        <polygon points="${WALL}" fill="none" stroke="#f4ede0" stroke-width="1.6"/>
+        <path d="M2 30H198" stroke="#f4ede0" stroke-width="1" stroke-dasharray="4 3"/>
+        ${holdsAt('fill="#7fd6cb" stroke="#f4ede0" stroke-width="1"')}
+        ${fig('fill="url(#' + hatch + ')"')}
+        ${fig('fill="#000" filter="url(#' + f.outline + 'c)"')}
+        <path d="M56 128L80 106L62 86L118 72L142 22" fill="none" stroke="#ffae28" stroke-width="1.6" stroke-dasharray="4 3"/>
+        <path d="M150 60c6-4 12-4 16 2" stroke="#ffae28" stroke-width="1.6" fill="none"/>
+        <text x="156" y="76" font-family="Bricolage Grotesque" font-weight="800" font-size="16" fill="#f4ede0">V5</text>
+        <text x="10" y="144" font-family="Hanken Grotesk" font-weight="700" font-size="8" fill="#f4ede0">DYNO DILEMMA</text>
+      </g>`, 'Chalk-on-slate route sketch');
+  }
+  function chalkBiner() {
+    const f = fx();
+    return svg(`<defs>${f.defs}</defs><rect width="200" height="150" fill="#2c3133"/>
+      <g filter="url(#${f.chalk})">
+        <g transform="rotate(-16 100 76)"><path d="${BINER}" fill="none" stroke="#b9a3ec" stroke-width="10"/><path d="${BINER}" fill="none" stroke="#f4ede0" stroke-width="1.4"/>
+        <rect x="55" y="62" width="18" height="34" rx="4" fill="#ffd27a"/></g>
+        <path d="M150 34l22-10M40 116l-16 10" stroke="#f4ede0" stroke-width="1.2"/>
+        <text x="152" y="20" font-family="Hanken Grotesk" font-weight="700" font-size="8" fill="#f4ede0">lock it!</text>
+      </g>`, 'Chalk drawing of a carabiner');
+  }
+
+  // ---------- H · Swiss modernist poster -----------------------------------
+  function swissRoute() {
+    return svg(`<rect width="200" height="150" fill="#ece6da"/>
+      <rect x="0" y="0" width="200" height="38" fill="#1fb8a6"/>
+      <circle cx="140" cy="30" r="44" fill="#ff6845" style="mix-blend-mode:multiply"/>
+      <path d="M0 150L36 38H200V150Z" fill="#d8cfbf"/>
+      <text x="-4" y="150" font-family="Bricolage Grotesque" font-weight="800" font-size="92" letter-spacing="-6" fill="#2a1d12" opacity="0.1">V5</text>
+      ${HOLDS.map(([x,y,rx,ry],i)=>`<circle cx="${x}" cy="${y}" r="${Math.max(2.5,(rx+ry)/4)}" fill="${i===5?'#2a1d12':'#1fb8a6'}"/>`).join('')}
+      ${fig('fill="#2a1d12"')}
+      <path d="M8 8H60M8 13H44" stroke="#2a1d12" stroke-width="2"/>
+      <text x="8" y="140" font-family="Hanken Grotesk" font-weight="700" font-size="7.5" fill="#2a1d12" letter-spacing="0.5">DYNO DILEMMA / OVERHANG / 35°</text>`, 'Swiss modernist poster-style route');
+  }
+  function swissBiner() {
+    return svg(`<rect width="200" height="150" fill="#ece6da"/>
+      <rect x="120" y="0" width="80" height="150" fill="#7a48cc"/>
+      <circle cx="96" cy="76" r="50" fill="#ffae28" style="mix-blend-mode:multiply"/>
+      <g transform="rotate(-16 100 76)"><path d="${BINER}" fill="none" stroke="#2a1d12" stroke-width="9"/><rect x="56" y="62" width="16" height="34" fill="#ece6da" stroke="#2a1d12" stroke-width="3"/></g>
+      <path d="M8 138H60" stroke="#2a1d12" stroke-width="2"/>
+      <text x="8" y="132" font-family="Hanken Grotesk" font-weight="700" font-size="7.5" fill="#2a1d12">24 kN · HMS</text>`, 'Swiss modernist poster-style carabiner');
+  }
+
+  STYLES.push(
+    { k: 'E', round: 2, name: 'Linocut / woodblock', route: linoRoute, gear: linoBiner,
+      look: 'Carved black ink with white gouge marks following the wall, one extra colour block, rough printed edges and paper fibre.',
+      refs: 'Outdoor heritage prints, Patagonia catalogue woodcuts, national-park block prints.',
+      pros: 'Hand-made and serious; very strong contrast; prints well in 2 colours.',
+      cons: 'Heavy black areas; hold colour is reduced to one accent per card.' },
+    { k: 'F', round: 2, name: 'Watercolour field sketch', route: waterRoute, gear: waterBiner,
+      look: 'Loose ink contours over bleeding watercolour washes, handwritten notes, cold-press paper.',
+      refs: 'Naturalist field journals, Moleskine climbing sketches, travel-sketch illustrators.',
+      pros: 'Warm, human and artful; colour stays soft but readable.',
+      cons: 'Gentle contrast at small sizes; filters are heavier to render.' },
+    { k: 'G', round: 2, name: 'Chalk on slate', route: chalkRoute, gear: chalkBiner,
+      look: 'Dry chalk lines and hatching on a dark slate board, coloured chalk for holds, scribbled grades.',
+      refs: 'The route-setter’s chalkboard by the front desk, coaching whiteboards, beta sketches.',
+      pros: 'Deeply on-theme (chalk is the gym’s material); dark cards make colours glow.',
+      cons: 'Dark card faces; texture needs restraint so lines stay crisp.' },
+    { k: 'H', round: 2, name: 'Swiss modernist poster', route: swissRoute, gear: swissBiner,
+      look: 'Grid, geometric colour fields, overprinted circles, oversized grade typography, solid anatomical silhouette.',
+      refs: 'Josef Müller-Brockmann, 1960s ski & alpine-club posters, modern gym branding.',
+      pros: 'Sophisticated and graphic; extremely legible; easy to keep consistent across 98 cards.',
+      cons: 'Abstract — holds become geometric marks rather than realistic shapes.' },
+  );
+
+  // ======================= ROUND 3 · CHALK × SCREENPRINT ====================
+  // Flat screen-printed layers (spotlight, faceted wall, two-tone holds, cast
+  // shadow) on a slate board, finished by hand in chalk (rim light, route
+  // line, grade scrawl, hatching, dust).
+  function slateFx() {
+    const f = fx(), grain = id('sg'), dust = id('sd'), soft = id('ss');
+    return { ...f, grain, dust, soft, defs: f.defs + `
+      <filter id="${grain}"><feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="2" seed="21"/><feColorMatrix values="0 0 0 0 0.95  0 0 0 0 0.93  0 0 0 0 0.88  0 0 0 0.12 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+      <filter id="${soft}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="5"/></filter>
+      <filter id="${dust}" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="13" result="n"/><feColorMatrix in="n" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -0.6" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in" result="c"/><feGaussianBlur in="c" stdDeviation="0.6"/></filter>` };
+  }
+  const SL = { base: '#23282b', mid: '#2f363a', lit: '#434c51', warm: '#5a564b', chalk: '#f1ebdf',
+    hold: '#1fb8a6', holdDk: '#0d6159', holdLt: '#7fe0d4', ink: '#121517', accent: '#ffae28' };
+
+  function hybridRoute(mode) {
+    const f = slateFx(), chalky = mode === 'chalk';
+    const hatchLines = Array.from({ length: chalky ? 16 : 7 }, (_, i) => `<path d="M${96 + i * 6} 0L${60 + i * 7} 150" stroke="${SL.chalk}" stroke-width="0.7" opacity="${chalky ? 0.45 : 0.28}"/>`).join('');
+    const holds = HOLDS.map(([x, y, rx, ry, rot], i) => {
+      const b = (dx, dy, k) => blob(x + dx, y + dy, rx / 1.6 * k, ry / 1.6 * k, rot, 0.16, i + 3);
+      return `<g>${b(2.6, 3.2, 1).replace('<path', `<path fill="${SL.ink}" opacity="0.55"`)}
+        ${b(0, 0, 1).replace('<path', `<path fill="${SL.holdDk}"`)}
+        ${b(-0.9, -1.1, 0.78).replace('<path', `<path fill="${SL.hold}"`)}
+        ${b(-1.8, -2, 0.36).replace('<path', `<path fill="${SL.holdLt}"`)}</g>`;
+    }).join('');
+    const holdChalk = chalky ? HOLDS.map(([x, y, rx, ry, rot], i) => blob(x, y, rx / 1.6 * 1.12, ry / 1.6 * 1.12, rot, 0.2, i + 3).replace('<path', `<path fill="none" stroke="${SL.chalk}" stroke-width="0.8"`)).join('') : '';
+    return svg(`<defs>${f.defs}</defs>
+      <rect width="200" height="150" fill="${SL.base}"/>
+      <polygon points="${WALL}" fill="${SL.mid}"/>
+      <polygon points="58,0 200,0 186,150 26,150" fill="${SL.lit}"/>
+      <polygon points="104,0 176,0 160,150 70,150" fill="${SL.warm}" opacity="0.55"/>
+      <polygon points="0,0 200,0 196,28 4,28" fill="${SL.ink}" opacity="0.45"/>
+      <g style="mix-blend-mode:screen" filter="url(#${f.chalk})">${hatchLines}</g>
+      ${holds}
+      <g fill="${SL.ink}" opacity="0.5" transform="translate(18 9) skewX(-14)"><path d="${figurePath()}"/>${headC()}</g>
+      <g filter="url(#${f.chalk})" fill="${SL.chalk}" transform="translate(-1.3 -1.1)"><path d="${figurePath()}"/>${headC()}${feet()}</g>
+      ${fig(`fill="${SL.ink}"`)}
+      <g filter="url(#${f.chalk})" fill="none" stroke-linecap="round">
+        ${holdChalk}
+        <path d="M0 0L14 150M200 0L186 150" stroke="${SL.chalk}" stroke-width="${chalky ? 1.4 : 0.8}" opacity="0.8"/>
+        <path d="M56 128L80 106L62 86L118 72L142 22" stroke="${SL.accent}" stroke-width="1.5" stroke-dasharray="4 3"/>
+        ${chalky ? `<path d="M150 58c7-5 14-4 17 2M160 52l7 6-8 2" stroke="${SL.accent}" stroke-width="1.4"/>` : ''}
+        <text x="${chalky ? 154 : 160}" y="${chalky ? 78 : 140}" font-family="Bricolage Grotesque" font-weight="800" font-size="${chalky ? 17 : 13}" fill="${SL.chalk}" stroke="none">V5</text>
+        ${chalky ? `<text x="10" y="144" font-family="Hanken Grotesk" font-weight="700" font-size="7.5" fill="${SL.chalk}" stroke="none">dyno to the lip →</text>` : ''}
+      </g>
+      <g filter="url(#${f.dust})"><ellipse cx="139" cy="22" rx="16" ry="9" fill="${SL.chalk}" opacity="0.55"/><ellipse cx="60" cy="126" rx="12" ry="6" fill="${SL.chalk}" opacity="0.35"/></g>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.grain})"/>`, `Chalk and screenprint route (${mode})`);
+  }
+  function hybridBiner(mode) {
+    const f = slateFx(), chalky = mode === 'chalk';
+    return svg(`<defs>${f.defs}</defs>
+      <rect width="200" height="150" fill="${SL.base}"/>
+      <circle cx="104" cy="74" r="62" fill="${SL.mid}"/><circle cx="96" cy="68" r="44" fill="${SL.lit}"/>
+      <ellipse cx="108" cy="132" rx="58" ry="7" fill="${SL.ink}" opacity="0.6"/>
+      <g transform="rotate(-16 100 76)">
+        <g transform="translate(7 9)"><path d="${BINER}" fill="none" stroke="${SL.ink}" stroke-width="12" opacity="0.55"/></g>
+        <path d="${BINER}" fill="none" stroke="#4b2a86" stroke-width="12"/>
+        <path d="${BINER}" fill="none" stroke="#7a48cc" stroke-width="7" transform="translate(-1.4 -1.4)"/>
+        <path d="M84 28H112A28 28 0 0 1 140 56V80" fill="none" stroke="#b9a3ec" stroke-width="3" transform="translate(-2 -2)"/>
+        <rect x="55" y="62" width="18" height="34" rx="4" fill="#9a6c12"/><rect x="55" y="62" width="10" height="34" rx="3" fill="#ffae28"/>
+      </g>
+      <g filter="url(#${f.chalk})" fill="none" stroke="${SL.chalk}" stroke-linecap="round">
+        ${chalky ? `<g transform="rotate(-16 100 76)"><path d="${BINER}" stroke-width="0.9" transform="scale(1.08) translate(-7.5 -6)"/></g>` : ''}
+        <path d="M150 32l20-9M44 112l-18 10" stroke-width="1.1"/>
+        <text x="150" y="19" font-family="Hanken Grotesk" font-weight="700" font-size="8" fill="${SL.chalk}" stroke="none">24 kN</text>
+        ${chalky ? `<text x="8" y="132" font-family="Hanken Grotesk" font-weight="700" font-size="8" fill="${SL.chalk}" stroke="none">screw it shut</text>` : ''}
+      </g>
+      <g filter="url(#${f.dust})"><ellipse cx="80" cy="40" rx="18" ry="10" fill="${SL.chalk}" opacity="0.4"/></g>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.grain})"/>`, `Chalk and screenprint carabiner (${mode})`);
+  }
+  function cardMock(art, { name, kind, frame, grade, gradeColor, reqs, dice, costs, foot }) {
+    return `<article class="aia-card aia-card--route" style="--frame: var(--${frame}); --frame-on: var(--on-${frame}); width: 100%; max-width: 17rem;">
+      <div class="aia-card__face">
+        <header class="aia-card__head"><span class="aia-card__kind">${kind}</span></header>
+        <h3 class="aia-card__name">${name}</h3>
+        <div class="aia-card__art">${art}${grade ? `<span class="aia-card__grade hold hold--label hold--${gradeColor}">${grade}</span>` : ''}</div>
+        <dl class="aia-reqs">${reqs.map(([k, l, v]) => `<div class="aia-req aia-req--${k}"><dt><span class="aia-req__label">${l}</span></dt><dd>${v}</dd></div>`).join('')}</dl>
+        ${dice}
+        <div class="aia-costs">${costs}</div>
+        <footer class="aia-card__foot"><span>${foot}</span><span>v0.7.0</span></footer>
+      </div></article>`;
+  }
+  function hybridRow(mode) {
+    const route = hybridRoute(mode), biner = hybridBiner(mode);
+    const reqs = [['strength', 'STR', 52], ['technique', 'TEC', 38], ['focus', 'FOC', 36], ['flexibility', 'FLX', 30]];
+    const routeCard = cardMock(hybridRoute(mode), { name: 'Dyno Dilemma', kind: 'Bouldering', frame: 'coral', grade: 'V5', gradeColor: 'teal', reqs,
+      dice: '<ul class="aia-dice"><li class="aia-die-chip is-nerf">+STR</li><li class="aia-die-chip is-nerf">+FOC</li><li class="aia-die-chip is-buff">−FLX</li></ul>',
+      costs: '<span class="aia-cost"><b>4</b>&nbsp;time</span><span class="aia-cost"><b>46</b>&nbsp;end</span><span class="aia-cost aia-cost--xp"><b>78</b><span class="aia-cost__fail">/38</span></span>', foot: 'AIA · BLD 08/26' });
+    const gearCard = cardMock(hybridBiner(mode), { name: 'Locking Carabiner', kind: 'Essential Safety Gear', frame: 'cobalt', reqs: [],
+      dice: '<div class="aia-rules"><p class="aia-rules__effect">+5 Max Endurance · Part of the Lead system</p><p class="aia-rules__flavor">A secure system builds confidence.</p></div>',
+      costs: '<span class="aia-cost aia-cost--xp"><b>60</b>&nbsp;XP</span>', foot: 'AIA · GR 02/17' }).replace('<dl class="aia-reqs"></dl>', '');
+    return { route, biner, routeCard, gearCard };
+  }
+  const HYBRID = [
+    { k: 'I', mode: 'print', name: 'Chalk × Screenprint — print-forward',
+      look: 'Flat screen-printed planes on slate: a warm spotlight band, faceted wall, two-tone holds with a lit face, a long flat cast shadow. Chalk is the finishing hand: a rim-light on the climber, the dashed route line, the grade.',
+      notes: 'Reads as a premium printed card; the chalk keeps it gym-specific without getting busy.' },
+    { k: 'J', mode: 'chalk', name: 'Chalk × Screenprint — chalk-forward',
+      look: 'Same printed base, with more of the route-setter’s hand on top: hatching in the spotlight, chalk outlines around holds and the wall edges, a scrawled grade, beta notes and an arrow.',
+      notes: 'More personality and "beta board" storytelling; slightly busier at small card sizes.' },
+  ];
+
+  // ======================= ROUND 4 · PASTEL · GRIT · CHALK DUST =============
+  // Drawn from the UI itself: chalk-paper pastels, the sand-in-paint grit of
+  // the wall and holds, and chalk dust everywhere hands have been.
+  const PA = {
+    sand: '#dcc6a4', sandLt: '#eadbc1', sandSh: '#bf9f78', sandDp: '#8f7052', paper: '#f4ede0',
+    teal: '#8fd6cb', tealSh: '#5fb3a7', tealLt: '#c4ece5', coral: '#ffab94', coralSh: '#e5806a',
+    butter: '#ffd896', violet: '#bba5e6', violetSh: '#8f76c9', violetLt: '#ddd0f5', lime: '#d5e78f',
+    umber: '#6b5038', umberLt: '#8d6f53', chalk: '#fbf8f2', toned: '#cdb391',
+  };
+  function pastelFx() {
+    const relief = id('pr'), speckD = id('pk'), speckL = id('pl'), dust = id('pd'), tooth = id('pt'), soft = id('ps'), edge = id('pe');
+    return { relief, speckD, speckL, dust, tooth, soft, edge, defs: `
+      <filter id="${relief}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="4" seed="7" result="n"/><feDiffuseLighting in="n" surfaceScale="0.9" diffuseConstant="1.15" lighting-color="#fff7ea" result="l"><feDistantLight azimuth="225" elevation="48"/></feDiffuseLighting><feComposite in="SourceGraphic" in2="l" operator="arithmetic" k1="1.1" k2="0" k3="0" k4="0.02" result="m"/><feComposite in="m" in2="SourceGraphic" operator="in"/></filter>
+      <filter id="${speckD}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="2.1" numOctaves="1" seed="3" result="t"/><feColorMatrix in="t" values="0 0 0 0 0.33  0 0 0 0 0.24  0 0 0 0 0.16  0 0 0 7 -4.3" result="s"/><feComposite in="s" in2="SourceAlpha" operator="in"/></filter>
+      <filter id="${speckL}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.9" numOctaves="1" seed="17" result="t"/><feColorMatrix in="t" values="0 0 0 0 1  0 0 0 0 0.98  0 0 0 0 0.95  0 0 0 7 -4.4" result="s"/><feComposite in="s" in2="SourceAlpha" operator="in"/></filter>
+      <filter id="${dust}" x="-40%" y="-40%" width="180%" height="180%"><feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed="13" result="n"/><feColorMatrix in="n" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.5 -0.5" result="m"/><feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/><feComposite in="b" in2="m" operator="in"/></filter>
+      <filter id="${tooth}" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="1.1 0.3" numOctaves="2" seed="5" result="n"/><feColorMatrix in="n" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.5 0.12" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in"/></filter>
+      <filter id="${soft}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.4"/></filter>
+      <filter id="${edge}" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="4" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="1.6"/></filter>` };
+  }
+  const hb = (i, k = 1, dx = 0, dy = 0) => { const [x, y, rx, ry, rot] = HOLDS[i]; return blob(x + dx, y + dy, rx / 1.6 * k, ry / 1.6 * k, rot, 0.16, i + 3); };
+  const holdsPath = (attrs, k = 1, dx = 0, dy = 0) => HOLDS.map((_, i) => hb(i, k, dx, dy).replace('<path', `<path ${attrs}`)).join('');
+  const dustPuffs = (f, list) => `<g filter="url(#${f.dust})">${list.map(([x, y, rx, ry, o]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${PA.chalk}" opacity="${o}"/>`).join('')}</g>`;
+  const motes = (n, seed) => { let s = seed; const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280); return Array.from({ length: n }, () => `<circle cx="${r(rnd() * 200)}" cy="${r(rnd() * 140)}" r="${r(0.4 + rnd() * 1.1)}" fill="${PA.chalk}" opacity="${r(0.3 + rnd() * 0.5)}"/>`).join(''); };
+  const ROUTE_DUST = [[139, 22, 16, 9, 0.75], [124, 20, 9, 6, 0.6], [60, 126, 14, 7, 0.5], [80, 106, 9, 5, 0.45], [112, 40, 22, 14, 0.35]];
+
+  // K · Gritty gouache — soft pastel planes, painted light, grit specks, no outlines
+  function gouacheRoute() {
+    const f = pastelFx();
+    return svg(`<defs>${f.defs}</defs>
+      <rect width="200" height="150" fill="${PA.sandDp}"/>
+      <g filter="url(#${f.edge})">
+        <polygon points="${WALL}" fill="${PA.sand}"/>
+        <polygon points="60,0 200,0 186,150 40,150" fill="${PA.sandLt}" opacity="0.7"/>
+        <polygon points="0,0 200,0 196,30 4,30" fill="${PA.sandSh}" opacity="0.8"/>
+      </g>
+      <polygon points="${WALL}" fill="#000" filter="url(#${f.speckD})"/>
+      <polygon points="${WALL}" fill="#000" filter="url(#${f.speckL})"/>
+      ${holdsPath(`fill="${PA.sandDp}" opacity="0.35" filter="url(#${f.soft})"`, 1, 2.5, 3)}
+      ${holdsPath(`fill="${PA.tealSh}"`)}
+      ${holdsPath(`fill="${PA.teal}"`, 0.8, -0.8, -1)}
+      ${holdsPath(`fill="${PA.tealLt}"`, 0.4, -1.6, -1.8)}
+      ${holdsPath('fill="#000"').replace(/<path/g, `<path filter="url(#${f.speckD})"`)}
+      <g fill="${PA.sandDp}" opacity="0.32" filter="url(#${f.soft})" transform="translate(12 9)"><path d="${figurePath()}"/>${headC()}</g>
+      ${fig(`fill="${PA.umber}"`)}
+      <g fill="${PA.umberLt}" transform="translate(-0.9 -0.9) scale(1)" opacity="0.7" clip-path="none"><path d="M100 70L110 52" stroke="${PA.umberLt}" stroke-width="2.4" stroke-linecap="round"/></g>
+      ${dustPuffs(f, ROUTE_DUST)}
+      ${motes(26, 7)}`, 'Gritty gouache route');
+  }
+  function gouacheBiner() {
+    const f = pastelFx();
+    return svg(`<defs>${f.defs}</defs>
+      <rect width="200" height="150" fill="${PA.sand}"/>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.speckD})"/>
+      <circle cx="98" cy="70" r="58" fill="${PA.sandLt}" filter="url(#${f.edge})"/>
+      <ellipse cx="106" cy="128" rx="54" ry="8" fill="${PA.sandDp}" opacity="0.35" filter="url(#${f.soft})"/>
+      <g transform="rotate(-16 100 76)">
+        <path d="${BINER}" fill="none" stroke="${PA.violetSh}" stroke-width="12"/>
+        <path d="${BINER}" fill="none" stroke="${PA.violet}" stroke-width="7" transform="translate(-1.2 -1.2)"/>
+        <path d="M86 30H112A26 26 0 0 1 138 56" fill="none" stroke="${PA.violetLt}" stroke-width="2.6" stroke-linecap="round"/>
+        <rect x="55" y="62" width="18" height="34" rx="4" fill="#e9b75e"/><rect x="55" y="62" width="9" height="34" rx="3" fill="${PA.butter}"/>
+      </g>
+      ${dustPuffs(f, [[76, 46, 20, 10, 0.55], [140, 96, 14, 8, 0.4]])}
+      ${motes(18, 3)}`, 'Gritty gouache carabiner');
+  }
+
+  // L · Soft pastel on toned paper — chalk-pastel strokes broken by paper tooth
+  function pastelRoute() {
+    const f = pastelFx();
+    const strokes = (color, n, y0, y1, w, o, seed) => { let s = seed; const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+      return Array.from({ length: n }, () => { const x = rnd() * 220 - 10, y = y0 + rnd() * (y1 - y0); return `<path d="M${r(x)} ${r(y)}l${r(18 + rnd() * 26)} ${r(-8 - rnd() * 10)}" stroke="${color}" stroke-width="${w}" stroke-linecap="round" opacity="${o}"/>`; }).join(''); };
+    return svg(`<defs>${f.defs}</defs>
+      <rect width="200" height="150" fill="${PA.toned}"/>
+      <g filter="url(#${f.tooth})">
+        <polygon points="${WALL}" fill="${PA.sand}"/>
+        ${strokes(PA.sandLt, 40, 0, 150, 5, 0.8, 11)}
+        ${strokes(PA.sandSh, 18, 0, 40, 6, 0.7, 23)}
+        ${holdsPath(`fill="${PA.tealSh}"`)}
+        ${holdsPath(`fill="${PA.teal}"`, 0.75, -1, -1.2)}
+        ${holdsPath(`fill="${PA.chalk}"`, 0.3, -2, -2.2)}
+        ${fig(`fill="${PA.umber}"`)}
+        <path d="M0 0L14 150M200 0L186 150" stroke="${PA.sandDp}" stroke-width="2.4"/>
+      </g>
+      <g filter="url(#${f.tooth})" fill="none" stroke-linecap="round"><path d="M56 128L80 106L62 86L118 72L142 22" stroke="${PA.coral}" stroke-width="2" stroke-dasharray="4 4"/></g>
+      ${dustPuffs(f, ROUTE_DUST)}
+      ${motes(20, 9)}`, 'Soft pastel route drawing');
+  }
+  function pastelBiner() {
+    const f = pastelFx();
+    return svg(`<defs>${f.defs}</defs>
+      <rect width="200" height="150" fill="${PA.toned}"/>
+      <g filter="url(#${f.tooth})">
+        <circle cx="100" cy="72" r="58" fill="${PA.sandLt}"/>
+        <g transform="rotate(-16 100 76)">
+          <path d="${BINER}" fill="none" stroke="${PA.violetSh}" stroke-width="13"/>
+          <path d="${BINER}" fill="none" stroke="${PA.violet}" stroke-width="7" transform="translate(-1.4 -1.4)"/>
+          <path d="M86 30H112A26 26 0 0 1 138 56" fill="none" stroke="${PA.chalk}" stroke-width="3"/>
+          <rect x="55" y="62" width="18" height="34" rx="4" fill="${PA.butter}"/>
+        </g>
+        <path d="M44 128h112" stroke="${PA.sandDp}" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+      </g>
+      ${dustPuffs(f, [[80, 44, 18, 9, 0.5]])}`, 'Soft pastel carabiner');
+  }
+
+  // M · Grit relief — lit sand-in-paint texture, matte pastel holds, chalk prints
+  function reliefRoute() {
+    const f = pastelFx(), hg = id('rg');
+    return svg(`<defs>${f.defs}<radialGradient id="${hg}" cx="32%" cy="28%" r="80%"><stop offset="0" stop-color="${PA.tealLt}"/><stop offset="0.55" stop-color="${PA.teal}"/><stop offset="1" stop-color="${PA.tealSh}"/></radialGradient></defs>
+      <rect width="200" height="150" fill="${PA.sandDp}"/>
+      <polygon points="${WALL}" fill="${PA.sand}" filter="url(#${f.relief})"/>
+      <polygon points="0,0 200,0 196,30 4,30" fill="${PA.sandDp}" opacity="0.28" filter="url(#${f.soft})"/>
+      ${holdsPath(`fill="${PA.sandDp}" opacity="0.45" filter="url(#${f.soft})"`, 1.05, 2.2, 3)}
+      <g filter="url(#${f.relief})">${holdsPath(`fill="url(#${hg})"`)}</g>
+      ${holdsPath(`fill="${PA.chalk}" opacity="0.55" filter="url(#${f.dust})"`, 0.55, -0.6, -1.4)}
+      <g fill="${PA.sandDp}" opacity="0.35" filter="url(#${f.soft})" transform="translate(11 8)"><path d="${figurePath()}"/>${headC()}</g>
+      ${fig(`fill="${PA.umber}"`)}
+      ${dustPuffs(f, ROUTE_DUST)}
+      ${motes(30, 5)}`, 'Grit relief route');
+  }
+  function reliefBiner() {
+    const f = pastelFx(), mg = id('rm');
+    return svg(`<defs>${f.defs}<linearGradient id="${mg}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${PA.violetLt}"/><stop offset="0.5" stop-color="${PA.violet}"/><stop offset="1" stop-color="${PA.violetSh}"/></linearGradient></defs>
+      <rect width="200" height="150" fill="${PA.sand}" filter="url(#${f.relief})"/>
+      <ellipse cx="106" cy="128" rx="56" ry="8" fill="${PA.sandDp}" opacity="0.45" filter="url(#${f.soft})"/>
+      <g transform="rotate(-16 100 76)">
+        <path d="${BINER}" fill="none" stroke="url(#${mg})" stroke-width="12"/>
+        <path d="M86 31H112A25 25 0 0 1 137 56" fill="none" stroke="#fff" stroke-opacity="0.6" stroke-width="2.2" stroke-linecap="round"/>
+        <rect x="55" y="62" width="18" height="34" rx="4" fill="${PA.butter}" filter="url(#${f.relief})"/>
+      </g>
+      ${dustPuffs(f, [[72, 50, 20, 11, 0.6], [146, 100, 14, 7, 0.4]])}
+      ${motes(22, 8)}`, 'Grit relief carabiner');
+  }
+
+  // N · Pastel sandstone print — flat printed planes, grit specks, chalk dust
+  function printRoute() {
+    const f = pastelFx();
+    return svg(`<defs>${f.defs}</defs>
+      <rect width="200" height="150" fill="${PA.sandSh}"/>
+      <polygon points="${WALL}" fill="${PA.sand}"/>
+      <polygon points="70,0 200,0 186,150 44,150" fill="${PA.sandLt}"/>
+      <polygon points="0,0 200,0 196,28 4,28" fill="${PA.sandSh}"/>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.speckD})"/>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.speckL})"/>
+      ${holdsPath(`fill="${PA.sandDp}" opacity="0.4"`, 1, 2.6, 3.2)}
+      ${holdsPath(`fill="${PA.tealSh}"`)}
+      ${holdsPath(`fill="${PA.teal}"`, 0.78, -0.9, -1.1)}
+      <g fill="${PA.sandDp}" opacity="0.38" transform="translate(16 9) skewX(-12)"><path d="${figurePath()}"/>${headC()}</g>
+      ${fig(`fill="${PA.umber}"`)}
+      <g fill="none" stroke-linecap="round" opacity="0.9"><path d="M56 128L80 106L62 86L118 72L142 22" stroke="${PA.coralSh}" stroke-width="1.4" stroke-dasharray="3 3"/></g>
+      ${dustPuffs(f, ROUTE_DUST)}
+      ${motes(16, 2)}`, 'Pastel sandstone print route');
+  }
+  function printBiner() {
+    const f = pastelFx();
+    return svg(`<defs>${f.defs}</defs>
+      <rect width="200" height="150" fill="${PA.sand}"/>
+      <circle cx="104" cy="74" r="60" fill="${PA.sandLt}"/>
+      <rect width="200" height="150" fill="#000" filter="url(#${f.speckD})"/>
+      <g transform="rotate(-16 100 76)">
+        <g transform="translate(6 8)"><path d="${BINER}" fill="none" stroke="${PA.sandDp}" stroke-width="12" opacity="0.35"/></g>
+        <path d="${BINER}" fill="none" stroke="${PA.violetSh}" stroke-width="12"/>
+        <path d="${BINER}" fill="none" stroke="${PA.violet}" stroke-width="6" transform="translate(-1.6 -1.6)"/>
+        <rect x="55" y="62" width="18" height="34" rx="4" fill="#e9b75e"/><rect x="55" y="62" width="9" height="34" rx="3" fill="${PA.butter}"/>
+      </g>
+      ${dustPuffs(f, [[78, 46, 18, 9, 0.55]])}`, 'Pastel sandstone print carabiner');
+  }
+
+  const PASTEL = [
+    { k: 'K', name: 'Gritty gouache', route: gouacheRoute, gear: gouacheBiner,
+      look: 'Soft painted planes in the UI’s sandstone and pastel hold colours, painted light instead of outlines, fine dark and light grit specks, chalk dust where hands have been.',
+      notes: 'Closest to a painted illustration; calm and warm, very much the current UI.' },
+    { k: 'L', name: 'Soft pastel on toned paper', route: pastelRoute, gear: pastelBiner,
+      look: 'Chalk-pastel strokes on tan paper, broken up by the paper’s tooth so every edge is gritty; white chalk highlights and dust smudges.',
+      notes: 'The most hand-made and tactile; the medium itself is chalk.' },
+    { k: 'M', name: 'Grit relief', route: reliefRoute, gear: reliefBiner,
+      look: 'The sand-in-paint texture is actually lit, so the wall and holds have real relief; matte pastel holds with chalky grip patches and soft cast shadows.',
+      notes: 'The most realistic and touchable, without the plastic look of a 3D render.' },
+    { k: 'N', name: 'Pastel sandstone print', route: printRoute, gear: printBiner,
+      look: 'Flat printed planes (like the screenprint you liked) in pastel sandstone, two-tone holds, a soft cast shadow, grit specks and chalk dust over everything.',
+      notes: 'Cleanest at small sizes and easiest to keep consistent across all 98 cards.' },
+  ];
+
+  document.getElementById('plates').innerHTML = STYLES.map((s, i) => `
+    ${i === 0 ? '<h2 class="round">Round 1</h2>' : ''}${s.round === 2 && STYLES[i - 1].round !== 2 ? '<h2 class="round">Round 2</h2>' : ''}
+    <section class="style" aria-labelledby="st-${s.k}">
+      <div class="plates">${s.route()}${s.gear()}</div>
+      <div class="notes">
+        <h2 id="st-${s.k}"><span class="letter">${s.k}</span>${s.name}</h2>
+        <dl><dt>Look</dt><dd>${s.look}</dd><dt>References</dt><dd class="refs">${s.refs}</dd><dt>Strengths</dt><dd>${s.pros}</dd><dt>Trade-offs</dt><dd>${s.cons}</dd></dl>
+      </div>
+    </section>`).join('');
+  document.getElementById('plates').insertAdjacentHTML('afterbegin', '<h2 class="round">Round 3 · your blend: chalk on slate × screenprint</h2>' + HYBRID.map(h => {
+    const row = hybridRow(h.mode);
+    return `<section class="style style--hybrid" aria-labelledby="st-${h.k}">
+      <div>
+        <div class="plates">${row.route}${row.biner}</div>
+        <div class="mocks">${row.routeCard}${row.gearCard}</div>
+      </div>
+      <div class="notes"><h2 id="st-${h.k}"><span class="letter">${h.k}</span>${h.name}</h2>
+        <dl><dt>Look</dt><dd>${h.look}</dd><dt>On a card</dt><dd>${h.notes}</dd></dl></div>
+    </section>`;
+  }).join(''));
+  {
+    const reqs = [['strength', 'STR', 52], ['technique', 'TEC', 38], ['focus', 'FOC', 36], ['flexibility', 'FLX', 30]];
+    document.getElementById('plates').insertAdjacentHTML('afterbegin', '<h2 class="round">Round 4 · from the UI: pastel, grit &amp; chalk dust</h2>' + PASTEL.map(p => {
+      const routeCard = cardMock(p.route(), { name: 'Dyno Dilemma', kind: 'Bouldering', frame: 'coral', grade: 'V5', gradeColor: 'teal', reqs,
+        dice: '<ul class="aia-dice"><li class="aia-die-chip is-nerf">+STR</li><li class="aia-die-chip is-nerf">+FOC</li><li class="aia-die-chip is-buff">−FLX</li></ul>',
+        costs: '<span class="aia-cost"><b>4</b>&nbsp;time</span><span class="aia-cost"><b>46</b>&nbsp;end</span><span class="aia-cost aia-cost--xp"><b>78</b><span class="aia-cost__fail">/38</span></span>', foot: 'AIA · BLD 08/26' });
+      const gearCard = cardMock(p.gear(), { name: 'Locking Carabiner', kind: 'Essential Safety Gear', frame: 'cobalt', reqs: [],
+        dice: '<div class="aia-rules"><p class="aia-rules__effect">+5 Max Endurance · Part of the Lead system</p><p class="aia-rules__flavor">A secure system builds confidence.</p></div>',
+        costs: '<span class="aia-cost aia-cost--xp"><b>60</b>&nbsp;XP</span>', foot: 'AIA · GR 02/17' }).replace('<dl class="aia-reqs"></dl>', '');
+      return `<section class="style style--hybrid" aria-labelledby="st-${p.k}">
+        <div><div class="plates">${p.route()}${p.gear()}</div><div class="mocks">${routeCard}${gearCard}</div></div>
+        <div class="notes"><h2 id="st-${p.k}"><span class="letter">${p.k}</span>${p.name}</h2>
+          <dl><dt>Look</dt><dd>${p.look}</dd><dt>On a card</dt><dd>${p.notes}</dd></dl></div>
+      </section>`;
+    }).join(''));
+  }
+})();
+</script>
+</body>
+</html>

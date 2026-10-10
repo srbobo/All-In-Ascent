@@ -1,0 +1,220 @@
+/* ==========================================================================
+   ALL IN ASCENT — GRIT & HOLDS v2 · DESIGN TOKENS
+   ==========================================================================
+   The single source of truth for colour, type, space, shape, depth and
+   motion. Every other stylesheet (surfaces, components, board) and the SVG
+   card-art module read from these custom properties — change a value here
+   and the wall, the holds, the cards and the printed deck all follow.
+
+   Colour model
+   ------------
+   • WALL      — sand-in-paint plywood panels (warm sandstone family).
+   • HOLDS     — the polyurethane hold circuit. Saturated fills used for
+                 decoration (holds, tape, card frames, art).
+   • ON-HOLD   — the text colour that passes WCAG AA (≥ 4.5:1) on each hold
+                 fill. Never put text on a hold fill without its --on-* pair.
+   • HOLD-TEXT — deeper "-text" variants for coloured text on chalk/cream
+                 paper (all ≥ 4.5:1 on --paper).
+   • SEMANTIC  — stat, area, state and feedback roles mapped onto the above.
+   ========================================================================== */
+
+:root {
+  /* ---------- Wall · sand-in-paint plywood -------------------------------- */
+  --wall-base:  #c2a07a;   /* textured panel paint                        */
+  --wall-light: #d8bf95;   /* sun-side of a volume / slab                  */
+  --wall-shade: #8a6440;   /* panel seams, overhang underside              */
+  --wall-deep:  #5a3f28;   /* steep cave, deep shadow                      */
+  --wall-slate: #9c9a94;   /* top-rope tower panels (cool grey ply)        */
+  --wall-umber: #7b5a3c;   /* lead wall — tall, darker stain               */
+  --tnut:       #241408;   /* T-nut bolt holes                             */
+  --pad:        #2f3b45;   /* crash pad vinyl                              */
+  --pad-seam:   #1d262d;
+  --rubber:     #1b1613;   /* shoe-rubber scuffs                           */
+  --wood:       #c48e55;   /* training boards, wooden holds                */
+  --wood-deep:  #8a5a2c;
+
+  /* ---------- Hold circuit · saturated fills ------------------------------ */
+  --lime:      #b6d62d;
+  --marigold:  #ffae28;
+  --coral:     #ff6845;
+  --teal:      #1fb8a6;
+  --cobalt:    #2a62cc;   /* v2: −2% L so chalk text passes 4.85:1        */
+  --raspberry: #c4286c;   /* v2: deepened from #d8347d → chalk 4.66:1      */
+  --violet:    #7a48cc;   /* v2: deepened from #8857d4 → chalk 4.97:1      */
+  --basalt:    #2e2b2f;   /* v2: black holds — project-level circuit      */
+  --chalk:     #f4ede0;
+
+  /* ---------- Card art · "Pastel sandstone print" ------------------------- */
+  /* Flat printed inks used by design/card-art.js. Hold colours print as a
+     lit face (hold + 50% chalk) over a shade body (hold + 24% chalk,
+     dirtied 20% toward --art-sand-deep). */
+  --art-sand:       #dcc6a4;   /* wall plane                                 */
+  --art-sand-light: #eadbc1;   /* sunlit plane                               */
+  --art-sand-shade: #bf9f78;   /* overhang underside, gym beyond the wall    */
+  --art-sand-deep:  #8f7052;   /* cast shadows                               */
+  --art-figure:     #6b5038;   /* the climber — warm umber, never black      */
+  --art-dust:       #fbf8f2;   /* chalk dust                                 */
+  --art-pad:        #97a3ab;   /* crash-pad vinyl                            */
+
+  /* ---------- Text that sits ON a hold fill (all ≥ 4.5:1) ----------------- */
+  --on-lime:      var(--ink);
+  --on-marigold:  var(--ink);
+  --on-coral:     var(--ink);
+  --on-teal:      var(--ink);
+  --on-cobalt:    var(--chalk);
+  --on-raspberry: var(--chalk);
+  --on-violet:    var(--chalk);
+  --on-basalt:    var(--chalk);
+  --on-chalk:     var(--ink);
+  --on-wood:      var(--ink);
+
+  /* ---------- Coloured text on paper (all ≥ 4.5:1 on --paper) ------------ */
+  --lime-text:      #4f6b0a;
+  --marigold-text:  #8a5a00;
+  --coral-text:     #b8341a;
+  --teal-text:      #0d7a6d;
+  --cobalt-text:    #1f4fa8;
+  --raspberry-text: #a51f5c;
+  --violet-text:    #6a3bb5;
+
+  /* ---------- Ink + paper ------------------------------------------------- */
+  --ink:        #2a1d12;   /* primary text            — 15.9:1 on paper   */
+  --ink-soft:   #5a4530;   /* secondary text          —  7.9:1 on paper   */
+  --ink-muted:  #7a6450;   /* tertiary / meta text    —  4.9:1 on paper   */
+  --paper:      #f8f0dc;   /* card stock, panels (was --tape-cream)       */
+  --paper-deep: #efe3c6;   /* inset wells on paper                         */
+  --tape-cream: var(--paper); /* v1 alias */
+  --rule:       rgba(90, 60, 40, 0.28);  /* hairlines on paper            */
+
+  /* ---------- Semantic · stats -------------------------------------------- */
+  --c-strength:     var(--coral);
+  --c-technique:    var(--teal);
+  --c-focus:        var(--violet);
+  --c-flexibility:  var(--lime);
+  --c-endurance:    var(--marigold);
+  --c-time:         var(--cobalt);
+  --c-xp:           var(--cobalt);
+
+  /* ---------- Semantic · climbing areas ----------------------------------- */
+  --area-bouldering:   var(--coral);
+  --area-toprope:      var(--teal);
+  --area-lead:         var(--raspberry);
+  --area-training:     var(--wood);
+  --area-gear:         var(--cobalt);
+  --area-milestone:    var(--marigold);
+  --area-climber:      var(--basalt);
+
+  /* ---------- Semantic · feedback ----------------------------------------- */
+  --ok:        var(--lime);        /* fill  */
+  --ok-text:   var(--lime-text);   /* text  */
+  --bad:       var(--raspberry);
+  --bad-text:  var(--raspberry-text);
+  --warn:      var(--marigold);
+  --warn-text: var(--marigold-text);
+  --focus-ring: #1f4fa8;           /* 6.7:1 on paper, 3:1+ on wall        */
+  --focus-halo: #fffaf0;
+
+  /* ---------- Typography -------------------------------------------------- */
+  --font-display: 'Bricolage Grotesque', 'Hanken Grotesk', system-ui, sans-serif;
+  --font-body:    'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Fluid scale — every step has a rem floor so browser zoom & user font
+     settings always win (WCAG 1.4.4). Nothing in the UI goes below 12px. */
+  --fs-2xs:  0.75rem;                                        /* 12px  meta  */
+  --fs-xs:   clamp(0.78rem, 0.76rem + 0.10vw, 0.84rem);
+  --fs-sm:   clamp(0.86rem, 0.83rem + 0.15vw, 0.94rem);
+  --fs-md:   clamp(0.98rem, 0.94rem + 0.20vw, 1.06rem);      /* body      */
+  --fs-lg:   clamp(1.13rem, 1.03rem + 0.45vw, 1.38rem);
+  --fs-xl:   clamp(1.45rem, 1.20rem + 1.10vw, 2.15rem);
+  --fs-2xl:  clamp(2.00rem, 1.45rem + 2.60vw, 3.60rem);
+  --fs-hero: clamp(3.00rem, 1.40rem + 7.20vw, 8.50rem);
+
+  --lh-tight: 0.95;
+  --lh-snug:  1.2;
+  --lh-body:  1.55;
+  --tracking-meta: 0.16em;   /* mono eyebrows / labels */
+  --tracking-tape: 0.14em;   /* tape strips            */
+
+  /* ---------- Space (4px rhythm, fluid at the large end) ------------------ */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: clamp(1.75rem, 1.4rem + 1.4vw, 2.5rem);
+  --sp-7: clamp(2.5rem, 1.8rem + 3vw, 4.5rem);
+  --gutter: clamp(1rem, 0.6rem + 1.8vw, 2rem);   /* page side padding (≥16px) */
+
+  /* ---------- Shape ------------------------------------------------------- */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+  /* the organic, hand-shaped hold radius (asymmetric, never a circle) */
+  --r-hold: 58% 42% 50% 50% / 50% 55% 45% 50%;
+  --r-btn:  18px 14px 16px 12px / 14px 18px 12px 16px;
+
+  /* ---------- Depth — lit from the upper-left like a gym's skylights ------ */
+  --shadow-hold:
+    inset 3px 6px 12px rgba(255,255,255,0.35),
+    inset -5px -8px 14px rgba(0,0,0,0.35),
+    4px 5px 10px rgba(40,20,10,0.40),
+    8px 12px 24px rgba(40,20,10,0.18);
+  --shadow-press:
+    inset 2px 4px 8px rgba(255,255,255,0.3),
+    inset -3px -5px 10px rgba(0,0,0,0.3),
+    3px 4px 8px rgba(40,20,10,0.35),
+    6px 9px 18px rgba(40,20,10,0.15);
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 2px 3px rgba(40,20,10,0.22),
+    0 10px 22px -8px rgba(40,20,10,0.35);
+  --shadow-lift:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 6px 10px rgba(40,20,10,0.22),
+    0 22px 38px -12px rgba(40,20,10,0.45);
+  --shadow-panel:
+    0 12px 32px rgba(40,20,10,0.30),
+    0 24px 48px rgba(40,20,10,0.14),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+
+  /* ---------- Motion ------------------------------------------------------ */
+  --ease-grip: cubic-bezier(0.16, 1, 0.3, 1);     /* catch & settle         */
+  --ease-dyno: cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoot on a dyno    */
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 420ms;
+
+  /* ---------- Cards (poker size 63.5 × 88.9 mm → 5 : 7) ------------------ */
+  --card-ratio: 5 / 7;
+  --card-min: 11.5rem;    /* board card min width; user-adjustable         */
+  --card-print-w: 2.5in;
+  --card-print-h: 3.5in;
+
+  /* ---------- Textures (data-URI SVG noise, reused everywhere) ------------ */
+  --tex-grit: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.1  0 0 0 0 0.05  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  --tex-paper: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.25 0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+  --tex-poly: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='3.5' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+  --tex-tape: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.25 0'/></filter><rect width='100%25' height='100%25' filter='url(%23t)'/></svg>");
+  --tex-night: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 0.95  0 0 0 0 0.85  0 0 0 0.07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+
+  /* grit specks printed over every illustration (dark + light grains) */
+  --tex-speck: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='2.1' numOctaves='1' seed='3'/><feColorMatrix values='0 0 0 0 0.33  0 0 0 0 0.24  0 0 0 0 0.16  0 0 0 9 -6.1'/></filter><rect width='100%25' height='100%25' filter='url(%23s)'/></svg>");
+  --tex-speck-light: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='1.9' numOctaves='1' seed='17'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 0.98  0 0 0 0 0.95  0 0 0 9 -6.2'/></filter><rect width='100%25' height='100%25' filter='url(%23s)'/></svg>");
+
+  color-scheme: light;
+}
+
+/* Users who ask for more contrast get crisper ink, solid rules, no grit. */
+@media (prefers-contrast: more) {
+  :root {
+    --ink-soft:  #3d2a18;
+    --ink-muted: #4a3622;
+    --rule:      rgba(42, 29, 18, 0.7);
+    --tex-grit:  none;
+    --tex-paper: none;
+    --tex-speck: none;
+    --tex-speck-light: none;
+  }
+}

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All In Ascent · The Deck</title>
+<meta name="description" content="Every card in All In Ascent — climbers, routes, training stations and gear — as the digital edition of the printed deck.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="design/tokens.css">
+<link rel="stylesheet" href="design/surfaces.css">
+<link rel="stylesheet" href="design/components.css">
+<style>
+  body { background: var(--wall-base); }
+  .deck-hero { padding: var(--sp-7) var(--gutter) var(--sp-6); }
+  .deck-hero h1 { font-size: var(--fs-2xl); font-weight: 800; line-height: var(--lh-tight); letter-spacing: -0.03em; margin: var(--sp-3) 0; }
+  .deck-hero h1 em { color: var(--marigold); font-weight: 500; }
+  .deck-hero p { max-width: 60ch; color: rgba(244,237,224,0.85); }
+  .deck-hero .eyebrow { color: rgba(244,237,224,0.75); }
+  .deck-hero .eyebrow::before { color: var(--marigold); }
+  .deck-hero nav { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-5); }
+  .deck-hero nav a { color: var(--chalk); }
+
+  .deck-toolbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-5);
+    padding: var(--sp-3) var(--gutter);
+    background: var(--paper);
+    box-shadow: 0 2px 10px rgba(40,20,10,0.25);
+  }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; border: 0; }
+  .seg legend { margin-right: var(--sp-2); }
+  .seg label { position: relative; }
+  .seg input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+  .seg span {
+    display: inline-flex; align-items: center; min-height: 40px; padding: 0 0.9em;
+    border: 2px solid var(--ink); border-radius: var(--r-pill);
+    font-family: var(--font-display); font-weight: 700; font-size: var(--fs-sm);
+    background: var(--paper);
+  }
+  .seg input:checked + span { background: var(--ink); color: var(--chalk); }
+  .seg input:focus-visible + span { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
+  .size-ctl { display: flex; align-items: center; gap: var(--sp-2); font-weight: 600; font-size: var(--fs-sm); }
+  .size-ctl input { accent-color: var(--ink); width: 9rem; }
+
+  main { padding: var(--sp-6) var(--gutter) var(--sp-7); }
+  .deck-section { margin-bottom: var(--sp-7); }
+  .deck-section > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+  .deck-section h2 { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.02em; }
+  .deck-section .count { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.12em; color: var(--ink-soft); }
+  .deck-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--deck-card, 15rem), 100%), 1fr));
+    gap: var(--sp-5) var(--sp-4);
+    align-items: start;
+  }
+  [hidden] { display: none !important; }
+
+  /* ---------- Print sheet: true poker size, 3 × 3 per Letter page ---------- */
+  @page { size: letter; margin: 0.5in 0.5in; }
+  @media print {
+    body { background: #fff !important; }
+    body::before, .deck-hero, .deck-toolbar, .skip-link { display: none !important; }
+    main { padding: 0; }
+    .deck-section > header { display: none; }
+    .deck-section { margin: 0; }
+    .deck-grid {
+      grid-template-columns: repeat(3, var(--card-print-w));
+      gap: 0.125in;
+      justify-content: center;
+    }
+    .aia-card { width: var(--card-print-w); height: var(--card-print-h); break-inside: avoid; aspect-ratio: auto; }
+    .aia-card__face { box-shadow: none; }
+    .aia-card__action-label, .aia-card__reason { display: none; }
+    .deck-grid > .aia-card:nth-child(9n) { break-after: page; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#deck">Skip to the cards</a>
+<header class="deck-hero wall wall--night">
+  <p class="eyebrow">All In Ascent · Digital edition of the printed deck</p>
+  <h1>The <em>whole deck.</em></h1>
+  <p>Every climber, route, training station and piece of gear as a poker-size card (63.5 × 88.9 mm). Illustrations are generated from the game data — wall angle, hold types, moves, rope system and grade circuit — so the art always matches the rules.</p>
+  <nav aria-label="Related pages">
+    <a class="btn btn--marigold btn--sm" href="index.html">Play the game</a>
+    <a class="btn btn--ghost btn--sm" href="docs/grit-and-holds-designSystem.html">Design system</a>
+    <button class="btn btn--ghost btn--sm" type="button" onclick="window.print()">Print sheet</button>
+  </nav>
+</header>
+
+<div class="deck-toolbar" role="region" aria-label="Deck filters">
+  <fieldset class="seg" id="filter">
+    <legend class="eyebrow">Show</legend>
+    <label><input type="radio" name="f" value="all" checked><span>All</span></label>
+    <label><input type="radio" name="f" value="climbers"><span>Climbers</span></label>
+    <label><input type="radio" name="f" value="bouldering"><span>Bouldering</span></label>
+    <label><input type="radio" name="f" value="topRope"><span>Top Rope</span></label>
+    <label><input type="radio" name="f" value="leadClimbing"><span>Lead</span></label>
+    <label><input type="radio" name="f" value="training"><span>Training</span></label>
+    <label><input type="radio" name="f" value="gear"><span>Gear</span></label>
+  </fieldset>
+  <label class="size-ctl">Card size <input type="range" id="size" min="12" max="24" step="1" value="15" aria-valuetext="15 rem"></label>
+</div>
+
+<main id="deck" tabindex="-1">
+  <section class="deck-section" data-group="climbers" aria-labelledby="h-climbers"><header><h2 id="h-climbers">Climbers</h2><span class="count"></span></header><div class="deck-grid"></div></section>
+  <section class="deck-section" data-group="bouldering" aria-labelledby="h-bouldering"><header><h2 id="h-bouldering">Bouldering</h2><span class="count"></span></header><div class="deck-grid"></div></section>
+  <section class="deck-section" data-group="topRope" aria-labelledby="h-topRope"><header><h2 id="h-topRope">Top Rope</h2><span class="count"></span></header><div class="deck-grid"></div></section>
+  <section class="deck-section" data-group="leadClimbing" aria-labelledby="h-leadClimbing"><header><h2 id="h-leadClimbing">Lead Climbing</h2><span class="count"></span></header><div class="deck-grid"></div></section>
+  <section class="deck-section" data-group="training" aria-labelledby="h-training"><header><h2 id="h-training">Training Stations</h2><span class="count"></span></header><div class="deck-grid"></div></section>
+  <section class="deck-section" data-group="gear" aria-labelledby="h-gear"><header><h2 id="h-gear">Gear</h2><span class="count"></span></header><div class="deck-grid"></div></section>
+</main>
+
+<script src="game.js"></script>
+<script src="design/icons.js"></script>
+<script src="design/card-art.js"></script>
+<script src="design/cards.js"></script>
+<script>
+  AIAArt.mount();
+  const groups = {
+    climbers: () => Object.entries(CHARACTERS).map(([k, c]) => AIACards.climber(k, c)),
+    bouldering: () => ROUTES.bouldering.map(r => AIACards.route(r, { area: 'bouldering' })),
+    topRope: () => ROUTES.topRope.map(r => AIACards.route(r, { area: 'topRope' })),
+    leadClimbing: () => ROUTES.leadClimbing.map(r => AIACards.route(r, { area: 'leadClimbing' })),
+    training: () => TRAINING_AREAS.map(a => AIACards.training(a)),
+    gear: () => GEAR_SHOP.map(g => AIACards.gear(g)),
+  };
+  for (const [g, build] of Object.entries(groups)) {
+    const sec = document.querySelector(`[data-group="${g}"]`);
+    const cards = build();
+    sec.querySelector('.deck-grid').append(...cards);
+    sec.querySelector('.count').textContent = `${cards.length} cards`;
+  }
+  document.getElementById('filter').addEventListener('change', (e) => {
+    const v = e.target.value;
+    document.querySelectorAll('.deck-section').forEach(s => { s.hidden = v !== 'all' && s.dataset.group !== v; });
+  });
+  const size = document.getElementById('size');
+  size.addEventListener('input', () => {
+    document.documentElement.style.setProperty('--deck-card', size.value + 'rem');
+    size.setAttribute('aria-valuetext', size.value + ' rem');
+  });
+</script>
+</body>
+</html>

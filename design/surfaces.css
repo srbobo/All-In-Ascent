@@ -1,0 +1,234 @@
+/* ==========================================================================
+   GRIT & HOLDS v2 · SURFACES
+   ==========================================================================
+   The physical materials of an indoor gym, as reusable classes:
+
+     .wall            sand-in-paint plywood with a T-nut grid, panel seams,
+                      chalk haze and shoe-rubber scuffs
+     .wall--slate     cool grey top-rope tower panels
+     .wall--umber     the tall, darker lead wall
+     .wall--night     ink slab (headers, the motion/ink surfaces)
+     .paper           chalky card stock for panels and cards
+     .tape            route-setter's tape strip (colour modifiers below)
+     .hold            a bolted polyurethane hold (shape + colour modifiers)
+     .chalk-smudge    decorative chalk haze to drop near a hold
+   Every surface keeps its children above its texture layers, so content
+   never needs its own z-index.
+   ========================================================================== */
+
+/* ---------- WALL ---------------------------------------------------------- */
+.wall {
+  --wall: var(--wall-base);
+  --tnut-gap: 72px;          /* ~8in T-nut spacing at board scale          */
+  --panel: calc(var(--tnut-gap) * 4); /* 4×4 T-nuts per plywood panel       */
+  position: relative;
+  isolation: isolate;
+  background-color: var(--wall);
+  background-image:
+    /* T-nut grid, offset every other row like a real 8" pattern */
+    radial-gradient(circle at 50% 50%, rgba(36,20,8,0.5) 1.2px, rgba(36,20,8,0.18) 2.4px, transparent 3.2px),
+    radial-gradient(circle at 50% 50%, rgba(36,20,8,0.5) 1.2px, rgba(36,20,8,0.18) 2.4px, transparent 3.2px),
+    /* plywood panel seams */
+    linear-gradient(90deg, rgba(60,35,15,0.28) 1px, transparent 1px),
+    linear-gradient(0deg,  rgba(60,35,15,0.28) 1px, transparent 1px),
+    /* skylight wash from upper-left */
+    radial-gradient(ellipse 80% 60% at 18% 8%, rgba(255,226,180,0.24), transparent 60%),
+    /* deep corner shadow */
+    radial-gradient(ellipse 70% 70% at 92% 96%, rgba(60,35,15,0.28), transparent 70%),
+    /* mottled paint */
+    radial-gradient(ellipse 40% 30% at 35% 60%, rgba(180,140,90,0.22), transparent 70%);
+  background-size:
+    var(--tnut-gap) var(--tnut-gap),
+    var(--tnut-gap) var(--tnut-gap),
+    var(--panel) var(--panel),
+    var(--panel) var(--panel),
+    auto, auto, auto;
+  background-position:
+    0 0,
+    calc(var(--tnut-gap) / 2) calc(var(--tnut-gap) / 2),
+    -1px 0, 0 -1px,
+    0 0, 0 0, 0 0;
+}
+/* sand-in-paint grit */
+.wall::before {
+  content: "";
+  position: absolute; inset: 0;
+  z-index: -1;
+  background-image: var(--tex-grit);
+  mix-blend-mode: multiply;
+  opacity: 0.65;
+  pointer-events: none;
+}
+/* chalk haze + rubber scuffs near the base (where climbers start) */
+.wall::after {
+  content: "";
+  position: absolute; inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 14% 8% at 22% 88%, rgba(27,22,19,0.16), transparent 70%),
+    radial-gradient(ellipse 9% 5% at 64% 93%, rgba(27,22,19,0.14), transparent 70%),
+    radial-gradient(ellipse 22% 12% at 72% 30%, rgba(244,237,224,0.16), transparent 70%),
+    radial-gradient(ellipse at center, transparent 55%, rgba(20,10,5,0.16) 100%);
+}
+.wall--slate { --wall: var(--wall-slate); }
+.wall--umber { --wall: var(--wall-umber); }
+.wall--night {
+  --wall: var(--ink);
+  color: var(--chalk);
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(244,237,224,0.10) 1.2px, transparent 3px),
+    radial-gradient(circle at 50% 50%, rgba(244,237,224,0.10) 1.2px, transparent 3px);
+  background-size: var(--tnut-gap) var(--tnut-gap), var(--tnut-gap) var(--tnut-gap);
+  background-position: 0 0, calc(var(--tnut-gap) / 2) calc(var(--tnut-gap) / 2);
+}
+.wall--night::before { background-image: var(--tex-night); mix-blend-mode: normal; opacity: 1; }
+.wall--night::after { display: none; }
+
+/* ---------- PAPER (card stock) -------------------------------------------- */
+.paper {
+  position: relative;
+  isolation: isolate;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-panel);
+}
+.paper::before {
+  content: "";
+  position: absolute; inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-image: var(--tex-paper);
+  mix-blend-mode: multiply;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ---------- TAPE (route-setter's tape) ------------------------------------ */
+.tape {
+  --t: var(--coral);
+  --t-on: var(--on-coral);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.85em 0.32em;
+  background: var(--t);
+  color: var(--t-on);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--fs-2xs);
+  line-height: 1.2;
+  letter-spacing: var(--tracking-tape);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: rotate(var(--tilt, -1.5deg));
+  /* torn ends */
+  clip-path: polygon(0 8%, 3% 0, 97% 4%, 100% 0, 99% 50%, 100% 96%, 96% 100%, 4% 94%, 0 100%, 1% 50%);
+  box-shadow: 0 1px 4px rgba(40,20,10,0.25), inset 0 1px 0 rgba(255,255,255,0.3);
+  position: relative;
+  isolation: isolate;
+}
+.tape::before {
+  content: "";
+  position: absolute; inset: 0;
+  z-index: -1;
+  background-image: var(--tex-tape);
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.tape--straight { --tilt: 0deg; }
+.tape--lime      { --t: var(--lime);      --t-on: var(--on-lime); }
+.tape--marigold  { --t: var(--marigold);  --t-on: var(--on-marigold); }
+.tape--coral     { --t: var(--coral);     --t-on: var(--on-coral); }
+.tape--teal      { --t: var(--teal);      --t-on: var(--on-teal); }
+.tape--cobalt    { --t: var(--cobalt);    --t-on: var(--on-cobalt); }
+.tape--raspberry { --t: var(--raspberry); --t-on: var(--on-raspberry); }
+.tape--violet    { --t: var(--violet);    --t-on: var(--on-violet); }
+.tape--basalt    { --t: var(--basalt);    --t-on: var(--on-basalt); }
+.tape--chalk     { --t: var(--chalk);     --t-on: var(--on-chalk); }
+.tape--wood      { --t: var(--wood);      --t-on: var(--on-wood); }
+
+/* ---------- HOLD ---------------------------------------------------------- */
+.hold {
+  --c: var(--coral);
+  --c-light: color-mix(in srgb, var(--c) 70%, #ffffff);
+  --c-deep:  color-mix(in srgb, var(--c) 55%, #1a0a05);
+  --size: 80px;
+  width: var(--size);
+  height: var(--size);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: var(--r-hold);
+  background: radial-gradient(ellipse at 30% 28%, var(--c-light) 0%, var(--c) 45%, var(--c-deep) 100%);
+  box-shadow: var(--shadow-hold);
+  transition: transform var(--dur-2) var(--ease-grip), box-shadow var(--dur-2);
+}
+.hold::before {       /* polyurethane grit */
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background-image: var(--tex-poly);
+  mix-blend-mode: overlay;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.hold:not(.hold--label)::after {        /* bolt hole */
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: max(6px, calc(var(--size) * 0.11));
+  aspect-ratio: 1;
+  background: radial-gradient(circle at 30% 30%, #2a1808, #0a0402 70%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.8), 0 0 0 2px color-mix(in srgb, var(--c-deep) 80%, black);
+  pointer-events: none;
+}
+/* a hold that carries a label (grade badge, level badge) — no bolt hole */
+.hold--label {
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--c-on, var(--ink));
+  text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+}
+
+.hold--lime      { --c: var(--lime);      --c-on: var(--on-lime); }
+.hold--marigold  { --c: var(--marigold);  --c-on: var(--on-marigold); }
+.hold--coral     { --c: var(--coral);     --c-on: var(--on-coral); }
+.hold--teal      { --c: var(--teal);      --c-on: var(--on-teal); }
+.hold--cobalt    { --c: var(--cobalt);    --c-on: var(--on-cobalt); }
+.hold--raspberry { --c: var(--raspberry); --c-on: var(--on-raspberry); }
+.hold--violet    { --c: var(--violet);    --c-on: var(--on-violet); }
+.hold--basalt    { --c: var(--basalt);    --c-on: var(--on-basalt); }
+.hold--chalk     { --c: var(--chalk);     --c-on: var(--on-chalk); }
+.hold--wood      { --c: var(--wood);      --c-on: var(--on-wood); }
+.hold--cobalt.hold--label, .hold--raspberry.hold--label,
+.hold--violet.hold--label, .hold--basalt.hold--label { text-shadow: 0 1px 2px rgba(0,0,0,0.45); }
+
+/* hold shapes — named for what they are on a real wall */
+.hold--jug    { border-radius: 55% 45% 50% 50% / 60% 60% 40% 40%; }
+.hold--crimp  { border-radius: 60% 60% 30% 30% / 70% 70% 25% 25%; height: calc(var(--size) * 0.55); }
+.hold--sloper { border-radius: 50% 50% 35% 35% / 75% 75% 30% 30%; height: calc(var(--size) * 0.7); }
+.hold--pinch  { border-radius: 50% 50% 40% 40% / 80% 80% 30% 30%; width: calc(var(--size) * 0.6); }
+.hold--pocket { border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%; }
+.hold--chip   { border-radius: 50%; --size: 28px; }
+
+/* ---------- CHALK SMUDGE -------------------------------------------------- */
+.chalk-smudge {
+  position: absolute;
+  width: var(--w, 90px); height: var(--h, 50px);
+  background: radial-gradient(ellipse, rgba(250,246,238,0.55), rgba(250,246,238,0) 70%);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+/* ---------- Forced colours / reduced texture ------------------------------ */
+@media (forced-colors: active) {
+  .wall::before, .wall::after, .paper::before, .hold::before, .tape::before { display: none; }
+  .hold, .tape { forced-color-adjust: none; border: 2px solid CanvasText; }
+}
