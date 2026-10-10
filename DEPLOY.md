@@ -7,7 +7,8 @@ optional bots) can play in real time. The stack is intentionally tiny:
   Cloudflare Workers + Durable Objects. Free tier covers ~100k requests/day,
   plenty for friend games.
 - **Frontend**: static HTML/JS — `online.html` (join form) hands off to
-  `index.html?online=1`, which loads `online-mode.js` + `game.js`. Can be
+  `index.html?online=1`, which loads `online-mode.js` + `game.js` + the
+  engine bundle `engine/engine.browser.js` (the same rules the server runs). Can be
   served by PartyKit itself (free), Netlify, GitHub Pages, or Cloudflare Pages.
 - **Logs**: when a game ends, the full JSONL event log is POSTed to a webhook
   you control (defaults to nothing → falls back to DO storage).

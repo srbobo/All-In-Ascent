@@ -126,13 +126,63 @@ The game continues until players decide to stop. Success is measured by:
 For playability in digital format:
 - Gear shop shows 3 items at a time (instead of full deck)
 - Special abilities are semi-automated (player must apply effects)
-- Some advanced gear effects are simplified
 
 ## Files
 
-- `index.html` - Main game file with UI structure and styling
-- `game.js` - Complete game engine and logic
-- `README.md` - This file
+- `index.html` - Main game page: UI structure and styling
+- `game.js` - Game data (source of truth for characters, routes, gear) and the browser UI
+- `engine/` - The rules engine: `state.js` (setup), `engine.js` (legal actions, applying actions), `helpers.js` (formulas)
+- `engine/engine.browser.js` - The engine bundled for the browser (generated; do not edit)
+- `online-mode.js`, `online.html`, `party/` - Online play: browser client and PartyKit server
+- `sim/`, `analysis/` - Bot playtests and balance reports
+- `tests/e2e/` - Browser end-to-end tests
+
+## Development
+
+### One rules engine for every mode
+
+Local hot-seat play, online play and the bots all run the same engine in
+`engine/`. `game.js` contains no game rules: it renders the engine's state,
+turns clicks into engine actions (`AscentEngine.getLegalActions` /
+`applyAction` locally, the PartyKit server online) and shows the events the
+engine emits. To change a rule, change `engine/`; to change game data, change
+the GAME DATA section of `game.js`. Then run:
+
+```bash
+npm run data:build
+```
+
+That regenerates `engine/data.js` (data for Node) and
+`engine/engine.browser.js` (the engine for the browser, which also works when
+`index.html` is opened from disk). Commit both.
+
+### Tests
+
+```bash
+npm test
+```
+
+runs everything: the linter, a check that generated files are up to date,
+the engine unit tests (including a check that the browser bundle plays
+identically to the engine), the PartyKit server smoke test, and the browser
+end-to-end tests. The end-to-end tests play local games through the real UI
+and require each one to replay identically through the engine; they also play
+an online game against the real PartyKit room code. Individually:
+
+```bash
+npm run lint
+```
+
+```bash
+npm run test:engine
+```
+
+```bash
+npm run test:e2e
+```
+
+The end-to-end tests use your installed Google Chrome. Without Chrome, run
+`npx playwright install chromium` once and set `PW_CHANNEL=` (empty).
 
 ## Browser Compatibility
 

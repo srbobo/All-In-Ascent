@@ -12,13 +12,14 @@
 //   - On 'welcome' captures host status + character list.
 //   - On 'lobby' renders the room lobby (seats, character pick, host
 //     controls).
-//   - On 'state' (phase = in_progress | completed) adapts the server state
-//     into the shape game.js's renderGameBoard() expects, sets it as
-//     window.gameState, and calls renderGameBoard().
-//   - User clicks (Climb, Train, Rest, Milestone, Buy Gear) — the original
-//     action functions in game.js short-circuit to OnlineMode.sendAction,
-//     which finds the matching entry in `legalActions` and sends its index
-//     to the server.
+//   - On 'state' (phase = in_progress | completed) hands the server's engine
+//     state to game.js (window.setGameState) and calls renderGameBoard().
+//     Local play renders the same engine state shape, so no adapting is needed.
+//   - User clicks (Climb, Train, Rest, Milestone, Buy Gear) — game.js's
+//     dispatchAction hands them to OnlineMode.sendAction, which finds the
+//     matching entry in `legalActions` with the engine's own matcher
+//     (AscentEngine.findLegalAction, the one local play uses) and sends its
+//     index to the server.
 //   - Server processes, broadcasts new state, the cycle repeats.
 
 (function () {
@@ -299,13 +300,12 @@
     if (board) board.style.display = 'block';
     document.body.classList.add('playing');
 
-    // Adapt server state → local-renderer shape, then push it into game.js
-    // via the exposed setter (gameState is declared with `let` inside game.js
-    // and is NOT a window property, so direct `window.gameState = ...` would
-    // silently no-op for the renderer).
-    const adapted = adaptState(serverState);
+    // Push the server's engine state into game.js via the exposed setter
+    // (gameState is declared with `let` inside game.js and is NOT a window
+    // property, so direct `window.gameState = ...` would silently no-op for
+    // the renderer).
     if (typeof window.setGameState === 'function') {
-      window.setGameState(adapted);
+      window.setGameState(serverState);
     } else {
       console.error('window.setGameState not available — game.js may not have loaded yet');
       return;
@@ -326,21 +326,6 @@
     }
   }
 
-  function adaptState(s) {
-    // Convert attemptedRoutes from { num: { key: true } } to { num: Set }
-    const attemptedRoutes = {};
-    for (const num of Object.keys(s.attemptedRoutes || {})) {
-      attemptedRoutes[num] = new Set(Object.keys(s.attemptedRoutes[num] || {}));
-    }
-    // Everything else passes through. Add winner/end flags the local renderer
-    // expects.
-    return {
-      ...s,
-      attemptedRoutes,
-      // pendingLevelUp is engine-driven; not a thing the local renderer touches.
-    };
-  }
-
   // -------------------------------------------------------------------------
   // Action dispatcher — called from game.js action functions in online mode.
   // -------------------------------------------------------------------------
@@ -354,22 +339,14 @@
     // menu only lists one suggested shift per route, but the player may pick
     // any valid one, so we match the plain climb and send the shift
     // separately for the server to validate.
-    const { shift, ...base } = match;
-    const idx = OnlineMode.legalActions.findIndex(a => {
-      if (a.type !== base.type || a.shift) return false;
-      // Every additional field on `base` must equal the same field on `a`.
-      for (const [k, v] of Object.entries(base)) {
-        if (k === 'type') continue;
-        if (a[k] !== v) return false;
-      }
-      return true;
-    });
-    if (idx < 0) {
-      const detail = JSON.stringify(match);
-      toast(`Action not currently legal: ${detail}`, 4000);
+    const legal = window.AscentEngine.findLegalAction(OnlineMode.legalActions, match);
+    if (!legal) {
+      const why = OnlineMode.serverState && window.AscentEngine.explainIllegalAction(OnlineMode.serverState, match);
+      toast(why || `Action not currently legal: ${JSON.stringify(match)}`, 4000);
       return;
     }
-    send(shift ? { type: 'action', actionIndex: idx, shift } : { type: 'action', actionIndex: idx });
+    const idx = OnlineMode.legalActions.indexOf(legal);
+    send(match.shift ? { type: 'action', actionIndex: idx, shift: match.shift } : { type: 'action', actionIndex: idx });
   }
   OnlineMode.sendAction = sendAction;
 

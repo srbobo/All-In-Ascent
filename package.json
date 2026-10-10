@@ -5,14 +5,16 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "lint": "eslint .",
-    "data:build": "node engine/build-data.js && node engine/build-browser-helpers.js",
-    "data:check": "node engine/build-data.js --check && node engine/build-browser-helpers.js --check",
+    "test": "npm run lint && npm run data:check && npm run test:engine && npm run test:bots && npm run test:party && npm run test:e2e",
+    "lint": "eslint . --max-warnings 0",
+    "data:build": "node engine/build-data.js && node engine/build-browser.js",
+    "data:check": "node engine/build-data.js --check && node engine/build-browser.js --check",
     "test:bots": "node sim/test-planner.js",
     "balance": "node sim/run-balance.js",
     "tune:planner": "node sim/tune-planner.js",
     "test:party": "BOT_MOVE_DELAY_MS=0 node party/_smoke.js",
-    "test:engine": "node engine/build-data.js && node engine/build-browser-helpers.js && node engine/test-data.js && node engine/test-state.js && node engine/test-helpers.js && node engine/test-engine.js && node engine/test-rules-v07.js && node engine/test-rules-v08.js && node engine/test-observe.js && node engine/test-browser-helpers.js",
+    "test:e2e": "playwright test",
+    "test:engine": "node engine/build-data.js && node engine/build-browser.js && node engine/test-data.js && node engine/test-state.js && node engine/test-helpers.js && node engine/test-engine.js && node engine/test-rules-v07.js && node engine/test-rules-v08.js && node engine/test-observe.js && node engine/test-ui-support.js && node engine/test-browser-engine.js",
     "playtest": "npm run test:engine && node sim/run-matrix.js --config=sim/config.json && node analysis/build-report.js --open",
     "playtest:smoke": "npm run test:engine && node sim/run-matrix.js --config=sim/config.smoke.json && node analysis/build-report.js",
     "playtest:dry": "node sim/run-matrix.js --config=sim/config.json --dry-run",
@@ -25,6 +27,7 @@
     "online:deploy": "partykit deploy"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "eslint": "^10.6.0",
     "partykit": "^0.0.115",
     "partysocket": "^1.0.2"

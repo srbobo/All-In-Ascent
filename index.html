@@ -195,7 +195,9 @@
 <script src="design/a11y.js"></script>
 <script src="online-mode.js"></script>
 <script src="effects.js"></script>
-<script src="engine/helpers.browser.js"></script>
 <script src="game.js"></script>
+<!-- The rules engine (generated from engine/*.js by engine/build-browser.js).
+     Loaded after game.js: it reads game.js's GAME DATA globals. -->
+<script src="engine/engine.browser.js"></script>
 </body>
 </html>

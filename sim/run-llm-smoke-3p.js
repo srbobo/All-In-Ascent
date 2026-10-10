@@ -142,8 +142,6 @@ for (let i = 0; i < SEEDS.length; i++) {
 // --- Aggregate ---
 
 const totalMin = ((Date.now() - startAll) / 60000).toFixed(1);
-const heurWins = summaries.filter(s => s.winnerAgent === 'heuristic').length;
-const llmWins = summaries.filter(s => s.winnerAgent?.startsWith('ollama')).length;
 const noWinner = summaries.filter(s => s.winner == null).length;
 const totalFbs = summaries.reduce((a, s) => a + (s.fallbackCount || 0), 0);
 
@@ -151,8 +149,6 @@ const totalFbs = summaries.reduce((a, s) => a + (s.fallbackCount || 0), 0);
 const seat1Ms = summaries.reduce((a, s) => a + (s.finalPlayers[0]?.milestonesDone || 0), 0);
 const seat2Ms = summaries.reduce((a, s) => a + (s.finalPlayers[1]?.milestonesDone || 0), 0);
 const seat3Ms = summaries.reduce((a, s) => a + (s.finalPlayers[2]?.milestonesDone || 0), 0);
-const llmMsTotal = seat2Ms + seat3Ms;
-const llmMaxPossible = summaries.length * 6; // 3 milestones × 2 LLM seats
 
 // Per-seat win counts
 const seat1Wins = summaries.filter(s => s.winner === 1).length;

@@ -31,6 +31,9 @@ const browserGlobals = {
   // Cross-file globals: the three classic scripts share one global scope at
   // runtime (index.html loads online-mode.js, effects.js, then game.js).
   renderGameBoard: 'readonly', // defined in game.js, called by online-mode.js
+  // The rules engine, loaded after game.js as engine/engine.browser.js.
+  AscentEngine: 'readonly',
+  structuredClone: 'readonly',
   // Grit & Holds design system (design/*.js), loaded before game.js.
   AIAArt: 'readonly',
   AIACards: 'readonly',
@@ -51,6 +54,7 @@ const nodeGlobals = {
   fetch: 'readonly',
   URL: 'readonly',
   URLSearchParams: 'readonly',
+  Response: 'readonly', // PartyKit onRequest (Workers + Node 18+ global)
   AbortController: 'readonly',
   structuredClone: 'readonly',
   TextEncoder: 'readonly',
@@ -81,9 +85,11 @@ export default [
       'docs/**',
       'online/vendor/**', // vendored third-party library
       'engine/data.js',   // auto-generated from game.js
-      'engine/helpers.browser.js', // auto-generated from engine/helpers.js
+      'engine/engine.browser.js', // auto-generated from engine/*.js
       '.partykit/**',
       '.claude/**',
+      'test-results/**', // Playwright output
+      'playwright-report/**',
     ],
   },
   {
@@ -94,15 +100,39 @@ export default [
       sourceType: 'script',
       globals: browserGlobals,
     },
-    rules,
+    rules: {
+      ...rules,
+      // game.js's GAME DATA consts are read by engine/engine.browser.js (and
+      // lifted into engine/data.js), not only by game.js itself.
+      'no-unused-vars': ['warn', {
+        args: 'none', caughtErrors: 'none',
+        varsIgnorePattern: '^(CHARACTERS|XP_TABLE|TRAINING_AREAS|ROUTES|GEAR_SHOP)$',
+      }],
+    },
   },
   {
-    // Node ES modules: engine, sim, analysis, PartyKit server.
-    files: ['engine/**/*.js', 'sim/**/*.js', 'analysis/**/*.js', 'party/**/*.js'],
+    // Node ES modules: engine, sim, analysis, PartyKit server, tooling.
+    files: ['engine/**/*.js', 'sim/**/*.js', 'analysis/**/*.js', 'party/**/*.js', 'playwright.config.js', 'eslint.config.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
       globals: nodeGlobals,
+    },
+    rules,
+  },
+  {
+    // End-to-end tests: Node modules whose page.evaluate() callbacks run in
+    // the browser, against index.html's globals.
+    files: ['tests/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      globals: {
+        ...nodeGlobals,
+        ...browserGlobals,
+        getGameState: 'readonly',
+        setGameState: 'readonly',
+      },
     },
     rules,
   },

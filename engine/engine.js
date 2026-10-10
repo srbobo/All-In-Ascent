@@ -38,16 +38,17 @@ import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';
 import { ACCESS_CARDS, drawTopRopeStations, regularRoutePool } from './state.js';
 import {
-  checkAreaAccess, canEnterSection,
+  checkAreaAccess, canEnterSection, getPlayersInSection,
   canClimbTopRopeRoute, pickFreeBelayerStation,
   getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost,
   getGearPurchaseTimeCost, getEffectiveGearCost,
   getSpendableXp, buildEffectRollArray, resolveClimbDice, computeClimbStats,
   applyDiceToRequirements, resolveClimbOutcome, computeClimbXp,
-  getFailureEnduranceExtra, getSuccessEnduranceHeal,
-  freeSoloCanAttempt, trainingSpec, trainingAllowed,
+  getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal,
+  describeClimbGearEffects,
+  freeSoloCanAttempt, trainingSpec, trainingAllowed, trainingCap,
   computeRestRecovery, applyLevelUpIfNeeded,
-  bestRouteReaderShift, canUseStatShift, isWellFormedStatShift,
+  bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, MAX_STAT_SHIFT,
 } from './helpers.js';
 
 // =============================================================================
@@ -162,6 +163,182 @@ export function getLegalActions(state) {
   }
 
   return actions;
+}
+
+// =============================================================================
+// findLegalAction / explainIllegalAction — for UIs
+// =============================================================================
+
+// The entry of `legalActions` that `wanted` asks for, or null. `wanted` is a
+// partial action ({ type: 'climb', area, routeName }, { type: 'buyGear',
+// gearName }, ...): every field it names must match. A Route Reader `shift`
+// is not part of the match — callers attach the player's chosen shift to the
+// plain climb, and applyAction validates it. Shared by local play and the
+// online client so both resolve a click to the same action.
+export function findLegalAction(legalActions, wanted) {
+  const fields = { ...(wanted || {}) };
+  delete fields.shift;
+  return legalActions.find(a => {
+    if (a.shift) return false;
+    return Object.entries(fields).every(([k, v]) => a[k] === v);
+  }) || null;
+}
+
+const AREA_LABELS = { bouldering: 'Bouldering', topRope: 'Top Rope', leadClimbing: 'Lead Climbing' };
+
+// Why `wanted` (a partial action, as for findLegalAction) is not legal for the
+// current player right now, or null if it is legal. getLegalActions alone
+// decides legality; this only explains a refusal, re-checking the same
+// conditions. Returns { code, message, ...details } so a UI can word it its
+// own way: `message` is a full player-facing sentence, `code` is one of
+//   gameOver, noSuchRoute, noSuchMilestone, noSuchStation, noSuchGear,
+//   unknownAction, unavailable,
+//   alreadyAttempted, alreadyCompleted, alreadyOwned, notInShop,
+//   needsGear {missing}, needsItems {missing}, needsLevel {level},
+//   belayerTaken {belayer}, noFreeBelayer, sectionFull {occupants},
+//   stationInUse {occupants}, trainingLimit {limit}, trainingCap {cap, stat},
+//   notEnoughTime {need, have},
+//   notEnoughEndurance {need, have}, notEnoughXp {need, have}, lifeOrDie,
+//   shiftNotAllowed, shiftMalformed
+// (occupants are playerNums).
+export function illegalActionReason(state, wanted) {
+  const reason = (code, message, details = {}) => ({ code, message, ...details });
+  if (state.gameEnded) return reason('gameOver', 'The game has ended.');
+  const legal = getLegalActions(state);
+  const match = findLegalAction(legal, wanted);
+  const player = state.players[state.currentPlayerIndex];
+  const char = player.character;
+  if (match) {
+    if (wanted.shift && (match.type !== 'climb' || !canUseStatShift(char, false))) {
+      return reason('shiftNotAllowed', 'Versatility can be used once per round, by the Route Reader, on a regular route.');
+    }
+    if (wanted.shift && !isWellFormedStatShift(wanted.shift)) {
+      return reason('shiftMalformed', `A stat shift moves 1 to ${MAX_STAT_SHIFT} points between two different stats.`);
+    }
+    return null;
+  }
+  const notEnough = (code, what, need, have) =>
+    reason(code, `Not enough ${what}: this costs ${need} and you have ${have}.`, { need, have });
+  const occupantsOf = (section) => getPlayersInSection(state.players, section).map(p => p.playerNum);
+  const lifeOrDie = () =>
+    reason('lifeOrDie', 'Life or Die: Free Solo can only attempt routes whose base requirements your stats already meet.');
+  const areaGate = (area) => {
+    const access = checkAreaAccess(char, area);
+    if (access.hasAccess) return null;
+    return reason('needsGear', `You need ${access.missingItems.join(', ')} to climb ${AREA_LABELS[area] || area}.`,
+      { missing: access.missingItems });
+  };
+  const sectionGate = (area) => {
+    const sec = canEnterSection(area, player.playerNum, state);
+    if (sec.canEnter) return null;
+    return reason('sectionFull', `You can't climb here right now: ${sec.reason}.`, { occupants: occupantsOf(area) });
+  };
+  const costGate = (route) => {
+    const t = getEffectiveClimbTimeCost(char, route.time, route);
+    const e = getEffectiveClimbEnduranceCost(char, route, route.endurance);
+    if (char.timeRemaining < t) return notEnough('notEnoughTime', 'time', t, char.timeRemaining);
+    if (char.currentEndurance < e) return notEnough('notEnoughEndurance', 'endurance', e, char.currentEndurance);
+    return null;
+  };
+
+  switch (wanted.type) {
+    case 'climb': {
+      const route = (state.availableRoutes[wanted.area] || []).find(r => r.name === wanted.routeName);
+      if (!route) return reason('noSuchRoute', 'That route is not on the wall right now.');
+      if (state.attemptedRoutes[player.playerNum]?.[`${wanted.area}:${route.name}`]) {
+        return reason('alreadyAttempted', 'You have already attempted this route this round. Try it again next round.');
+      }
+      const gate = areaGate(wanted.area);
+      if (gate) return gate;
+      if (wanted.area === 'topRope') {
+        if (!canClimbTopRopeRoute(state, player.playerNum, route)) {
+          return reason('belayerTaken',
+            `Belayer ${route.belayer + 1} is in use by another climber. Pick a route at a free belayer or wait for the wall to clear.`,
+            { belayer: route.belayer });
+        }
+      } else {
+        const full = sectionGate(wanted.area);
+        if (full) return full;
+      }
+      return costGate(route) || (!freeSoloCanAttempt(char, route) ? lifeOrDie() : null)
+        || reason('unavailable', 'That climb is not available right now.');
+    }
+    case 'milestone': {
+      const m = state.milestoneRoutes[wanted.difficulty];
+      if (!m) return reason('noSuchMilestone', 'There is no milestone route at that tier.');
+      if (char.milestonesCompleted[wanted.difficulty]) {
+        return reason('alreadyCompleted', `You have already completed the ${wanted.difficulty} milestone.`);
+      }
+      const gate = areaGate(m.area);
+      if (gate) return gate;
+      if (m.area === 'topRope') {
+        if (pickFreeBelayerStation(state, player.playerNum) === null) {
+          return reason('noFreeBelayer', 'Every belayer is in use right now. Wait for one to free up.');
+        }
+      } else {
+        const full = sectionGate(m.area);
+        if (full) return full;
+      }
+      return costGate(m.route) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie() : null)
+        || reason('unavailable', 'That milestone is not available right now.');
+    }
+    case 'train': {
+      const area = TRAINING_AREAS.find(a => a.name === wanted.areaName);
+      if (!area) return reason('noSuchStation', 'There is no such training station.');
+      const sec = canEnterSection(area.name, player.playerNum, state);
+      if (!sec.canEnter) {
+        return reason('stationInUse', `You can't train here right now: ${sec.reason}.`, { occupants: occupantsOf(area.name) });
+      }
+      // Costs and limits as the rules variant (state.rules) sets them.
+      const spec = trainingSpec(state.rules, area, char);
+      if (char.timeRemaining < spec.time) return notEnough('notEnoughTime', 'time', spec.time, char.timeRemaining);
+      if (char.currentEndurance < spec.endurance) {
+        return notEnough('notEnoughEndurance', 'endurance', spec.endurance, char.currentEndurance);
+      }
+      if (!trainingAllowed(state.rules, char, area.stat, spec.gain)) {
+        const perRound = state.rules?.trainPerRound;
+        if (perRound !== undefined && (char.trainedThisRound || 0) >= perRound) {
+          return reason('trainingLimit', `You can train ${perRound} time${perRound === 1 ? '' : 's'} per round.`, { limit: perRound });
+        }
+        const cap = trainingCap(state.rules, char);
+        return reason('trainingCap', `Training ${area.stat} is capped at +${cap} at Level ${char.level}.`, { cap, stat: area.stat });
+      }
+      return reason('unavailable', 'That training station is not available right now.');
+    }
+    case 'rest':
+      return reason('notEnoughTime', 'Not enough time to rest.', { need: 1, have: char.timeRemaining });
+    case 'buyGear': {
+      const gear = GEAR_SHOP.find(g => g.name === wanted.gearName);
+      if (!gear) return reason('noSuchGear', 'There is no such gear.');
+      if (char.equipment.includes(gear.name)) return reason('alreadyOwned', `You already own ${gear.name}.`);
+      const inShop = state.availableGear.some(g => g.name === gear.name) || ACCESS_CARDS.includes(gear.name);
+      if (!inShop) return reason('notInShop', `${gear.name} is not in the shop right now.`);
+      const missing = (gear.prerequisiteItems || []).filter(n => !char.equipment.includes(n));
+      if (missing.length) return reason('needsItems', `${gear.name} requires ${missing.join(', ')} first.`, { missing });
+      if (char.level < (gear.prerequisiteLevel || 1)) {
+        return reason('needsLevel', `${gear.name} requires Level ${gear.prerequisiteLevel}.`, { level: gear.prerequisiteLevel });
+      }
+      const timeCost = getGearPurchaseTimeCost(char);
+      if (char.timeRemaining < timeCost) return notEnough('notEnoughTime', 'time', timeCost, char.timeRemaining);
+      const cost = getEffectiveGearCost(char, gear);
+      const spendable = getSpendableXp(char);
+      if (spendable < cost) {
+        return reason('notEnoughXp', `Not enough spendable XP: ${gear.name} costs ${cost} and you have ${spendable} XP earned this level.`,
+          { need: cost, have: spendable });
+      }
+      return reason('unavailable', `${gear.name} can't be bought right now.`);
+    }
+    case 'endTurn':
+      return reason('unavailable', 'You cannot end your turn right now.');
+    default:
+      return reason('unknownAction', `Unknown action "${wanted.type}".`);
+  }
+}
+
+// illegalActionReason's player-facing sentence, or null if `wanted` is legal.
+export function explainIllegalAction(state, wanted) {
+  const r = illegalActionReason(state, wanted);
+  return r ? r.message : null;
 }
 
 // =============================================================================
@@ -348,12 +525,15 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   //    re-roll, add an extra die, replace dice, or shift dice on milestones).
   //    Gear choices ("your choice") are made against effectiveStats.
   const effectArray = buildEffectRollArray(char, route);
-  const { dice, mentorIndex } = resolveClimbDice(() => rng.rollDie(6), effectArray, char, route, isMilestone, effectiveStats);
+  const diceTrace = [];
+  const { dice, mentorIndex } = resolveClimbDice(() => rng.rollDie(6), effectArray, char, route, isMilestone, effectiveStats, diceTrace);
   const { requirements, appliedModifiers } = applyDiceToRequirements(char, route, effectArray, dice, { mentorIndex });
 
   emitter.emit('dice_rolled', {
     playerNum: player.playerNum,
     dice,
+    // Dice rolled but not kept (Power Tap Belt's discard), for display.
+    discardedDice: diceTrace.filter(t => t.effectKind === 'extraDieDiscardOne').map(t => t.from),
     modifiers: appliedModifiers,
     modifiedRequirements: { ...requirements },
     baseRequirements: {
@@ -372,13 +552,12 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     failPenalty = getFailureEnduranceExtra(char);
     char.currentEndurance -= failPenalty;
   }
-  // 9b. Power Spotting: successful climbs heal endurance.
-  let successHeal = 0;
+  // 9b. Power Spotting: successful climbs heal endurance, up to maxEndurance.
+  let healed = 0;
   if (outcome.success) {
-    successHeal = getSuccessEnduranceHeal(char);
-    char.currentEndurance += successHeal;
-    // Cap healed endurance at maxEndurance — don't go above the ceiling.
-    if (char.currentEndurance > char.maxEndurance) char.currentEndurance = char.maxEndurance;
+    const beforeHeal = char.currentEndurance;
+    char.currentEndurance = applySuccessHeal(char.currentEndurance, char.maxEndurance, getSuccessEnduranceHeal(char));
+    healed = char.currentEndurance - beforeHeal;
   }
   // Floor endurance at 0. Going negative is nonsensical for downstream checks.
   if (char.currentEndurance < 0) char.currentEndurance = 0;
@@ -394,7 +573,13 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     effectiveStats,
     xpGained,
     timeCost,
-    enduranceCost: route.endurance + failPenalty,
+    enduranceCost: baseEnduranceCost + failPenalty,
+    failPenalty,
+    // Every gear effect that changed this climb (see describeClimbGearEffects).
+    gearEffects: describeClimbGearEffects({
+      char, route, effectRollArray: effectArray, diceTrace, appliedModifiers,
+      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed,
+    }),
     resourcesDelta: {
       time: { before: timeBefore, after: char.timeRemaining, delta: -timeCost },
       endurance: { before: enduranceBefore, after: char.currentEndurance, delta: char.currentEndurance - enduranceBefore },
