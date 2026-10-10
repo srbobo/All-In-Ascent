@@ -5,7 +5,7 @@
 // automatically by the test/playtest npm scripts) so the Node engine, sim
 // harness, and analysis tools read the same values without hand-syncing.
 // Rules version is kept in step with the Node engine (engine/version.js).
-const GAME_VERSION = '0.6.0';
+const GAME_VERSION = '0.7.0';
 if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
 
 // ===== GAME DATA =====
@@ -219,13 +219,13 @@ const ROUTES = {
 // rerollOnTag — re-roll one die on tagged climbs
 // timeCostReduction — reduce time cost on tagged climbs by `value`
 // enduranceHalvedOnTag — endurance cost halved (round up) on tagged climbs
-// extraDieBestN — roll one extra die on tagged climbs, keep best N (`value`)
+// extraDieDiscardOne — roll `value` extra die on tagged climbs, then discard one (N dice → roll N+1, keep N)
 // ignoreFailPenalty — skip Iron Lung's −5 fail-endurance penalty AND general fail penalties
 // treatOneDieAsValue — on every climb, may treat one die as `value` (typically 1)
 // failBonusXp — every failed climb grants `value` extra XP
 // successHealEndurance — every successful climb restores `value` endurance
 // trainingBonusBoost — every training session grants `value` extra stat bonus
-// milestoneDiceBonus — every die on milestone climbs is +`value`
+// milestoneBuffDiceBonus — every buff die (modifier −1) on milestone climbs is +`value` (max 6)
 // negateOneNerfDie — on every climb, treat one nerf die (modifier +1) as 0
 const GEAR_SHOP = [
  // ===== ACCESS CARDS (gate Lead climbing area; Top Rope is open to all) =====
@@ -239,7 +239,7 @@ const GEAR_SHOP = [
  { name: "Crimp Sequence Decoder", cost: 130, category: "Strategy Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "rerollOnTag", tagFilter: "Pinch/Crimp", description: "Decode the puzzle of small holds — re-rolls give you a second chance", effectDisplay: "On Pinch/Crimp climbs, re-roll one die of your choice", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Trick Foot Manual", cost: 110, category: "Strategy Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "timeCostReduction", tagFilter: "Toe/Heel Hook", description: "Footwork techniques shave seconds off every move", effectDisplay: "Toe/Heel Hook climbs cost 1 less time (min 1)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Body Tension Belt", cost: 150, category: "Specialized Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "enduranceHalvedOnTag", tagFilter: "Roof/Sloper", description: "Core engagement on overhang and slopey holds", effectDisplay: "Roof/Sloper climbs cost half endurance (round up)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
- { name: "Power Tap Belt", cost: 120, category: "Specialized Gear", statEffect: "none", value: 2, routeFilter: [], holdFeatureFilter: [], effectKind: "extraDieBestN", tagFilter: "Dynamic", description: "Explosive feedback for dynamic moves", effectDisplay: "On Dynamic climbs, roll an extra die and use the best 2", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+ { name: "Power Tap Belt", cost: 120, category: "Specialized Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "extraDieDiscardOne", tagFilter: "Dynamic", description: "Explosive feedback for dynamic moves", effectDisplay: "On Dynamic climbs, roll 1 extra die, then discard any one die", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
 
  // ===== FIX + BOOST CARDS (F/B roles; permanent passives) =====
  { name: "Beta Reading Book", cost: 100, category: "Recovery Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], description: "Pre-climb visualization restores composure", effectDisplay: "Rest restores +10 endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 10 },
@@ -250,7 +250,7 @@ const GEAR_SHOP = [
  { name: "Power Spotting", cost: 90, category: "Recovery Gear", statEffect: "none", value: 5, routeFilter: [], holdFeatureFilter: [], effectKind: "successHealEndurance", description: "A spotter's encouragement returns energy", effectDisplay: "Successful climbs restore +5 endurance", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Approach Shoes", cost: 55, category: "Comfort Gear", statEffect: "timePerRound", value: 1, routeFilter: ["All"], holdFeatureFilter: [], description: "Ergonomic footwear keeps you fresh", effectDisplay: "+1 Time at round start", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Old Climbing Journal", cost: 100, category: "Training Equipment", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "trainingBonusBoost", description: "Track every session and pattern of progress", effectDisplay: "Training sessions give +6 instead of +5", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
- { name: "Climbing Coach", cost: 180, category: "Strategy Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "milestoneDiceBonus", description: "Expert guidance for the routes that matter most", effectDisplay: "On milestone climbs, every die is +1", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+ { name: "Climbing Coach", cost: 180, category: "Strategy Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "milestoneBuffDiceBonus", description: "Expert guidance for the routes that matter most", effectDisplay: "On milestone climbs, every buff die is +1 (max 6)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Mountain Mentor", cost: 200, category: "Strategy Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "negateOneNerfDie", description: "Years of wisdom in your ear", effectDisplay: "On every climb, treat one nerf die as 0", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
 ];
 
@@ -346,12 +346,24 @@ function getPlayersInSection(section) {
 
 // ===== TOP ROPE BELAYER STATIONS (RuleModifications 2026-06-27) =====
 
+// The routes of `area` that may be dealt to the wall: the area's deck minus
+// this game's milestone routes (milestones stay on the milestone board and
+// never also appear as regular routes). Mirrors engine/state.js regularRoutePool.
+function regularRoutePool(area) {
+ const milestoneNames = new Set(
+ Object.values(gameState.milestoneRoutes || {})
+ .filter(m => m && m.area === area)
+ .map(m => m.route.name)
+ );
+ return ROUTES[area].filter(r => !milestoneNames.has(r.name));
+}
+
 // Draw the Top Rope rotation as belayerCount stations of ROUTES_PER_BELAYER
 // routes each. Returns a FLAT array of 2×belayerCount routes, each tagged with
-// a `belayer` index (0-based station). A 1-player game → 0 stations → empty.
+// a `belayer` index (0-based station).
 function drawTopRopeStations() {
  const count = Math.max(0, gameState.belayerCount) * ROUTES_PER_BELAYER;
- const pool = [...ROUTES.topRope].sort(() => Math.random() - 0.5);
+ const pool = [...regularRoutePool('topRope')].sort(() => Math.random() - 0.5);
  return pool.slice(0, count).map((route, i) => ({
  ...route, belayer: Math.floor(i / ROUTES_PER_BELAYER),
  }));
@@ -847,8 +859,9 @@ function startGame() {
  // Initialize attempted routes tracking
  gameState.attemptedRoutes = {};
 
- // Top Rope belayer stations: N − 1 for N players, fixed for the whole game.
- gameState.belayerCount = gameState.players.length - 1;
+ // Top Rope belayer stations: N − 1 for N players, minimum 1 (the solo
+ // Auto-Belay). Fixed for the whole game. Mirrors engine/state.js belayerCountFor.
+ gameState.belayerCount = Math.max(1, gameState.players.length - 1);
 
  // Select milestone routes FIRST (before initializing regular routes)
  selectMilestoneRoutes();
@@ -868,12 +881,12 @@ function startGame() {
 }
 
 function initializeRoutes() {
- // Shuffle and select 5 bouldering routes
- const boulderingPool = [...ROUTES.bouldering].sort(() => Math.random() - 0.5);
+ // Shuffle and select 5 bouldering routes (milestone routes excluded)
+ const boulderingPool = [...regularRoutePool('bouldering')].sort(() => Math.random() - 0.5);
  gameState.availableRoutes.bouldering = boulderingPool.slice(0, 5);
 
  // Lead climbing starts with 5 routes
- const leadPool = [...ROUTES.leadClimbing].sort(() => Math.random() - 0.5);
+ const leadPool = [...regularRoutePool('leadClimbing')].sort(() => Math.random() - 0.5);
  gameState.availableRoutes.leadClimbing = leadPool.slice(0, 5);
 
  // Top rope is split into belayerCount stations of 2 routes each.
@@ -1600,36 +1613,134 @@ function renderStore() {
 
 // ===== CHARACTER ABILITY SYSTEM =====
 
-function canUseAbility(char, route, area) {
- if (char.abilityUsed) return false;
+// Route Reader "Versatility" stat shift: once per round, before a regular
+// (non-milestone) climb, move up to MAX_STAT_SHIFT points from one stat to
+// another for that climb only. All other abilities are fully passive.
+const SHIFT_STATS = ['strength', 'technique', 'focus', 'flexibility'];
+const MAX_STAT_SHIFT = 10;
 
- const abilityName = CHARACTERS[char.key].specialAbility.name;
-
- // Only Versatility has a user-activated component (stat redistribution once per round)
- // All other abilities are fully passive
- if (abilityName !== 'Versatility') return false;
-
- return true;
+function canUseStatShift(char) {
+ return char.key === 'routeReader' && !char.abilityUsed;
 }
 
-function promptAbilityUse(char, route, area) {
- const abilityName = CHARACTERS[char.key].specialAbility.name;
-
- // Only Versatility prompts the user (for stat redistribution)
- const preClimbAbilities = ['Versatility'];
-
- if (preClimbAbilities.includes(abilityName)) {
- const use = confirm(` Use Versatility – Stat Redistribution?\n\nMove up to 10 points between any two stats for this climb.\n\nThis can only be used once per round.`);
- if (use) {
- char.abilityUsed = true;
- return abilityName;
+// Total stats for a climb attempt by the current player (base + training +
+// permanent gear + route-specific gear). No ability effects.
+function computeClimbStats(char, route, area) {
+ if (!char.gearBonuses) {
+ char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
  }
- }
-
- return null;
+ const routeGearBonuses = calculateGearBonuses(route, area);
+ const stats = {};
+ SHIFT_STATS.forEach(k => {
+ stats[k] = char.stats[k] + char.trainingBonuses[k] + char.gearBonuses[k] + routeGearBonuses[k];
+ });
+ return stats;
 }
 
-function applyAbilityToStats(char, abilityName, totalStats) {
+function shiftStats(stats, shift) {
+ return { ...stats, [shift.from]: stats[shift.from] - shift.amount, [shift.to]: stats[shift.to] + shift.amount };
+}
+
+// Suggest the most useful shift before the dice are rolled, or null if none
+// helps. A Route Reader sends with 3 of 4 stats, so the deciding stat is the
+// one with the 3rd-largest margin over its base requirement; maximise it.
+// Not offered when that margin is already 6+ (one die's swing). Mirrors
+// engine/helpers.js bestRouteReaderShift.
+function suggestStatShift(stats, route) {
+ const deciding = (st) => SHIFT_STATS.map(k => st[k] - route[k]).sort((a, b) => b - a)[2];
+ const baseline = deciding(stats);
+ if (baseline >= 6) return null;
+ let best = null;
+ let bestScore = baseline;
+ SHIFT_STATS.forEach(from => SHIFT_STATS.forEach(to => {
+ if (from === to) return;
+ for (let amount = 1; amount <= MAX_STAT_SHIFT; amount++) {
+ const score = deciding(shiftStats(stats, { from, to, amount }));
+ if (score > bestScore) { bestScore = score; best = { from, to, amount }; }
+ }
+ }));
+ return best;
+}
+
+// Show the Versatility dialog. `stats` are the climber's stats for this climb
+// (including any Beta Boost); `suggested` pre-fills the controls. Resolves
+// { shift } to climb with a shift, { shift: null } to climb without one, or
+// null if the player cancels the climb.
+function chooseStatShift(route, stats, suggested) {
+ return new Promise(resolve => {
+ const modal = document.getElementById('statShiftModal');
+ const body = document.getElementById('statShiftBody');
+ const label = (k) => k.charAt(0).toUpperCase() + k.slice(1);
+ const options = SHIFT_STATS.map(k => `<option value="${k}">${label(k)}</option>`).join('');
+ body.innerHTML = `
+ <p class="shift-intro">Once per round, move up to ${MAX_STAT_SHIFT} points from one stat to another for <strong>this climb only</strong>. You send if 3 of your 4 stats meet their requirement.</p>
+ <div class="shift-controls">
+ <label>Move <input type="number" id="shiftAmount" min="1" max="${MAX_STAT_SHIFT}" step="1"></label>
+ <label>from <select id="shiftFrom">${options}</select></label>
+ <label>to <select id="shiftTo">${options}</select></label>
+ </div>
+ <table class="shift-table">
+ <thead><tr><th>Stat</th><th>Needs</th><th>You</th><th>After shift</th></tr></thead>
+ <tbody id="shiftRows"></tbody>
+ </table>
+ <p class="shift-summary" id="shiftSummary"></p>
+ <p class="shift-note">Requirements shown before dice. ${route.name} (${route.grade}).</p>`;
+
+ const fromSel = document.getElementById('shiftFrom');
+ const toSel = document.getElementById('shiftTo');
+ const amountIn = document.getElementById('shiftAmount');
+ const applyBtn = document.getElementById('statShiftApply');
+ const initial = suggested || { from: 'flexibility', to: 'strength', amount: MAX_STAT_SHIFT };
+ fromSel.value = initial.from;
+ toSel.value = initial.to;
+ amountIn.value = initial.amount;
+
+ const readShift = () => {
+ const amount = parseInt(amountIn.value, 10);
+ if (fromSel.value === toSel.value || !Number.isInteger(amount) || amount < 1 || amount > MAX_STAT_SHIFT) return null;
+ return { from: fromSel.value, to: toSel.value, amount };
+ };
+ const refresh = () => {
+ const shift = readShift();
+ const after = shift ? shiftStats(stats, shift) : stats;
+ const cell = (v, need) => `<td class="${v >= need ? 'shift-pass' : 'shift-fail'}">${v}</td>`;
+ document.getElementById('shiftRows').innerHTML = SHIFT_STATS.map(k =>
+ `<tr><td>${label(k)}</td><td>${route[k]}</td>${cell(stats[k], route[k])}${cell(after[k], route[k])}</tr>`).join('');
+ const passing = (st) => SHIFT_STATS.filter(k => st[k] >= route[k]).length;
+ document.getElementById('shiftSummary').textContent = shift
+ ? `Before the dice: ${passing(stats)} of 4 pass now, ${passing(after)} of 4 with this shift.`
+ : 'Pick two different stats and an amount from 1 to 10.';
+ applyBtn.disabled = !shift;
+ };
+ [fromSel, toSel, amountIn].forEach(el => el.addEventListener('input', refresh));
+ refresh();
+
+ const finish = (result) => {
+ modal.classList.remove('show');
+ document.getElementById('statShiftApply').onclick = null;
+ document.getElementById('statShiftSkip').onclick = null;
+ document.getElementById('statShiftCancel').onclick = null;
+ resolve(result);
+ };
+ applyBtn.onclick = () => { const shift = readShift(); if (shift) finish({ shift }); };
+ document.getElementById('statShiftSkip').onclick = () => finish({ shift: null });
+ document.getElementById('statShiftCancel').onclick = () => finish(null);
+ modal.classList.add('show');
+ });
+}
+
+// Offer the Route Reader a stat shift for this climb when one would help.
+// Resolves { shift } (possibly null) or null if the player cancelled.
+async function maybeChooseStatShift(char, route, area) {
+ if (!canUseStatShift(char)) return { shift: null };
+ let stats = computeClimbStats(char, route, area);
+ if (char.betaBoostActive) stats = Object.fromEntries(SHIFT_STATS.map(k => [k, stats[k] + 3]));
+ const suggested = suggestStatShift(stats, route);
+ if (!suggested) return { shift: null };
+ return chooseStatShift(route, stats, suggested);
+}
+
+function applyAbilityToStats(char, shift, totalStats) {
  let modified = { ...totalStats };
 
  // Route Reader: Beta Boost passive (set after resting, consumed here)
@@ -1642,12 +1753,10 @@ function applyAbilityToStats(char, abilityName, totalStats) {
  addLog(`Beta Boost: +3 to all stats this climb!`);
  }
 
- // Versatility: stat redistribution (activated once per round)
- if (abilityName === 'Versatility') {
- const result = promptStatRedistribution(char, modified);
- if (result) {
- return result;
- }
+ // Versatility: stat shift chosen before the climb (regular routes only)
+ if (shift) {
+ modified = shiftStats(modified, shift);
+ addLog(`Versatility: moved ${shift.amount} ${shift.from} → ${shift.to} for this climb`);
  }
 
  return modified;
@@ -1680,28 +1789,6 @@ function applyAbilityToDice(char, abilityName, route, diceEffects, area) {
  return modified;
 }
 
-function promptStatRedistribution(char, totalStats) {
- // Simplified implementation - could be expanded with a dialog
- const statNames = ['strength', 'technique', 'focus', 'flexibility'];
- const fromStat = prompt(`Versatility: Take points FROM which stat?\n\nOptions: strength, technique, focus, flexibility\n\nYou can move up to 10 points.`);
-
- if (!fromStat || !statNames.includes(fromStat.toLowerCase())) return null;
-
- const toStat = prompt(`Take points from ${fromStat} and move TO which stat?\n\nOptions: strength, technique, focus, flexibility`);
-
- if (!toStat || !statNames.includes(toStat.toLowerCase()) || toStat.toLowerCase() === fromStat.toLowerCase()) return null;
-
- const amount = parseInt(prompt(`How many points to move? (1-10)`, '5'));
-
- if (isNaN(amount) || amount < 1 || amount > 10) return null;
-
- const modified = {...totalStats};
- modified[fromStat.toLowerCase()] -= amount;
- modified[toStat.toLowerCase()] += amount;
-
- return modified;
-}
-
 function applyAbilityToTimeAndXP(char, abilityName, route) {
  let timeCost = route.time;
  let xpMultiplier = 1.0;
@@ -1722,12 +1809,17 @@ function applyAbilityToTimeAndXP(char, abilityName, route) {
 
 // ===== GAME ACTIONS =====
 
-function attemptClimb(route, area) {
+async function attemptClimb(route, area) {
  // Online mode short-circuit: send the matching action to the server
  // instead of mutating local state. Server broadcasts the new state and
- // the renderer updates itself.
+ // the renderer updates itself. A Route Reader picks a stat shift first.
  if (window.OnlineMode && window.OnlineMode.active) {
-  return window.OnlineMode.sendAction({ type: 'climb', area, routeName: route.name });
+  const onlinePlayer = gameState.players[gameState.currentPlayerIndex];
+  const choice = onlinePlayer ? await maybeChooseStatShift(onlinePlayer.character, route, area) : { shift: null };
+  if (!choice) return;
+  const action = { type: 'climb', area, routeName: route.name };
+  if (choice.shift) action.shift = choice.shift;
+  return window.OnlineMode.sendAction(action);
  }
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
  const char = currentPlayer.character;
@@ -1759,14 +1851,8 @@ function attemptClimb(route, area) {
  return;
  }
 
- // ABILITY: Prompt for ability use before climb (Versatility only)
- let activatedAbility = null;
- if (canUseAbility(char, route, area)) {
- activatedAbility = promptAbilityUse(char, route, area);
- }
-
  // ABILITY: Apply passive time/XP modifications (Sprinter Flash Speed, Technician Perfect Beta)
- const { timeCost, xpMultiplier } = applyAbilityToTimeAndXP(char, activatedAbility, route);
+ const { timeCost, xpMultiplier } = applyAbilityToTimeAndXP(char, null, route);
 
  // Check requirements (with modified time cost)
  if (char.timeRemaining < timeCost || char.currentEndurance < route.endurance) {
@@ -1774,26 +1860,8 @@ function attemptClimb(route, area) {
  return;
  }
 
- // Move player to this section and (for Top Rope) occupy the route's belayer
- // station; any other area clears the belayer-station assignment.
- movePlayerToSection(currentPlayer.playerNum, area);
- char.belayerStation = (area === 'topRope') ? route.belayer : null;
-
- // Ensure gearBonuses exists
- if (!char.gearBonuses) {
- char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
- }
-
- // Calculate gear bonuses for this specific route
- const routeGearBonuses = calculateGearBonuses(route, area);
-
  // Calculate total stats (including route-specific gear bonuses)
- let totalStats = {
- strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength + routeGearBonuses.strength,
- technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique + routeGearBonuses.technique,
- focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus + routeGearBonuses.focus,
- flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility + routeGearBonuses.flexibility
- };
+ let totalStats = computeClimbStats(char, route, area);
 
  // ABILITY: Free Solo — guarantee check against base requirements (no dice since Life or Die negates them)
  if (char.key === 'freeSolo') {
@@ -1804,8 +1872,22 @@ function attemptClimb(route, area) {
  }
  }
 
- // ABILITY: Apply stat modifications (beta boost passive + Versatility redistribution)
- totalStats = applyAbilityToStats(char, activatedAbility, totalStats);
+ // ABILITY: Route Reader Versatility — choose a stat shift before paying.
+ // Cancelling here costs nothing; the once-per-round use is only spent when
+ // the climb goes ahead with a shift.
+ const shiftChoice = await maybeChooseStatShift(char, route, area);
+ if (!shiftChoice) return;
+ const shift = shiftChoice.shift;
+ if (shift) char.abilityUsed = true;
+ const activatedAbility = shift ? 'Versatility' : null;
+
+ // Move player to this section and (for Top Rope) occupy the route's belayer
+ // station; any other area clears the belayer-station assignment.
+ movePlayerToSection(currentPlayer.playerNum, area);
+ char.belayerStation = (area === 'topRope') ? route.belayer : null;
+
+ // ABILITY: Apply stat modifications (beta boost passive + Versatility shift)
+ totalStats = applyAbilityToStats(char, shift, totalStats);
 
  // Build local roll effect array (allows Sprinter to add extra Focus nerf without mutating route data)
  let effectRollArray = route.rollEffect ? [...route.rollEffect]: [];
@@ -2679,7 +2761,21 @@ function updateCharacterStatsForLevel(char) {
  char.stats.technique = Math.round(charTemplate.startingStats.technique + charTemplate.growth.technique * (char.level - 1));
  char.stats.focus = Math.round(charTemplate.startingStats.focus + charTemplate.growth.focus * (char.level - 1));
  char.stats.flexibility = Math.round(charTemplate.startingStats.flexibility + charTemplate.growth.flexibility * (char.level - 1));
- char.maxEndurance = Math.round(charTemplate.startingEndurance + charTemplate.growth.endurance * (char.level - 1));
+ // Permanent gear max-endurance (e.g. Locking Carabiner +5) is added back so it
+ // survives the level-up recompute. Mirrors engine/helpers.js getGearMaxEnduranceBonus.
+ char.maxEndurance = Math.round(charTemplate.startingEndurance + charTemplate.growth.endurance * (char.level - 1))
+ + getGearMaxEnduranceBonus(char);
+}
+
+function getGearMaxEnduranceBonus(char) {
+ let bonus = 0;
+ for (const name of char.equipment || []) {
+ const gear = GEAR_SHOP.find(g => g.name === name);
+ if (!gear) continue;
+ if (gear.statEffect === 'endurance') bonus += gear.value;
+ if (typeof gear.enduranceBonus === 'number') bonus += gear.enduranceBonus;
+ }
+ return bonus;
 }
 
 function getSpendableXP(char) {
@@ -2803,7 +2899,7 @@ function clearRoutes() {
  // Clear the next area in clockwise rotation
  if (gameState.routeClearingPosition === 0) {
  // Token between bouldering and lead → clear lead climbing
- const leadPool = [...ROUTES.leadClimbing].sort(() => Math.random() - 0.5);
+ const leadPool = [...regularRoutePool('leadClimbing')].sort(() => Math.random() - 0.5);
  gameState.availableRoutes.leadClimbing = leadPool.slice(0, 5);
  addLog(' Lead climbing routes refreshed and reset');
  } else if (gameState.routeClearingPosition === 1) {
@@ -2813,7 +2909,7 @@ function clearRoutes() {
  addLog(' Top rope routes refreshed and reset');
  } else {
  // Token between top rope and bouldering → clear bouldering
- const boulderingPool = [...ROUTES.bouldering].sort(() => Math.random() - 0.5);
+ const boulderingPool = [...regularRoutePool('bouldering')].sort(() => Math.random() - 0.5);
  gameState.availableRoutes.bouldering = boulderingPool.slice(0, 5);
  addLog(' Bouldering routes refreshed and reset');
  }

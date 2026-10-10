@@ -17,13 +17,33 @@
 // a single tweak.
 
 // Note (TechDebt cleanup): the browser game (game.js) is stamped
-//   GAME_VERSION '0.6.0' to match this engine, and it now implements the same
+//   GAME_VERSION to match this engine, and it now implements the same
 //   Scenario 2C milestone selection (it previously used the old un-constrained
 //   v0.3.x random pick). engine/data.js is no longer hand-synced: it is
 //   auto-generated from game.js's GAME DATA section by
 //   `node engine/build-data.js` (run by the test/playtest scripts; standalone
 //   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
 //
+// 0.7.0 (2026-10-09): Rulebook-revision rules fixes.
+//   - Solo games get 1 Top Rope belayer station (the "Auto-Belay"):
+//     belayerCount = max(1, N − 1). Previously a solo game had 0 stations and
+//     could never attempt its Top Rope milestone, so it was unwinnable.
+//   - Milestone routes are removed from the wall decks (regularRoutePool), so
+//     they never also appear as regular routes.
+//   - Permanent gear max-endurance (Locking Carabiner +5) now survives
+//     level-up; applyLevelUpIfNeeded used to recompute it away.
+//   - Climbing Coach: +1 only to BUFF dice on milestone climbs (was every die,
+//     which made nerf dice worse). effectKind milestoneBuffDiceBonus.
+//   - Power Tap Belt: generic "roll 1 extra die, discard one" (N dice → roll
+//     N+1, keep N). Was "keep best 2", which dropped dice on 3-die routes.
+//     effectKind extraDieDiscardOne.
+//   - Route Reader Versatility stat shift is now in the engine: a climb action
+//     may carry shift {from, to, amount ≤ 10}, once per round, regular routes
+//     only. getLegalActions adds one suggested-shift variant per climb when it
+//     helps. (Previously only game.js local play had it, via prompt()
+//     dialogs, so bots, sims and online play never used it.)
+//   Minor bump — invalidates v0.6.x baselines (RNG draws, dice gear, Route
+//   Reader strength and solo play all changed).
 // 0.6.0 (2026-06-27): RuleModifications — Top Rope / Lead overhaul.
 //   - Top Rope is now OPEN (no gear required) and split into N − 1 belayer
 //     stations (N = player count), each holding 2 routes and admitting at most
@@ -81,5 +101,5 @@
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-export const ENGINE_VERSION = { major: 0, minor: 6, patch: 0 };
+export const ENGINE_VERSION = { major: 0, minor: 7, patch: 0 };
 export const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;

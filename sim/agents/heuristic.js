@@ -25,7 +25,7 @@
 
 import { TRAINING_AREAS, GEAR_SHOP } from '../../engine/data.js';
 import {
-  computeEffectiveStats, getSpendableXp,
+  computeEffectiveStats, getSpendableXp, applyStatShiftToStats,
 } from '../../engine/helpers.js';
 
 // RuleModifications: Harness removed; these three gate Lead Climbing only.
@@ -97,13 +97,13 @@ export function createHeuristicAgent() {
       if (approachBuy !== -1 && !char.equipment.includes('Approach Shoes')) {
         return { actionIndex: approachBuy, rationale: 'buying Approach Shoes (+1 time/round, cheap)' };
       }
-      // (b) Climbing Coach mid-to-late game — milestone dice +1 is the most
+      // (b) Climbing Coach mid-to-late game — milestone buff dice +1 is the most
       //     valuable single boost on the routes that win the game.
       if (getSpendableXp(char) >= 180 && char.level >= 3) {
         const coachBuy = findActionIndex(legalActions, a =>
           a.type === 'buyGear' && a.gearName === 'Climbing Coach');
         if (coachBuy !== -1 && !char.equipment.includes('Climbing Coach')) {
-          return { actionIndex: coachBuy, rationale: 'buying Climbing Coach (+1 to all milestone dice)' };
+          return { actionIndex: coachBuy, rationale: 'buying Climbing Coach (+1 to milestone buff dice)' };
         }
       }
       // (c) Mountain Mentor late game — universal nerf-die negation.
@@ -131,8 +131,10 @@ export function createHeuristicAgent() {
       let bestScore = -Infinity;
       for (const { a, i } of climbActions) {
         const route = state.availableRoutes[a.area].find(r => r.name === a.routeName);
-        const stats = computeEffectiveStats(char, route, a.area, attempted);
-        const likely = passesBaseCheck(stats, route);
+        let stats = computeEffectiveStats(char, route, a.area, attempted);
+        // Route Reader climb variants carry a suggested stat shift.
+        if (a.shift) stats = applyStatShiftToStats(stats, a.shift);
+        const likely = passesBaseCheck(stats, route, char.key === 'routeReader' ? 3 : 4);
         // Expected-XP-style score: success XP if likely, half-fail XP if risky.
         const score = likely ? route.xpSuccess : route.xpFail * 0.5;
         if (score > bestScore) { bestScore = score; bestClimb = { a, i, likely, route }; }
@@ -193,13 +195,10 @@ export function createHeuristicAgent() {
 
 // --- Helpers ---
 
-function passesBaseCheck(stats, route) {
-  return (
-    stats.strength    >= route.strength    &&
-    stats.technique   >= route.technique   &&
-    stats.focus       >= route.focus       &&
-    stats.flexibility >= route.flexibility
-  );
+// Do at least `needed` of the four stats meet the route's base requirements?
+// (4 for most climbers; Route Reader's Versatility needs only 3.)
+function passesBaseCheck(stats, route, needed = 4) {
+  return STATS.filter(k => stats[k] >= route[k]).length >= needed;
 }
 
 function weakestStat(char) {

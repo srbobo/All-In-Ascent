@@ -330,82 +330,90 @@ export function buildEffectRollArray(char, route) {
   return effects;
 }
 
+// The modifier a die will actually apply for this character once character
+// overrides run (see applyDiceToRequirements): Free Solo negates every die,
+// Technician negates nerf dice. Used to decide which dice are worth improving.
+function effectiveDieModifier(char, effect) {
+  if (!effect) return 0;
+  if (char && char.key === 'freeSolo') return 0;
+  if (char && char.key === 'technician' && effect.modifier === 1) return 0;
+  return effect.modifier;
+}
+
 // Roll the dice for a climb. `numDice` is max(2, effects.length) — even on a
 // Type-C "Pure Skill" route (empty rollEffect) we roll 2 dice that get
-// ignored, matching game.js behavior.
+// ignored, matching game.js behavior. Die i is applied to effectRollArray[i].
 //
-// Engine v0.3.0 gear effects on dice (applied AFTER initial roll):
-//   - Crimp Sequence Decoder (rerollOnTag, Pinch/Crimp): re-roll the highest die once.
-//     We re-roll the WORST die (highest value, since lower is better when applying
-//     buff dice and unchanged-or-better when applying nerf dice; on average lower is
-//     a better outcome for the player). This is a deterministic best-effort policy.
-//   - Power Tap Belt (extraDieBestN, Dynamic): roll N+1 dice, keep best 2 (lowest 2).
-//   - Sequence Memorization (treatOneDieAsValue=1, every climb): treat one die as 1.
-//     Applied as a final pass — replace the highest die with 1 if 1 is better.
-//   - Climbing Coach (milestoneDiceBonus, milestone climbs only): every die +1.
-//     Applied here as a uniform shift; cancels out on buff dice (modifier -1) but
-//     hurts on nerf dice (+1) — this is a NET POSITIVE in expectation only when the
-//     player has more buff dice than nerf dice on the route.
+// Gear effects on dice (applied AFTER the initial roll, in this order):
+//   - Crimp Sequence Decoder (rerollOnTag, Pinch/Crimp): re-roll one die. We
+//     re-roll the highest die (deterministic best-effort policy).
+//   - Power Tap Belt (extraDieDiscardOne, Dynamic): roll ONE extra die, then
+//     discard any one die — so an N-die climb rolls N+1 and keeps N. In
+//     practice the extra die is swapped in for whichever die it improves the
+//     most (a buff die wants a high number, a nerf die a low one), or is
+//     itself discarded if it improves nothing.
+//   - Sequence Memorization (treatOneDieAsValue=1, every climb): treat one die
+//     as 1. Applied as a final pass — replace the highest die with 1.
+//   - Climbing Coach (milestoneBuffDiceBonus, milestone climbs only): every
+//     BUFF die (modifier -1) is +1, max 6. Nerf dice are untouched.
 export function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilestone = false) {
-  let numDice = Math.max(2, effectRollArray.length);
-  // Power Tap Belt: extra die on Dynamic
-  let extraDie = 0;
-  let keepBest = numDice;
-  if (char && route && route.tag) {
-    for (const gearName of char.equipment || []) {
-      const gear = GEAR_SHOP.find(g => g.name === gearName);
-      if (!gear) continue;
-      if (gear.effectKind === 'extraDieBestN' && gear.tagFilter === route.tag) {
-        extraDie++;
-        keepBest = gear.value || numDice; // typically 2
-      }
-    }
-  }
+  const numDice = Math.max(2, effectRollArray.length);
+  const ownedGear = (char && char.equipment ? char.equipment : [])
+    .map(name => GEAR_SHOP.find(g => g.name === name))
+    .filter(Boolean);
+  const onTag = (gear) => route && route.tag && gear.tagFilter === route.tag;
+
   const rolls = [];
-  for (let i = 0; i < numDice + extraDie; i++) rolls.push(rng.rollDie(6));
-  // Crimp Sequence Decoder: re-roll one die on tagged climbs (re-roll the highest = worst)
-  if (char && route && route.tag) {
-    for (const gearName of char.equipment || []) {
-      const gear = GEAR_SHOP.find(g => g.name === gearName);
-      if (gear && gear.effectKind === 'rerollOnTag' && gear.tagFilter === route.tag) {
-        // Find index of highest die and re-roll it
-        let maxIdx = 0;
-        for (let i = 1; i < rolls.length; i++) if (rolls[i] > rolls[maxIdx]) maxIdx = i;
-        rolls[maxIdx] = rng.rollDie(6);
-      }
+  for (let i = 0; i < numDice; i++) rolls.push(rng.rollDie(6));
+
+  // Crimp Sequence Decoder: re-roll one die on tagged climbs (re-roll the highest).
+  for (const gear of ownedGear) {
+    if (gear.effectKind === 'rerollOnTag' && onTag(gear)) {
+      let maxIdx = 0;
+      for (let i = 1; i < rolls.length; i++) if (rolls[i] > rolls[maxIdx]) maxIdx = i;
+      rolls[maxIdx] = rng.rollDie(6);
     }
   }
-  // If we have an extra die from Power Tap Belt, keep only the best `keepBest` dice
-  // (lowest values, since lower is generally better — this is consistent with how
-  // buff dice work in the game).
-  let finalRolls = rolls;
-  if (extraDie > 0) {
-    const sorted = rolls.slice().sort((a, b) => a - b);
-    finalRolls = sorted.slice(0, keepBest);
+
+  // Power Tap Belt: roll an extra die, keep the best N (discard one).
+  for (const gear of ownedGear) {
+    if (gear.effectKind === 'extraDieDiscardOne' && onTag(gear)) {
+      const extra = rng.rollDie(6);
+      let bestIdx = -1;
+      let bestGain = 0;
+      for (let i = 0; i < effectRollArray.length; i++) {
+        const mod = effectiveDieModifier(char, effectRollArray[i]);
+        // Buff die (mod -1): a higher die subtracts more. Nerf die (mod +1):
+        // a lower die adds less.
+        const gain = mod === -1 ? extra - rolls[i] : mod === 1 ? rolls[i] - extra : 0;
+        if (gain > bestGain) { bestGain = gain; bestIdx = i; }
+      }
+      if (bestIdx !== -1) rolls[bestIdx] = extra;
+    }
   }
+
   // Sequence Memorization: every climb, treat one die as 1 (replace highest die with 1)
-  if (char) {
-    for (const gearName of char.equipment || []) {
-      const gear = GEAR_SHOP.find(g => g.name === gearName);
-      if (gear && gear.effectKind === 'treatOneDieAsValue') {
-        const target = gear.value || 1;
-        let maxIdx = 0;
-        for (let i = 1; i < finalRolls.length; i++) if (finalRolls[i] > finalRolls[maxIdx]) maxIdx = i;
-        if (finalRolls[maxIdx] > target) finalRolls[maxIdx] = target;
-      }
+  for (const gear of ownedGear) {
+    if (gear.effectKind === 'treatOneDieAsValue') {
+      const target = gear.value || 1;
+      let maxIdx = 0;
+      for (let i = 1; i < rolls.length; i++) if (rolls[i] > rolls[maxIdx]) maxIdx = i;
+      if (rolls[maxIdx] > target) rolls[maxIdx] = target;
     }
   }
-  // Climbing Coach: on milestone climbs, every die +1
-  if (isMilestone && char) {
-    for (const gearName of char.equipment || []) {
-      const gear = GEAR_SHOP.find(g => g.name === gearName);
-      if (gear && gear.effectKind === 'milestoneDiceBonus') {
+
+  // Climbing Coach: on milestone climbs, every buff die +1 (max 6).
+  if (isMilestone) {
+    for (const gear of ownedGear) {
+      if (gear.effectKind === 'milestoneBuffDiceBonus') {
         const bonus = gear.value || 1;
-        finalRolls = finalRolls.map(r => Math.min(6, r + bonus));
+        for (let i = 0; i < effectRollArray.length; i++) {
+          if (effectRollArray[i].modifier === -1) rolls[i] = Math.min(6, rolls[i] + bonus);
+        }
       }
     }
   }
-  return finalRolls;
+  return rolls;
 }
 
 // Apply dice rolls and character overrides to produce final per-stat
@@ -604,6 +612,65 @@ export function applyBetaBoostIfActive(char, effectiveStats) {
 }
 
 // =============================================================================
+// ROUTE READER STAT SHIFT ("Versatility", once per round, regular climbs only)
+// =============================================================================
+
+// Before a regular (non-milestone) climb, a Route Reader may move up to
+// MAX_STAT_SHIFT points from one stat to another for that climb only.
+// A shift is { from, to, amount }.
+export const MAX_STAT_SHIFT = 10;
+const SHIFT_STATS = ['strength', 'technique', 'focus', 'flexibility'];
+
+// Is `shift` well-formed (two different stats, whole amount 1..MAX_STAT_SHIFT)?
+export function isWellFormedStatShift(shift) {
+  return !!shift && typeof shift === 'object' &&
+    SHIFT_STATS.includes(shift.from) && SHIFT_STATS.includes(shift.to) &&
+    shift.from !== shift.to &&
+    Number.isInteger(shift.amount) && shift.amount >= 1 && shift.amount <= MAX_STAT_SHIFT;
+}
+
+// May this character use a stat shift right now on this kind of climb?
+export function canUseStatShift(char, isMilestone) {
+  return char.key === 'routeReader' && !char.abilityUsed && !isMilestone;
+}
+
+// Return a copy of `stats` with the shift applied.
+export function applyStatShiftToStats(stats, shift) {
+  return { ...stats, [shift.from]: stats[shift.from] - shift.amount, [shift.to]: stats[shift.to] + shift.amount };
+}
+
+// Pick the most useful shift for a Route Reader before the dice are rolled,
+// or null if no shift helps. A Route Reader sends when 3 of 4 stats pass, so
+// the stat that decides the climb is the one with the 3rd-largest margin
+// (stat − base requirement). We maximise that margin, then prefer the smallest
+// amount that achieves it. Only offered when the margin is under 6 (one die's
+// swing). Read-only: does not consume the ability.
+export function bestRouteReaderShift(char, route, area, attemptedRoutesForPlayer) {
+  if (char.key !== 'routeReader') return null;
+  let stats = computeEffectiveStats(char, route, area, attemptedRoutesForPlayer);
+  if (char.betaBoostActive) {
+    stats = Object.fromEntries(SHIFT_STATS.map(k => [k, stats[k] + 3]));
+  }
+  const deciding = (st) => SHIFT_STATS.map(k => st[k] - route[k]).sort((a, b) => b - a)[2];
+  const baseline = deciding(stats);
+  // A single die swings a requirement by at most 6. With a bigger margin the
+  // climb is already safe, so don't offer (or waste) the once-per-round shift.
+  if (baseline >= 6) return null;
+  let best = null;
+  let bestScore = baseline;
+  for (const from of SHIFT_STATS) {
+    for (const to of SHIFT_STATS) {
+      if (from === to) continue;
+      for (let amount = 1; amount <= MAX_STAT_SHIFT; amount++) {
+        const score = deciding(applyStatShiftToStats(stats, { from, to, amount }));
+        if (score > bestScore) { bestScore = score; best = { from, to, amount }; }
+      }
+    }
+  }
+  return best;
+}
+
+// =============================================================================
 // REST RECOVERY (game.js:1958-2006)
 // =============================================================================
 
@@ -630,6 +697,20 @@ export function computeRestRecovery(char) {
 // LEVEL-UP (game.js:2393-2435)
 // =============================================================================
 
+// Permanent max-endurance granted by owned gear (e.g. Locking Carabiner +5).
+// Level-up recomputes maxEndurance from the growth formula, so this has to be
+// added back or the gear bonus would vanish at the next level.
+export function getGearMaxEnduranceBonus(char) {
+  let bonus = 0;
+  for (const name of char.equipment || []) {
+    const g = GEAR_SHOP.find(x => x.name === name);
+    if (!g) continue;
+    if (g.statEffect === 'endurance') bonus += g.value;
+    if (typeof g.enduranceBonus === 'number') bonus += g.enduranceBonus;
+  }
+  return bonus;
+}
+
 // If the character's cumulative XP has crossed the next-level threshold,
 // advance level and recompute stats from the growth formula. Mutates char.
 // Returns { leveledUp: boolean, newLevel, oldStats, newStats, oldMaxEndurance, newMaxEndurance }.
@@ -652,7 +733,8 @@ export function applyLevelUpIfNeeded(char) {
     focus:       Math.round(tmpl.startingStats.focus       + tmpl.growth.focus       * (char.level - 1)),
     flexibility: Math.round(tmpl.startingStats.flexibility + tmpl.growth.flexibility * (char.level - 1)),
   };
-  char.maxEndurance = Math.round(tmpl.startingEndurance + tmpl.growth.endurance * (char.level - 1));
+  char.maxEndurance = Math.round(tmpl.startingEndurance + tmpl.growth.endurance * (char.level - 1))
+    + getGearMaxEnduranceBonus(char);
   return {
     leveledUp: true,
     newLevel: char.level,

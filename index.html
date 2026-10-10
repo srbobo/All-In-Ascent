@@ -895,6 +895,22 @@
  letter-spacing: -0.02em;
  line-height: 1;
  }
+ /* Route Reader stat-shift dialog */
+ .shift-intro { margin-bottom: 14px; line-height: 1.5; }
+ .shift-controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 14px; font-weight: 700; }
+ .shift-controls label { display: inline-flex; align-items: center; gap: 6px; }
+ .shift-controls select, .shift-controls input {
+ font: inherit; font-weight: 500; padding: 6px 8px;
+ border: 2px solid var(--ink); border-radius: 8px; background: var(--chalk); color: var(--ink);
+ }
+ .shift-controls input { width: 64px; }
+ .shift-table { width: 100%; border-collapse: collapse; border: 2px solid var(--ink); background: var(--chalk); }
+ .shift-table th, .shift-table td { padding: 6px 10px; border: 1px solid rgba(40,20,10,0.15); text-align: left; }
+ .shift-table th { background: var(--ink); color: var(--chalk); font-family: 'Bricolage Grotesque', sans-serif; }
+ .shift-table td.shift-pass { color: #3f7a10; font-weight: 700; }
+ .shift-table td.shift-fail { color: #c23a1c; font-weight: 700; }
+ .shift-summary { margin-top: 12px; font-weight: 700; }
+ .shift-note { margin-top: 4px; font-size: 0.85rem; color: var(--ink-soft); }
  .level-up-modal-content {
  background: var(--marigold);
  border-color: var(--ink);
@@ -2027,6 +2043,18 @@
  <div id="modalBody"></div>
  <div class="action-buttons">
  <button class="btn" onclick="closeClimbModal()">Close</button>
+ </div>
+ </div>
+ </div>
+
+ <div class="modal" id="statShiftModal">
+ <div class="modal-content">
+ <div class="modal-header">Versatility</div>
+ <div id="statShiftBody"></div>
+ <div class="action-buttons">
+ <button class="btn btn-success" id="statShiftApply">Climb with shift</button>
+ <button class="btn" id="statShiftSkip">Climb without shift</button>
+ <button class="btn btn-secondary" id="statShiftCancel">Cancel</button>
  </div>
  </div>
  </div>
