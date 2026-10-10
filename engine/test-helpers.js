@@ -20,7 +20,6 @@ import {
   dispatchToolCall,
 } from './helpers.js';
 import { createRng } from './rng.js';
-import { ROUTES } from './data.js';
 
 const results = [];
 function check(label, cond, detail) {

@@ -11,3 +11,7 @@ results/
 # PartyKit dev-server local state (Durable Object cache, etc.) — regenerated on
 # every `partykit dev` run, never useful in version control.
 .partykit/
+
+# Playwright end-to-end test output (npm run test:e2e).
+test-results/
+playwright-report/

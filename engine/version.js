@@ -44,6 +44,16 @@
 //     Tap Belt too) now scores choices by the dice's net effect after
 //     Mountain Mentor, so it never improves a die that is cancelled anyway.
 //   - Mountain Mentor cancels the highest nerf die (was: the first one).
+//   - Power Spotting's success heal stops at max endurance but never lowers
+//     endurance: a successful climb used to cap any surplus from rest-bonus
+//     gear back down to max, even without Power Spotting (applySuccessHeal).
+//   - climb_resolved now reports gearEffects (every gear effect that changed
+//     the climb), failPenalty, and the real enduranceCost (it ignored Body
+//     Tension Belt); dice_rolled reports discardedDice.
+//   - Local hot-seat play runs this engine (engine/engine.browser.js, built by
+//     engine/build-browser.js) instead of game.js's own copy of the rules, so
+//     local and online play can no longer drift apart. findLegalAction and
+//     explainIllegalAction back the UIs' click handling.
 //   - Route Reader Versatility stat shift is now in the engine: a climb action
 //     may carry shift {from, to, amount ≤ 10}, once per round, regular routes
 //     only. getLegalActions adds one suggested-shift variant per climb when it

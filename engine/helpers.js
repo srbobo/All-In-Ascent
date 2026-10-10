@@ -607,6 +607,72 @@ export function getSuccessEnduranceHeal(char) {
   return heal;
 }
 
+// Endurance after a success heal of `heal`: the heal stops at maxEndurance but
+// never takes endurance away, so endurance a rest pushed above max (rest-bonus
+// gear) is kept.
+export function applySuccessHeal(currentEndurance, maxEndurance, heal) {
+  if (heal <= 0) return currentEndurance;
+  return Math.max(currentEndurance, Math.min(maxEndurance, currentEndurance + heal));
+}
+
+// Owned gear cards with the given effectKind.
+function ownedGearWithEffect(char, effectKind) {
+  return (char.equipment || [])
+    .map(name => GEAR_SHOP.find(g => g.name === name))
+    .filter(g => g && g.effectKind === effectKind);
+}
+
+// Every gear effect that changed a resolved climb, as structured entries for
+// the climb_resolved event (and the UIs that show it). Each entry has
+// { gear, effectKind } plus effect-specific fields:
+//   timeCostReduction / enduranceHalvedOnTag  from, to (the cost)
+//   rerollOnTag / treatOneDieAsValue / milestoneBuffDiceBonus  die, from, to
+//   extraDieDiscardOne  extra, die (-1 = the extra die was discarded), from, to
+//   negateOneNerfDie  die, value, stat
+//   failBonusXp  xp;  ignoreFailPenalty  endurance (penalty avoided)
+//   successHealEndurance  endurance (actually healed)
+// `diceTrace` is the trace from rollClimbDice; `appliedModifiers` comes from
+// applyDiceToRequirements.
+export function describeClimbGearEffects({
+  char, route, effectRollArray, diceTrace, appliedModifiers, success, timeCost, enduranceCost, healed,
+}) {
+  const out = [];
+  const names = (kind) => ownedGearWithEffect(char, kind).map(g => g.name).join(', ');
+
+  const charOnlyTime = getEffectiveClimbTimeCost(char, route.time);
+  if (timeCost < charOnlyTime) {
+    out.push({ gear: names('timeCostReduction'), effectKind: 'timeCostReduction', from: charOnlyTime, to: timeCost });
+  }
+  if (enduranceCost < route.endurance) {
+    out.push({ gear: names('enduranceHalvedOnTag'), effectKind: 'enduranceHalvedOnTag', from: route.endurance, to: enduranceCost });
+  }
+  for (const t of diceTrace) {
+    if (t.effectKind === 'milestoneBuffDiceBonus' && t.from === t.to) continue; // already a 6
+    out.push({ ...t });
+  }
+  const mentor = ownedGearWithEffect(char, 'negateOneNerfDie')[0];
+  if (mentor) {
+    effectRollArray.forEach((effect, i) => {
+      if (effectiveDieModifier(char, effect) === 1 && appliedModifiers[i] && appliedModifiers[i].modifier === 0) {
+        out.push({ gear: mentor.name, effectKind: 'negateOneNerfDie', die: i, value: appliedModifiers[i].die, stat: effect.stat });
+      }
+    });
+  }
+  if (!success) {
+    for (const g of ownedGearWithEffect(char, 'failBonusXp')) {
+      out.push({ gear: g.name, effectKind: 'failBonusXp', xp: g.value || 0 });
+    }
+    if (char.key === 'ironLung') {
+      for (const g of ownedGearWithEffect(char, 'ignoreFailPenalty')) {
+        out.push({ gear: g.name, effectKind: 'ignoreFailPenalty', endurance: 5 });
+      }
+    }
+  } else if (healed > 0) {
+    out.push({ gear: names('successHealEndurance'), effectKind: 'successHealEndurance', endurance: healed });
+  }
+  return out;
+}
+
 // Engine v0.3.0 — Old Climbing Journal boosts every training session by +N.
 // Returns the per-training bonus boost (0 if no such gear owned).
 export function getTrainingBonusBoost(char) {
