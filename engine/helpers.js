@@ -356,7 +356,12 @@ function effectiveDieModifier(char, effect) {
 //     as 1. Applied as a final pass — replace the highest die with 1.
 //   - Climbing Coach (milestoneBuffDiceBonus, milestone climbs only): every
 //     BUFF die (modifier -1) is +1, max 6. Nerf dice are untouched.
-export function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilestone = false) {
+//
+// `trace` (optional array): each gear effect that fires pushes
+// { gear, effectKind, die, from, to } (die = index into the returned rolls;
+// Power Tap Belt also records `extra`, with die -1 when the extra die was the
+// one discarded). Read-only bookkeeping for UIs; it never changes the rolls.
+export function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilestone = false, trace = null) {
   const numDice = Math.max(2, effectRollArray.length);
   const ownedGear = (char && char.equipment ? char.equipment : [])
     .map(name => GEAR_SHOP.find(g => g.name === name))
@@ -371,7 +376,9 @@ export function rollClimbDice(rng, effectRollArray, char = null, route = null, i
     if (gear.effectKind === 'rerollOnTag' && onTag(gear)) {
       let maxIdx = 0;
       for (let i = 1; i < rolls.length; i++) if (rolls[i] > rolls[maxIdx]) maxIdx = i;
+      const from = rolls[maxIdx];
       rolls[maxIdx] = rng.rollDie(6);
+      if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: maxIdx, from, to: rolls[maxIdx] });
     }
   }
 
@@ -388,6 +395,10 @@ export function rollClimbDice(rng, effectRollArray, char = null, route = null, i
         const gain = mod === -1 ? extra - rolls[i] : mod === 1 ? rolls[i] - extra : 0;
         if (gain > bestGain) { bestGain = gain; bestIdx = i; }
       }
+      if (trace) {
+        trace.push({ gear: gear.name, effectKind: gear.effectKind, die: bestIdx, extra,
+          from: bestIdx === -1 ? extra : rolls[bestIdx], to: extra });
+      }
       if (bestIdx !== -1) rolls[bestIdx] = extra;
     }
   }
@@ -398,7 +409,10 @@ export function rollClimbDice(rng, effectRollArray, char = null, route = null, i
       const target = gear.value || 1;
       let maxIdx = 0;
       for (let i = 1; i < rolls.length; i++) if (rolls[i] > rolls[maxIdx]) maxIdx = i;
-      if (rolls[maxIdx] > target) rolls[maxIdx] = target;
+      if (rolls[maxIdx] > target) {
+        if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: maxIdx, from: rolls[maxIdx], to: target });
+        rolls[maxIdx] = target;
+      }
     }
   }
 
@@ -408,7 +422,10 @@ export function rollClimbDice(rng, effectRollArray, char = null, route = null, i
       if (gear.effectKind === 'milestoneBuffDiceBonus') {
         const bonus = gear.value || 1;
         for (let i = 0; i < effectRollArray.length; i++) {
-          if (effectRollArray[i].modifier === -1) rolls[i] = Math.min(6, rolls[i] + bonus);
+          if (effectRollArray[i].modifier !== -1) continue;
+          const from = rolls[i];
+          rolls[i] = Math.min(6, rolls[i] + bonus);
+          if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: i, from, to: rolls[i] });
         }
       }
     }
