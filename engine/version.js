@@ -41,8 +41,9 @@
 //     helps: Crimp re-rolls the die furthest on the wrong side of average
 //     (3.5), Memorization sets the highest nerf die to 1. Both used to take
 //     the highest die, which threw away good buff dice. The dice gear (Power
-//     Tap Belt too) now skips dice that apply nothing, including the nerf die
-//     Mountain Mentor is about to negate.
+//     Tap Belt too) now scores choices by the dice's net effect after
+//     Mountain Mentor, so it never improves a die that is cancelled anyway.
+//   - Mountain Mentor cancels the highest nerf die (was: the first one).
 //   - Route Reader Versatility stat shift is now in the engine: a climb action
 //     may carry shift {from, to, amount ≤ 10}, once per round, regular routes
 //     only. getLegalActions adds one suggested-shift variant per climb when it

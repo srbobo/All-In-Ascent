@@ -349,19 +349,35 @@ function effectiveDieModifier(char, effect) {
   return effect.modifier;
 }
 
-// Index of the nerf die Mountain Mentor will negate in applyDiceToRequirements
-// (the first die whose effective modifier is +1), or -1 if the card isn't owned
-// or there is no such die. Lets the dice gear leave that die alone.
-function mountainMentorDieIndex(char, effectRollArray, ownedGear) {
-  if (!ownedGear.some(g => g.effectKind === 'negateOneNerfDie')) return -1;
-  return effectRollArray.findIndex(e => effectiveDieModifier(char, e) === 1);
+// Does this character own Mountain Mentor (negateOneNerfDie)?
+function hasMountainMentor(char) {
+  return !!char && (char.equipment || []).some(name => {
+    const g = GEAR_SHOP.find(x => x.name === name);
+    return g && g.effectKind === 'negateOneNerfDie';
+  });
 }
 
-// How much changing a die from `from` to `to` lowers its stat requirement,
-// given the modifier it applies: a buff die (-1) wants a high number, a nerf
-// die (+1) a low one, a die that applies nothing (0) doesn't care.
-function dieChangeGain(mod, from, to) {
-  return mod * (from - to);
+// Index of the nerf die Mountain Mentor cancels: the highest-rolled die whose
+// effective modifier is +1 (the first such die on a tie), or -1 if none.
+function mountainMentorDieIndex(char, effectRollArray, rolls) {
+  let idx = -1;
+  for (let i = 0; i < effectRollArray.length; i++) {
+    if (effectiveDieModifier(char, effectRollArray[i]) !== 1) continue;
+    if (idx === -1 || rolls[i] > rolls[idx]) idx = i;
+  }
+  return idx;
+}
+
+// Net amount the dice add to this climb's requirements (nerf dice add, buff
+// dice subtract) after character overrides and, if owned, Mountain Mentor.
+// Lower is better for the climber. The die-choosing gear minimises this.
+function diceRequirementTotal(char, effectRollArray, rolls, mentor) {
+  const mentorIdx = mentor ? mountainMentorDieIndex(char, effectRollArray, rolls) : -1;
+  let total = 0;
+  for (let i = 0; i < effectRollArray.length; i++) {
+    if (i !== mentorIdx) total += effectiveDieModifier(char, effectRollArray[i]) * rolls[i];
+  }
+  return total;
 }
 
 // Roll the dice for a climb. `numDice` is max(2, effects.length) — even on a
@@ -370,13 +386,14 @@ function dieChangeGain(mod, from, to) {
 //
 // Gear effects on dice (applied AFTER the initial roll, in this order). The
 // "die of your choice" cards pick for the player: the die whose change most
-// lowers its requirement (a buff die wants a high number, a nerf die a low
-// one). Dice that apply nothing are never picked — dice negated by Free Solo /
-// Technician, dice past the route's effects, and the nerf die Mountain Mentor
-// is about to negate anyway.
-//   - Crimp Sequence Decoder (rerollOnTag, Pinch/Crimp): re-roll one die — the
-//     one furthest on the wrong side of a fresh roll's average (3.5). No
-//     re-roll when every die is already average or better.
+// lowers the dice's net effect on the requirements (diceRequirementTotal — a
+// buff die wants a high number, a nerf die a low one), first die on a tie.
+// That total already leaves out dice that apply nothing: dice negated by Free
+// Solo / Technician, dice past the route's effects, and the highest nerf die,
+// which Mountain Mentor cancels.
+//   - Crimp Sequence Decoder (rerollOnTag, Pinch/Crimp): re-roll one die,
+//     scoring a re-roll as a fresh roll's average (3.5). No re-roll when no die
+//     is expected to improve.
 //   - Power Tap Belt (extraDieDiscardOne, Dynamic): roll ONE extra die, then
 //     discard any one die — so an N-die climb rolls N+1 and keeps N. The extra
 //     die is swapped in for whichever die it improves the most, or is itself
@@ -401,15 +418,17 @@ function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilest
   const rolls = [];
   for (let i = 0; i < numDice; i++) rolls.push(rng.rollDie(6));
 
-  const mentorIdx = mountainMentorDieIndex(char, effectRollArray, ownedGear);
-  // Modifier die i will actually apply (0 for dice that count for nothing).
-  const dieMod = (i) => (i === mentorIdx ? 0 : effectiveDieModifier(char, effectRollArray[i]));
-  // Index of the die whose change to `to` gains the most, or -1 if no change helps.
+  const mentor = hasMountainMentor(char);
+  // Index of the die whose change to `to` most lowers diceRequirementTotal,
+  // or -1 if no change helps.
   const bestDieToChange = (to) => {
+    const before = diceRequirementTotal(char, effectRollArray, rolls, mentor);
     let bestIdx = -1;
     let bestGain = 0;
     for (let i = 0; i < rolls.length; i++) {
-      const gain = dieChangeGain(dieMod(i), rolls[i], to);
+      const trial = rolls.slice();
+      trial[i] = to;
+      const gain = before - diceRequirementTotal(char, effectRollArray, trial, mentor);
       if (gain > bestGain) { bestGain = gain; bestIdx = i; }
     }
     return bestIdx;
@@ -477,7 +496,8 @@ function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilest
 //
 // Engine v0.3.0 gear effect (negateOneNerfDie / Mountain Mentor):
 //   On every climb, the player may treat ONE nerf die (modifier +1) as 0.
-//   We apply this to the FIRST nerf die encountered (best-effort policy).
+//   We cancel the highest-rolled nerf die (the first one on a tie), counting
+//   only nerf dice the character overrides haven't already negated.
 //
 // Returns { requirements, appliedModifiers }
 //   appliedModifiers = array of {die, stat, modifier, deltaApplied, source}
@@ -491,11 +511,10 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls) {
   };
   const appliedModifiers = [];
 
-  // Mountain Mentor: negate ONE nerf die per climb (one-shot per climb)
-  let mountainMentorAvailable = (char.equipment || []).some(name => {
-    const g = GEAR_SHOP.find(x => x.name === name);
-    return g && g.effectKind === 'negateOneNerfDie';
-  });
+  // Mountain Mentor: cancel the highest nerf die (one per climb).
+  const mentorIdx = hasMountainMentor(char)
+    ? mountainMentorDieIndex(char, effectRollArray, effectRollArray.map((_, i) => diceRolls[i] ?? 0))
+    : -1;
 
   for (let i = 0; i < effectRollArray.length; i++) {
     const effect = effectRollArray[i];
@@ -504,11 +523,7 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls) {
 
     if (char.key === 'freeSolo') effectiveMod = 0;
     if (char.key === 'technician' && effectiveMod === 1) effectiveMod = 0;
-    // Mountain Mentor — apply to the first nerf die we see that hasn't already been negated.
-    if (effectiveMod === 1 && mountainMentorAvailable) {
-      effectiveMod = 0;
-      mountainMentorAvailable = false;
-    }
+    if (i === mentorIdx) effectiveMod = 0;
 
     // stat may be outside the four stat fields only as paranoia; ignore
     // silently if so (matches game.js permissiveness).
