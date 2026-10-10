@@ -81,6 +81,7 @@ export default [
       'docs/**',
       'online/vendor/**', // vendored third-party library
       'engine/data.js',   // auto-generated from game.js
+      'engine/helpers.browser.js', // auto-generated from engine/helpers.js
       '.partykit/**',
       '.claude/**',
     ],
