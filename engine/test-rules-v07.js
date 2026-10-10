@@ -8,6 +8,7 @@
 //   - Climbing Coach +1 on buff dice only
 //   - Power Tap Belt: roll N+1, keep N
 //   - Crimp Sequence Decoder / Sequence Memorization pick the die that helps
+//   - Mountain Mentor cancels the highest nerf die
 //   - Route Reader stat shift in the engine
 
 import { createGame, belayerCountFor, regularRoutePool } from './state.js';
@@ -31,6 +32,13 @@ function throws(fn) {
 const queuedRng = (values) => {
   const q = [...values];
   return { rollDie: () => { if (!q.length) throw new Error('rng queue empty'); return q.shift(); } };
+};
+
+// Total amount the dice added to a route's four requirements.
+const flatRoute = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
+const addedByDice = (char, effects, dice) => {
+  const { requirements } = applyDiceToRequirements(char, flatRoute, effects, dice);
+  return Object.values(requirements).reduce((sum, v) => sum + v, 0) - 80;
 };
 
 const charBase = (key, equipment = []) => ({
@@ -165,8 +173,11 @@ check('belayerCountFor(4) = 3', belayerCountFor(4) === 3);
 
   const nerfs = [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }];
   const mentorBelt = charBase('ironLung', ['Power Tap Belt', 'Mountain Mentor']);
+  // Rolls 6 and 3, extra 1: Mentor cancels the higher nerf die and the 1 replaces
+  // the other, so the dice add just 1 (not 3, from swapping in for the cancelled 6).
   const g = rollClimbDice(queuedRng([6, 3, 1]), nerfs, mentorBelt, dynamic);
-  check('Power Tap: skips the nerf die Mountain Mentor negates', g[0] === 6 && g[1] === 1, JSON.stringify(g));
+  check('Power Tap + Mountain Mentor: extra die improves a nerf die Mentor keeps',
+    addedByDice(mentorBelt, nerfs, g) === 1, JSON.stringify(g));
 }
 
 // =============================================================================
@@ -194,6 +205,13 @@ check('belayerCountFor(4) = 3', belayerCountFor(4) === 3);
   const e = rollClimbDice(queuedRng([3, 6, 5]), effects, tech, crimp);
   check('Crimp: Technician never re-rolls an ignored nerf die', e[0] === 5 && e[1] === 6, JSON.stringify(e));
 
+  // Nerf 6 and 2 with Mountain Mentor: the 6 is cancelled anyway and re-rolling
+  // the 2 is expected to make it worse, so no re-roll (a third draw would throw).
+  const nerfs = [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }];
+  const mentorDecoder = charBase('ironLung', ['Crimp Sequence Decoder', 'Mountain Mentor']);
+  const f = rollClimbDice(queuedRng([6, 2]), nerfs, mentorDecoder, crimp);
+  check('Crimp + Mountain Mentor: no re-roll of the die Mentor cancels', f[0] === 6 && f[1] === 2, JSON.stringify(f));
+
   const trace = [];
   rollClimbDice(queuedRng([1, 4, 5]), effects, decoder, crimp, false, trace);
   check('Crimp: trace names the re-rolled die',
@@ -220,14 +238,43 @@ check('belayerCountFor(4) = 3', belayerCountFor(4) === 3);
   const c = rollClimbDice(queuedRng([6, 6, 6]), mixed, solo, { tag: null });
   check('Memorization: no change when Free Solo ignores every die', c.every(d => d === 6), JSON.stringify(c));
 
+  // Nerf 6 and 4: one is cancelled by Mentor, the other becomes a 1.
   const nerfs = [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }];
-  const route = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
   const mentor = charBase('ironLung', ['Sequence Memorization', 'Mountain Mentor']);
   const d = rollClimbDice(queuedRng([6, 4]), nerfs, mentor, { tag: null });
-  check('Memorization + Mountain Mentor: leaves the die Mentor negates', d[0] === 6 && d[1] === 1, JSON.stringify(d));
-  const { requirements } = applyDiceToRequirements(mentor, route, nerfs, d);
-  check('Memorization + Mountain Mentor: both nerf dice neutralised',
-    requirements.strength === 20 && requirements.focus === 21, JSON.stringify(requirements));
+  check('Memorization + Mountain Mentor: never spends both on one die',
+    addedByDice(mentor, nerfs, d) === 1, JSON.stringify(d));
+}
+
+// =============================================================================
+// MOUNTAIN MENTOR — CANCEL THE HIGHEST NERF DIE
+// =============================================================================
+{
+  const mentor = charBase('ironLung', ['Mountain Mentor']);
+  const nerfs = [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }];
+  const reqs = (char, effects, dice) => applyDiceToRequirements(char, flatRoute, effects, dice).requirements;
+
+  const a = reqs(mentor, nerfs, [2, 5]);
+  check('Mentor: cancels the higher nerf die', a.strength === 22 && a.focus === 20, JSON.stringify(a));
+
+  const b = reqs(mentor, nerfs, [4, 4]);
+  check('Mentor: cancels the first nerf die on a tie', b.strength === 20 && b.focus === 24, JSON.stringify(b));
+
+  const mixed = [{ stat: 'technique', modifier: -1 }, { stat: 'strength', modifier: 1 }];
+  const c = reqs(mentor, mixed, [6, 3]);
+  check('Mentor: never cancels a buff die', c.technique === 14 && c.strength === 20, JSON.stringify(c));
+
+  const d = reqs(mentor, [{ stat: 'technique', modifier: -1 }], [5]);
+  check('Mentor: no effect without a nerf die', d.technique === 15, JSON.stringify(d));
+
+  const tech = charBase('technician', ['Mountain Mentor']);
+  const e = reqs(tech, [{ stat: 'technique', modifier: -1 }, { stat: 'strength', modifier: 1 }], [2, 6]);
+  check('Mentor: Technician keeps buff dice (nerf dice already ignored)',
+    e.technique === 13 && e.strength === 15, JSON.stringify(e));
+
+  const { appliedModifiers } = applyDiceToRequirements(mentor, flatRoute, nerfs, [2, 5]);
+  check('Mentor: appliedModifiers shows the cancelled die as modifier 0',
+    appliedModifiers[0].modifier === 1 && appliedModifiers[1].modifier === 0, JSON.stringify(appliedModifiers));
 }
 
 // =============================================================================

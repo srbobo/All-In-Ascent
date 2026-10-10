@@ -103,7 +103,6 @@ const totalMin = ((Date.now() - startAll) / 60000).toFixed(1);
 const llmWins      = summaries.filter(s => s.winnerAgent?.startsWith('ollama')).length;
 const heurWins     = summaries.filter(s => s.winnerAgent === 'heuristic').length;
 const drawn        = summaries.filter(s => s.winner == null).length;
-const totalAction  = summaries.reduce((a, s) => a + s.actions, 0);
 const totalFbs     = summaries.reduce((a, s) => a + (s.fallbackCount || 0), 0);
 const llmMilestonesTotal = summaries.reduce((a, s) => a + (s.finalPlayers[1]?.milestonesDone || 0), 0);
 const heurMilestonesTotal = summaries.reduce((a, s) => a + (s.finalPlayers[0]?.milestonesDone || 0), 0);

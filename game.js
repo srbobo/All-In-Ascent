@@ -1,9 +1,13 @@
-// All In Ascent — browser game bundle.
+// All In Ascent — browser game: game data + UI.
 //
 // This file is the SINGLE SOURCE OF TRUTH for game data. The GAME DATA section
 // below is extracted into engine/data.js by `node engine/build-data.js` (run
 // automatically by the test/playtest npm scripts) so the Node engine, sim
 // harness, and analysis tools read the same values without hand-syncing.
+//
+// It holds NO game rules: local and online play both run the engine in
+// engine/ (loaded in the browser as engine/engine.browser.js). See the RULES
+// ENGINE BRIDGE section below and CLAUDE.md.
 // Rules version is kept in step with the Node engine (engine/version.js).
 const GAME_VERSION = '0.7.0';
 if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
@@ -256,34 +260,17 @@ const GEAR_SHOP = [
 
 // ===== GAME STATE =====
 
-let gameState = {
- round: 1,
- players: [],
- currentPlayerIndex: 0,
- routeClearingPosition: 0, // 0: between bouldering and lead, 1: between lead and top rope, 2: between top rope and bouldering
- availableRoutes: {
- bouldering: [],
- topRope: [],
- leadClimbing: []
- },
- // Top Rope belayer-station count = number of players − 1 (RuleModifications
- // 2026-06-27). Fixed for the whole game; set in startGame(). Each station
- // holds 2 routes and admits at most 1 climber.
- belayerCount: 1,
- gameLog: [],
- availableGear: [], // Randomized gear available in shop
- attemptedRoutes: {}, // Maps playerNum -> Set of route keys ("area:routeName") attempted this round
- milestoneRoutes: {
- beginner: null,
- intermediate: null,
- expert: null
- },
- gameEnded: false,
- winner: null,
- pendingLevelUp: null
-};
+// The engine's game state (engine/state.js createGame shape): built by
+// AscentEngine.createGame for local play, or the server's state online. null
+// until a game starts.
+let gameState = null;
 
-// ===== SECTION CAPACITY SYSTEM =====
+// UI-only state, kept out of the engine state.
+let gameLog = []; // newest first, max 20 entries
+let setupPlayerCount = 0; // chosen on the setup screen
+let setupCharacterKeys = []; // character picked by each player, in seat order
+
+// ===== BOARD QUERIES (engine rules, for the renderers) =====
 
 function formatLocationName(location) {
  // Convert location codes to display names
@@ -297,343 +284,32 @@ function formatLocationName(location) {
  };
 
  // Check if it's a training equipment location
- if (isTrainingEquipment(location)) {
+ if (AscentEngine.isTrainingEquipment(location)) {
  return `Training: ${location}`;
  }
 
  return locationNames[location] || location;
 }
 
-// Number of top-rope routes assigned to each belayer station.
-const ROUTES_PER_BELAYER = 2;
-
 function getSectionCapacity(section) {
- // Returns the maximum number of players allowed in a section
- switch(section) {
- case 'bouldering':
- return 10; // Unlimited for practical purposes
- case 'topRope':
- // Aggregate occupancy = belayer-station count (1 climber per station).
- // The real gate is per-station (see canClimbTopRopeStation).
- return Math.max(0, gameState.belayerCount);
- case 'leadClimbing':
- return 1; // A single lead belayer — one climber at a time
- case 'gearShop':
- return 10; // Unlimited for practical purposes
- case 'rest':
- return 10; // Unlimited for practical purposes
- case 'lobby':
- return 10; // Unlimited for practical purposes
- default:
- // Check if it's a training equipment location
- if (isTrainingEquipment(section)) {
- return 1; // Only one player per training equipment
- }
- return 10;
- }
-}
-
-function isTrainingEquipment(location) {
- // Check if location is a training equipment name
- const trainingEquipmentNames = TRAINING_AREAS.map(area => area.name);
- return trainingEquipmentNames.includes(location);
+ return AscentEngine.getSectionCapacity(section, gameState.belayerCount);
 }
 
 function getPlayersInSection(section) {
- // Returns array of players currently in a section
- return gameState.players.filter(p => p.character.location === section);
-}
-
-// ===== TOP ROPE BELAYER STATIONS (RuleModifications 2026-06-27) =====
-
-// The routes of `area` that may be dealt to the wall: the area's deck minus
-// this game's milestone routes (milestones stay on the milestone board and
-// never also appear as regular routes). Mirrors engine/state.js regularRoutePool.
-function regularRoutePool(area) {
- const milestoneNames = new Set(
- Object.values(gameState.milestoneRoutes || {})
- .filter(m => m && m.area === area)
- .map(m => m.route.name)
- );
- return ROUTES[area].filter(r => !milestoneNames.has(r.name));
-}
-
-// Draw the Top Rope rotation as belayerCount stations of ROUTES_PER_BELAYER
-// routes each. Returns a FLAT array of 2×belayerCount routes, each tagged with
-// a `belayer` index (0-based station).
-function drawTopRopeStations() {
- const count = Math.max(0, gameState.belayerCount) * ROUTES_PER_BELAYER;
- const pool = [...regularRoutePool('topRope')].sort(() => Math.random() - 0.5);
- return pool.slice(0, count).map((route, i) => ({
- ...route, belayer: Math.floor(i / ROUTES_PER_BELAYER),
- }));
+ return AscentEngine.getPlayersInSection(gameState.players, section);
 }
 
 // Belayer stations occupied by players OTHER than playerNum.
 function getOccupiedBelayerStations(playerNum) {
- const occupied = new Set();
- gameState.players.forEach(p => {
- if (p.playerNum === playerNum) return;
- const c = p.character;
- if (c.location === 'topRope' && c.belayerStation !== null && c.belayerStation !== undefined) {
- occupied.add(c.belayerStation);
- }
- });
- return occupied;
+ return AscentEngine.getOccupiedBelayerStations(gameState, playerNum);
 }
 
-// May playerNum occupy belayer station `stationIndex`? Free unless another
-// player holds it (the asking player may already be parked there).
-function canClimbTopRopeStation(stationIndex, playerNum) {
- if (stationIndex === null || stationIndex === undefined) return true;
- return !getOccupiedBelayerStations(playerNum).has(stationIndex);
-}
-
-// Pick a belayer station for a player who must occupy one but isn't tied to a
-// specific route's station (e.g. a Top Rope milestone). Reuses their current
-// station, else the lowest free one, else null.
-function pickFreeBelayerStation(playerNum) {
- const me = gameState.players.find(p => p.playerNum === playerNum);
- if (me && me.character.location === 'topRope' &&
- me.character.belayerStation !== null && me.character.belayerStation !== undefined) {
- return me.character.belayerStation;
- }
- const occupied = getOccupiedBelayerStations(playerNum);
- for (let i = 0; i < gameState.belayerCount; i++) {
- if (!occupied.has(i)) return i;
- }
- return null;
-}
-
-function canEnterSection(section, playerNum) {
- // Check if a player can enter a section
- const capacity = getSectionCapacity(section);
- const currentPlayers = getPlayersInSection(section);
- const player = gameState.players.find(p => p.playerNum === playerNum);
-
- // If player is already in this section, they can stay
- if (player && player.character.location === section) {
- return { canEnter: true, reason: '' };
- }
-
- // Check if section is at capacity
- if (currentPlayers.length >= capacity) {
- const playerNames = currentPlayers.map(p => `Player ${p.playerNum}`).join(', ');
-
- // Special message for training equipment
- if (isTrainingEquipment(section)) {
- return {
- canEnter: false,
- reason: `This training equipment is currently in use by ${playerNames}.`
- };
- }
-
- return {
- canEnter: false,
- reason: `Section is at capacity (${currentPlayers.length}/${capacity}). Currently occupied by: ${playerNames}`
- };
- }
-
- return { canEnter: true, reason: '' };
-}
-
-function movePlayerToSection(playerNum, section) {
- // Move a player to a section if space is available
- const check = canEnterSection(section, playerNum);
- if (!check.canEnter) {
- return { success: false, message: check.reason };
- }
-
- const player = gameState.players.find(p => p.playerNum === playerNum);
- if (player) {
- const oldLocation = player.character.location;
- player.character.location = section;
- return { success: true, message: `Moved from ${oldLocation} to ${section}` };
- }
-
- return { success: false, message: 'Player not found' };
-}
-
-// ===== AREA ACCESS CHECKING =====
-
+// Does the current player have the gear to climb in `area`?
 function checkAreaAccess(area) {
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
-
- // Free Solo bypasses all equipment requirements
- if (char.key === 'freeSolo') return { hasAccess: true, missingItems: [] };
-
- // Bouldering and Top Rope are OPEN — no gear required (RuleModifications).
- if (area === 'bouldering' || area === 'topRope') {
- return { hasAccess: true, missingItems: [] };
- }
-
- // Lead Climbing requires Belay Device + Locking Carabiner + Lead Rope
- // (Harness was removed from the game).
- if (area === 'leadClimbing') {
- const needs = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
- const missing = needs.filter(n => !char.equipment.includes(n));
- return { hasAccess: missing.length === 0, missingItems: missing };
- }
-
- return { hasAccess: true, missingItems: [] };
+ return AscentEngine.checkAreaAccess(gameState.players[gameState.currentPlayerIndex].character, area);
 }
 
-// ===== GEAR BONUS CALCULATION =====
-
-function calculateGearBonuses(route, area) {
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
-
- const bonuses = {
- strength: 0,
- technique: 0,
- focus: 0,
- flexibility: 0
- };
-
- // Check if this route has been attempted before (for Repeated filter)
- const routeKey = `${area}:${route.name}`;
- const isRepeated = gameState.attemptedRoutes[currentPlayer.playerNum] &&
- gameState.attemptedRoutes[currentPlayer.playerNum].has(routeKey);
-
- // Iterate through owned equipment
- char.equipment.forEach(gearName => {
- const gear = GEAR_SHOP.find(g => g.name === gearName);
- if (!gear) return;
-
- // Skip gear that doesn't apply to routes (time/endurance only)
- if (gear.statEffect === 'endurance' || gear.statEffect === 'time' || gear.statEffect === 'special') {
- return;
- }
-
- // Check for "Repeated" route filter
- if (gear.routeFilter && gear.routeFilter.includes("Repeated")) {
- if (!isRepeated) return; // Only applies to repeated routes
- }
-
- // Check route and feature filters.
- // When BOTH routeFilter and holdFeatureFilter are present, use OR logic (either match qualifies).
- // When only one is present, that filter must pass.
- const hasRouteFilter = gear.routeFilter && gear.routeFilter.length > 0 &&
- !gear.routeFilter.includes("All") && !gear.routeFilter.includes("Repeated");
- const hasFeatureFilter = gear.holdFeatureFilter && gear.holdFeatureFilter.length > 0;
-
- if (hasRouteFilter || hasFeatureFilter) {
- let routeFilterPasses = false;
- let featureFilterPasses = false;
-
- if (hasRouteFilter) {
- if (area === 'bouldering' && gear.routeFilter.includes('Bouldering')) routeFilterPasses = true;
- if (area === 'topRope' && gear.routeFilter.includes('Top Rope')) routeFilterPasses = true;
- if (area === 'leadClimbing' && gear.routeFilter.includes('Lead')) routeFilterPasses = true;
- if (route.routeType && gear.routeFilter.includes(route.routeType)) routeFilterPasses = true;
- }
-
- if (hasFeatureFilter) {
- if (route.holdFeatures) {
- route.holdFeatures.forEach(feature => {
- if (gear.holdFeatureFilter.includes(feature)) featureFilterPasses = true;
- });
- }
- if (route.moveFeatures) {
- route.moveFeatures.forEach(feature => {
- if (gear.holdFeatureFilter.includes(feature)) featureFilterPasses = true;
- });
- }
- }
-
- // OR logic when both filters specified; AND logic when only one is specified
- if (hasRouteFilter && hasFeatureFilter) {
- if (!routeFilterPasses && !featureFilterPasses) return;
- } else {
- if (hasRouteFilter && !routeFilterPasses) return;
- if (hasFeatureFilter && !featureFilterPasses) return;
- }
- }
-
- // Apply gear effect (negative values reduce requirements, which is a bonus)
- if (gear.statEffect === 'all') {
- bonuses.strength += Math.abs(gear.value);
- bonuses.technique += Math.abs(gear.value);
- bonuses.focus += Math.abs(gear.value);
- bonuses.flexibility += Math.abs(gear.value);
- } else if (gear.statEffect === 'strength') {
- bonuses.strength += Math.abs(gear.value);
- } else if (gear.statEffect === 'technique') {
- bonuses.technique += Math.abs(gear.value);
- } else if (gear.statEffect === 'focus') {
- bonuses.focus += Math.abs(gear.value);
- } else if (gear.statEffect === 'flexibility') {
- bonuses.flexibility += Math.abs(gear.value);
- }
- });
-
- return bonuses;
-}
-
-// ===== MILESTONE ROUTES SYSTEM =====
-
-function selectMilestoneRoutes() {
- // Define difficulty ranges based on grade
- const beginnerRoutes = [];
- const intermediateRoutes = [];
- const expertRoutes = [];
-
- // Categorize all routes by difficulty
- Object.keys(ROUTES).forEach(area => {
- ROUTES[area].forEach(route => {
- const grade = route.grade;
-
- // Bouldering grades
- if (grade === 'V0' || grade === 'V1' || grade === 'V2') {
- beginnerRoutes.push({ area, route });
- } else if (grade === 'V3' || grade === 'V4' || grade === 'V5' || grade === 'V6' || grade === 'V7') {
- intermediateRoutes.push({ area, route });
- } else if (grade === 'V8' || grade === 'V9' || grade === 'V10' || grade === 'V11' || grade === 'V12') {
- expertRoutes.push({ area, route });
- }
- // Top Rope grades
- else if (grade === '5.6' || grade === '5.7' || grade === '5.8') {
- beginnerRoutes.push({ area, route });
- } else if (grade === '5.9' || grade === '5.10a' || grade === '5.10b' || grade === '5.10d' || grade === '5.11b' || grade === '5.11c') {
- intermediateRoutes.push({ area, route });
- } else if (grade === '5.12a' || grade === '5.12b' || grade === '5.12d' || grade === '5.13a' || grade === '5.13c') {
- expertRoutes.push({ area, route });
- }
- // Lead grades (5.8 and 5.9 are beginner for lead)
- else if (area === 'leadClimbing' && (grade === '5.8' || grade === '5.9')) {
- beginnerRoutes.push({ area, route });
- } else if (area === 'leadClimbing' && (grade === '5.10a' || grade === '5.10b' || grade === '5.10d' || grade === '5.11a' || grade === '5.11b' || grade === '5.11c')) {
- intermediateRoutes.push({ area, route });
- } else if (area === 'leadClimbing' && (grade === '5.12a' || grade === '5.12b' || grade === '5.12d' || grade === '5.13a' || grade === '5.14a')) {
- expertRoutes.push({ area, route });
- }
- });
- });
-
- // Scenario 2C: sequential area-exclusion sampling (v0.4.0).
- // The three milestones must span three DIFFERENT climbing areas. Mirrors
- // engine/state.js pickMilestoneRoutes so local play matches online play.
- const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
- // 1. Beginner — free pick from any area.
- const beginner = pick(beginnerRoutes);
-
- // 2. Intermediate — only from a different area than the beginner pick.
- let intermediatePool = intermediateRoutes.filter(r => r.area !== beginner.area);
- if (intermediatePool.length === 0) intermediatePool = intermediateRoutes; // safety fallback
- const intermediate = pick(intermediatePool);
-
- // 3. Expert — only from a third area, different from both prior picks.
- let expertPool = expertRoutes.filter(r => r.area !== beginner.area && r.area !== intermediate.area);
- if (expertPool.length === 0) expertPool = expertRoutes; // safety fallback
- const expert = pick(expertPool);
-
- gameState.milestoneRoutes.beginner = beginner;
- gameState.milestoneRoutes.intermediate = intermediate;
- gameState.milestoneRoutes.expert = expert;
-}
+// ===== MILESTONE ROUTES =====
 
 function renderMilestonePanel() {
  const container = document.getElementById('milestonePanel');
@@ -725,20 +401,18 @@ function startCharacterSelect() {
  return;
  }
 
- gameState.players = [];
- for (let i = 0; i < numPlayers; i++) {
- gameState.players.push({ playerNum: i + 1, character: null });
- }
+ setupPlayerCount = numPlayers;
+ setupCharacterKeys = [];
 
  const charSelectionDiv = document.getElementById('characterSelection');
  if (!charSelectionDiv) return;
 
  // Lock the Continue button + player-count input so we can't re-trigger this
  // flow mid-selection. Re-running this function with characters already
- // chosen would reset gameState.players to empty while leaving the Start
- // Game button enabled — that's how bug #3 ("start without character") used
- // to fire. Both controls re-enable themselves only after the game ends
- // (via the page reload that happens on "New Game" / win screen close).
+ // chosen would reset the picks while leaving the Start Game button enabled
+ // — that's how bug #3 ("start without character") used to fire. Both
+ // controls re-enable themselves only after the game ends (via the page
+ // reload that happens on "New Game" / win screen close).
  const continueBtn = document.getElementById('continueBtn');
  if (continueBtn) continueBtn.disabled = true;
  numPlayersInput.disabled = true;
@@ -800,28 +474,8 @@ function renderCharacterSelect() {
 }
 
 function selectCharacter(charKey) {
- const nextPlayer = gameState.players.find(p => !p.character);
- if (!nextPlayer) return;
-
- const char = CHARACTERS[charKey];
- nextPlayer.character = {
- key: charKey,
- ...JSON.parse(JSON.stringify(char)),
- level: 1,
- xp: 0,
- currentEndurance: char.startingEndurance,
- maxEndurance: char.startingEndurance,
- stats: { ...char.startingStats },
- equipment: [],
- trainingBonuses: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
- gearBonuses: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
- timeRemaining: 10,
- abilityUsed: false,
- betaBoostActive: false, // Route Reader: set to true after resting, consumed on next climb
- location: 'lobby', // Track which section of the gym the player is at
- belayerStation: null, // Which Top Rope belayer station (0-based) the player occupies, or null
- milestonesCompleted: { beginner: false, intermediate: false, expert: false }
- };
+ if (setupCharacterKeys.length >= setupPlayerCount || setupCharacterKeys.includes(charKey)) return;
+ setupCharacterKeys.push(charKey);
 
  // Mark character as selected
  document.querySelectorAll('.character-card').forEach((card, idx) => {
@@ -833,7 +487,7 @@ function selectCharacter(charKey) {
  });
 
  // Check if all players have selected
- if (gameState.players.every(p => p.character)) {
+ if (setupCharacterKeys.length === setupPlayerCount) {
  document.getElementById('startGameBtn').disabled = false;
  }
 }
@@ -841,9 +495,8 @@ function selectCharacter(charKey) {
 function startGame() {
  // Defense in depth: if the Start Game button somehow gets clicked while a
  // player slot is still missing a character (bug #3 escape hatch), bail out
- // loudly instead of crashing on .character.name later.
- if (!Array.isArray(gameState.players) || gameState.players.length === 0
-     || gameState.players.some(p => !p || !p.character)) {
+ // loudly instead of crashing later.
+ if (setupPlayerCount < 1 || setupCharacterKeys.length !== setupPlayerCount) {
   alert('Each player must select a character before starting the game.');
   return;
  }
@@ -856,20 +509,13 @@ function startGame() {
  // original hero treatment.
  document.body.classList.add('playing');
 
- // Initialize attempted routes tracking
- gameState.attemptedRoutes = {};
+ // The engine deals the milestones, walls and shop from a random seed. The
+ // seed is logged so a local game can be replayed exactly.
+ const seed = Math.floor(Math.random() * 2 ** 32);
+ gameState = AscentEngine.createGame({ seed, characterKeys: setupCharacterKeys }).state;
 
- // Top Rope belayer stations: N − 1 for N players, minimum 1 (the solo
- // Auto-Belay). Fixed for the whole game. Mirrors engine/state.js belayerCountFor.
- gameState.belayerCount = Math.max(1, gameState.players.length - 1);
-
- // Select milestone routes FIRST (before initializing regular routes)
- selectMilestoneRoutes();
-
- initializeRoutes();
- initializeGearShop();
  renderGameBoard();
- addLog("Game started! Round 1 begins.");
+ addLog(`Game started! Round 1 begins. (seed ${seed})`);
  addLog(" Milestone routes have been set! First player to complete all 3 wins the game!");
 
  // EFFECTS: opening round transition + first turn log.
@@ -880,80 +526,15 @@ function startGame() {
  }
 }
 
-function initializeRoutes() {
- // Shuffle and select 5 bouldering routes (milestone routes excluded)
- const boulderingPool = [...regularRoutePool('bouldering')].sort(() => Math.random() - 0.5);
- gameState.availableRoutes.bouldering = boulderingPool.slice(0, 5);
-
- // Lead climbing starts with 5 routes
- const leadPool = [...regularRoutePool('leadClimbing')].sort(() => Math.random() - 0.5);
- gameState.availableRoutes.leadClimbing = leadPool.slice(0, 5);
-
- // Top rope is split into belayerCount stations of 2 routes each.
- gameState.availableRoutes.topRope = drawTopRopeStations();
-}
-
-function initializeGearShop() {
- // Define access card names that should never be in random rotation
- const accessCardNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
-
- // Filter out access cards from the pool
- const nonAccessGear = GEAR_SHOP.filter(gear => !accessCardNames.includes(gear.name));
-
- // Shuffle and select 3 random gear items (excluding access cards)
- const gearPool = [...nonAccessGear].sort(() => Math.random() - 0.5);
- gameState.availableGear = gearPool.slice(0, 3);
-}
-
-function replaceGearInShop(purchasedGearName) {
- // Define access card names
- const accessCardNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
-
- // Access cards should not be replaced - they stay visible
- if (accessCardNames.includes(purchasedGearName)) {
- return; // Don't replace access cards
- }
-
- // Remove purchased gear and add a new random one
- const purchasedIndex = gameState.availableGear.findIndex(g => g.name === purchasedGearName);
-
- if (purchasedIndex !== -1) {
- // Get all gear currently in shop or owned by any player
- const ownedGearNames = new Set();
- gameState.players.forEach(player => {
- player.character.equipment.forEach(name => ownedGearNames.add(name));
- });
-
- const unavailableGearNames = new Set([
- ...gameState.availableGear.map(g => g.name),
- ...ownedGearNames,
- ...accessCardNames // Also exclude access cards from pool
- ]);
-
- const availablePool = GEAR_SHOP.filter(gear =>
- !unavailableGearNames.has(gear.name)
-);
-
- if (availablePool.length > 0) {
- // Replace with random new gear
- const randomGear = availablePool[Math.floor(Math.random() * availablePool.length)];
- gameState.availableGear[purchasedIndex] = randomGear;
- } else {
- // No more gear available, remove the slot
- gameState.availableGear.splice(purchasedIndex, 1);
- }
- }
-}
-
 function addLog(message) {
- gameState.gameLog.unshift({ time: new Date().toLocaleTimeString(), message });
- if (gameState.gameLog.length > 20) gameState.gameLog.pop();
+ gameLog.unshift({ time: new Date().toLocaleTimeString(), message });
+ if (gameLog.length > 20) gameLog.pop();
  renderLog();
 }
 
 function renderLog() {
  const logEntries = document.getElementById('logEntries');
- logEntries.innerHTML = gameState.gameLog.map(entry => `
+ logEntries.innerHTML = gameLog.map(entry => `
  <div class="log-entry">
  <div class="log-time">${entry.time}</div>
  <div>${entry.message}</div>
@@ -979,15 +560,13 @@ function renderGameBoard() {
 // during a UI cleanup pass; full panels are now always visible.
 
 function renderGameInfo() {
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
 
  // B2: dropped the redundant "Current Player" info-box.
  // B3: belayers info-box shows the fixed Top Rope belayer-station count.
  // C3: Rest is an inline button here, not its own panel.
  // The route-clearing token is now rendered as a pill on the area-title
  // of the climbing area that will be cleared next (see renderSectionStatusPills).
- const char = currentPlayer.character;
- const canRest = !gameState.gameEnded && char.timeRemaining >= 1;
+ const canRest = isLegalNow({ type: 'rest' });
  const restBtn = `<button class="info-rest-btn" onclick="restAction()" ${canRest ? '' : 'disabled'}>Rest (Ti 1)</button>`;
 
  document.getElementById('gameInfo').innerHTML = `
@@ -1084,7 +663,7 @@ function renderPlayers() {
   const xpPct = char.level < 15
    ? Math.max(0, Math.min(100, ((char.xp - xpForLevel.cumulative) / xpForLevel.needed) * 100))
    : 100;
-  const spendableXP = getSpendableXP(char);
+  const spendableXP = AscentEngine.getSpendableXp(char);
   const xpToGo = getXPToNextLevel(char);
 
   const trBonus = (s) => (char.trainingBonuses[s] || 0) + (char.gearBonuses[s] || 0);
@@ -1328,12 +907,10 @@ function createRouteCard(route, area, idx) {
 
  // Check if route already attempted
  const routeKey = `${area}:${route.name}`;
- const alreadyAttempted = gameState.attemptedRoutes[currentPlayer.playerNum]?.has(routeKey) || false;
+ const alreadyAttempted = !!gameState.attemptedRoutes[currentPlayer.playerNum]?.[routeKey];
 
  const costs = getClimbCosts(char, route);
- const canAttempt = char.timeRemaining >= costs.time &&
- char.currentEndurance >= costs.endurance &&
- !alreadyAttempted;
+ const canAttempt = isLegalNow({ type: 'climb', area, routeName: route.name });
 
  // Check if player has any applicable gear
  const playerHasGear = route.gearModifiers && route.gearModifiers.length > 0
@@ -1426,14 +1003,11 @@ function renderTraining() {
 
  TRAINING_AREAS.forEach(area => {
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-  const char = currentPlayer.character;
   const playersHere = getPlayersInSection(area.name);
   const isOccupied = playersHere.length > 0;
   const occupyingPlayer = isOccupied ? playersHere[0] : null;
   const isMine = isOccupied && occupyingPlayer.playerNum === currentPlayer.playerNum;
-  const canTrain = char.timeRemaining >= area.time
-                && char.currentEndurance >= area.endurance
-                && (!isOccupied || isMine);
+  const canTrain = isLegalNow({ type: 'train', areaName: area.name });
 
   const card = document.createElement('div');
   card.className = 'training-area compact-card';
@@ -1498,11 +1072,11 @@ function renderStore() {
  const container = document.getElementById('gearShop');
  const currentPlayer = gameState.players[gameState.currentPlayerIndex];
  const char = currentPlayer.character;
- const spendableXP = getSpendableXP(char);
+ const spendableXP = AscentEngine.getSpendableXp(char);
  const xpToGo = getXPToNextLevel(char);
 
  // Affordability badge on the area-title (no longer collapses the panel).
- syncShopCollapseState(char, spendableXP);
+ syncShopCollapseState();
 
  // Occupancy is on the area-title pill — no inline duplicate. Header line
  // keeps the spendable / XP-to-next info that drives buy decisions.
@@ -1510,9 +1084,6 @@ function renderStore() {
  <strong style="color: #28a745;">Spendable: ${spendableXP} XP</strong> ·
  <strong style="color: #ff9800;">${xpToGo} XP to next level</strong>
  </p>`;
-
- const hasGearBag = char.equipment.includes('Gear Bag');
- const canVisitStore = hasGearBag || char.timeRemaining >= 1;
 
  // Two-column wrapper: essential gear on the left, rotating gear on the right.
  const columnsWrapper = document.createElement('div');
@@ -1526,13 +1097,12 @@ function renderStore() {
    <div class="column-subhead">Gates access to Lead Climbing (Top Rope is open)</div>
  `;
 
- // Define the 3 essential access cards (Harness removed in RuleModifications)
- const accessCardNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
- const accessCards = GEAR_SHOP.filter(g => accessCardNames.includes(g.name));
+ // The 3 essential access cards (Harness removed in RuleModifications)
+ const accessCards = GEAR_SHOP.filter(g => AscentEngine.ACCESS_CARDS.includes(g.name));
 
  accessCards.forEach(gear => {
  const owned = char.equipment.includes(gear.name);
- const canAfford = !owned && canVisitStore && spendableXP >= gear.cost;
+ const canAfford = isLegalNow({ type: 'buyGear', gearName: gear.name });
 
  // Check prerequisites
  let prerequisitesMet = true;
@@ -1576,7 +1146,7 @@ function renderStore() {
 
  gameState.availableGear.forEach(gear => {
  const owned = char.equipment.includes(gear.name);
- const canAfford = !owned && canVisitStore && spendableXP >= gear.cost;
+ const canAfford = isLegalNow({ type: 'buyGear', gearName: gear.name });
 
  // Check prerequisites
  let prerequisitesMet = true;
@@ -1612,56 +1182,70 @@ function renderStore() {
  container.appendChild(columnsWrapper);
 }
 
-// ===== CHARACTER ABILITY SYSTEM =====
+// ===== RULES ENGINE BRIDGE =====
+//
+// game.js holds no game rules. Every rule lives in the engine (engine/*.js),
+// which index.html loads after this file as one classic script
+// (engine/engine.browser.js, generated by engine/build-browser.js) exposing
+// window.AscentEngine. Local play applies the player's choices with
+// AscentEngine.applyAction; online play sends them to the PartyKit server,
+// which runs the same engine. game.js only renders state, turns clicks into
+// engine actions, and presents the events the engine emits.
 
-// Route Reader "Versatility" stat shift: once per round, before a regular
-// (non-milestone) climb, move up to MAX_STAT_SHIFT points from one stat to
-// another for that climb only. All other abilities are fully passive.
-const SHIFT_STATS = ['strength', 'technique', 'focus', 'flexibility'];
-const MAX_STAT_SHIFT = 10;
+const STAT_KEYS = ['strength', 'technique', 'focus', 'flexibility'];
+const STAT_LABELS = { strength: 'Strength', technique: 'Technique', focus: 'Focus', flexibility: 'Flexibility' };
+const AREA_LABELS = { bouldering: 'Bouldering', topRope: 'Top Rope', leadClimbing: 'Lead Climbing' };
 
-function canUseStatShift(char) {
- return char.key === 'routeReader' && !char.abilityUsed;
+function isOnline() {
+ return !!(window.OnlineMode && window.OnlineMode.active);
 }
 
-// Total stats for a climb attempt by the current player (base + training +
-// permanent gear + route-specific gear). No ability effects.
-function computeClimbStats(char, route, area) {
- if (!char.gearBonuses) {
- char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
+function currentPlayer() {
+ return gameState.players[gameState.currentPlayerIndex];
+}
+
+// The current player's legal actions: the server's menu online, the engine's
+// locally (the same getLegalActions either way).
+function legalActionsNow() {
+ if (isOnline()) return window.OnlineMode.legalActions || [];
+ return gameState.gameEnded ? [] : AscentEngine.getLegalActions(gameState);
+}
+
+function isLegalNow(wanted) {
+ return !!AscentEngine.findLegalAction(legalActionsNow(), wanted);
+}
+
+// Time and endurance a climb costs this character (character passives and gear).
+function getClimbCosts(char, route) {
+ return {
+ time: AscentEngine.getEffectiveClimbTimeCost(char, route.time, route),
+ endurance: AscentEngine.getEffectiveClimbEnduranceCost(char, route, route.endurance),
+ };
+}
+
+// What the last local action did that is still waiting on the climb-result
+// modal or level-up popups: { levelUps, turnEvents, afterRender }.
+let pendingPresentation = null;
+
+// Hand a player's choice (a partial action, e.g. { type: 'train', areaName })
+// to the rules. Online it goes to the server. Locally it must match one of the
+// engine's legal actions; the engine applies it and we present the events.
+function dispatchAction(wanted, afterRender = null) {
+ if (isOnline()) return window.OnlineMode.sendAction(wanted);
+ if (pendingPresentation || gameState.gameEnded) return;
+ const match = AscentEngine.findLegalAction(AscentEngine.getLegalActions(gameState), wanted);
+ if (!match) {
+ alert(AscentEngine.explainIllegalAction(gameState, wanted) || 'That action is not available right now.');
+ return;
  }
- const routeGearBonuses = calculateGearBonuses(route, area);
- const stats = {};
- SHIFT_STATS.forEach(k => {
- stats[k] = char.stats[k] + char.trainingBonuses[k] + char.gearBonuses[k] + routeGearBonuses[k];
- });
- return stats;
+ const action = wanted.shift ? { ...match, shift: wanted.shift } : match;
+ const before = gameState;
+ const { state, events } = AscentEngine.applyAction(before, action);
+ gameState = state;
+ presentEvents(before, events, afterRender);
 }
 
-function shiftStats(stats, shift) {
- return { ...stats, [shift.from]: stats[shift.from] - shift.amount, [shift.to]: stats[shift.to] + shift.amount };
-}
-
-// Suggest the most useful shift before the dice are rolled, or null if none
-// helps. A Route Reader sends with 3 of 4 stats, so the deciding stat is the
-// one with the 3rd-largest margin over its base requirement; maximise it.
-// Not offered when that margin is already 6+ (one die's swing). Mirrors
-// engine/helpers.js bestRouteReaderShift.
-function suggestStatShift(stats, route) {
- const deciding = (st) => SHIFT_STATS.map(k => st[k] - route[k]).sort((a, b) => b - a)[2];
- const baseline = deciding(stats);
- if (baseline >= 6) return null;
- let best = null;
- let bestScore = baseline;
- SHIFT_STATS.forEach(from => SHIFT_STATS.forEach(to => {
- if (from === to) return;
- for (let amount = 1; amount <= MAX_STAT_SHIFT; amount++) {
- const score = deciding(shiftStats(stats, { from, to, amount }));
- if (score > bestScore) { bestScore = score; best = { from, to, amount }; }
- }
- }));
- return best;
-}
+// ===== CHARACTER ABILITY: ROUTE READER STAT SHIFT =====
 
 // Show the Versatility dialog. `stats` are the climber's stats for this climb
 // (including any Beta Boost); `suggested` pre-fills the controls. Resolves
@@ -1672,11 +1256,11 @@ function chooseStatShift(route, stats, suggested) {
  const modal = document.getElementById('statShiftModal');
  const body = document.getElementById('statShiftBody');
  const label = (k) => k.charAt(0).toUpperCase() + k.slice(1);
- const options = SHIFT_STATS.map(k => `<option value="${k}">${label(k)}</option>`).join('');
+ const options = STAT_KEYS.map(k => `<option value="${k}">${label(k)}</option>`).join('');
  body.innerHTML = `
- <p class="shift-intro">Once per round, move up to ${MAX_STAT_SHIFT} points from one stat to another for <strong>this climb only</strong>. You send if 3 of your 4 stats meet their requirement.</p>
+ <p class="shift-intro">Once per round, move up to ${AscentEngine.MAX_STAT_SHIFT} points from one stat to another for <strong>this climb only</strong>. You send if 3 of your 4 stats meet their requirement.</p>
  <div class="shift-controls">
- <label>Move <input type="number" id="shiftAmount" min="1" max="${MAX_STAT_SHIFT}" step="1"></label>
+ <label>Move <input type="number" id="shiftAmount" min="1" max="${AscentEngine.MAX_STAT_SHIFT}" step="1"></label>
  <label>from <select id="shiftFrom">${options}</select></label>
  <label>to <select id="shiftTo">${options}</select></label>
  </div>
@@ -1691,23 +1275,23 @@ function chooseStatShift(route, stats, suggested) {
  const toSel = document.getElementById('shiftTo');
  const amountIn = document.getElementById('shiftAmount');
  const applyBtn = document.getElementById('statShiftApply');
- const initial = suggested || { from: 'flexibility', to: 'strength', amount: MAX_STAT_SHIFT };
+ const initial = suggested || { from: 'flexibility', to: 'strength', amount: AscentEngine.MAX_STAT_SHIFT };
  fromSel.value = initial.from;
  toSel.value = initial.to;
  amountIn.value = initial.amount;
 
  const readShift = () => {
  const amount = parseInt(amountIn.value, 10);
- if (fromSel.value === toSel.value || !Number.isInteger(amount) || amount < 1 || amount > MAX_STAT_SHIFT) return null;
+ if (fromSel.value === toSel.value || !Number.isInteger(amount) || amount < 1 || amount > AscentEngine.MAX_STAT_SHIFT) return null;
  return { from: fromSel.value, to: toSel.value, amount };
  };
  const refresh = () => {
  const shift = readShift();
- const after = shift ? shiftStats(stats, shift) : stats;
+ const after = shift ? AscentEngine.applyStatShiftToStats(stats, shift) : stats;
  const cell = (v, need) => `<td class="${v >= need ? 'shift-pass' : 'shift-fail'}">${v}</td>`;
- document.getElementById('shiftRows').innerHTML = SHIFT_STATS.map(k =>
+ document.getElementById('shiftRows').innerHTML = STAT_KEYS.map(k =>
  `<tr><td>${label(k)}</td><td>${route[k]}</td>${cell(stats[k], route[k])}${cell(after[k], route[k])}</tr>`).join('');
- const passing = (st) => SHIFT_STATS.filter(k => st[k] >= route[k]).length;
+ const passing = (st) => STAT_KEYS.filter(k => st[k] >= route[k]).length;
  document.getElementById('shiftSummary').textContent = shift
  ? `Before the dice: ${passing(stats)} of 4 pass now, ${passing(after)} of 4 with this shift.`
  : 'Pick two different stats and an amount from 1 to 10.';
@@ -1733,165 +1317,170 @@ function chooseStatShift(route, stats, suggested) {
 // Offer the Route Reader a stat shift for this climb when one would help.
 // Resolves { shift } (possibly null) or null if the player cancelled.
 async function maybeChooseStatShift(char, route, area) {
- if (!canUseStatShift(char)) return { shift: null };
- let stats = computeClimbStats(char, route, area);
- if (char.betaBoostActive) stats = Object.fromEntries(SHIFT_STATS.map(k => [k, stats[k] + 3]));
- const suggested = suggestStatShift(stats, route);
+ if (!AscentEngine.canUseStatShift(char, false)) return { shift: null };
+ const attempted = gameState.attemptedRoutes[currentPlayer().playerNum];
+ const suggested = AscentEngine.bestRouteReaderShift(char, route, area, attempted);
  if (!suggested) return { shift: null };
+ // Stats as the climb will see them, including an unspent Beta Boost (applied
+ // to a copy so the real flag is untouched).
+ const base = AscentEngine.computeEffectiveStats(char, route, area, attempted);
+ const { stats } = AscentEngine.applyBetaBoostIfActive({ ...char }, base);
  return chooseStatShift(route, stats, suggested);
 }
 
-function applyAbilityToStats(char, shift, totalStats) {
- let modified = { ...totalStats };
+// ===== GAME ACTIONS =====
 
- // Route Reader: Beta Boost passive (set after resting, consumed here)
- if (char.key === 'routeReader' && char.betaBoostActive) {
- modified.strength += 3;
- modified.technique += 3;
- modified.focus += 3;
- modified.flexibility += 3;
- char.betaBoostActive = false; // consume the boost
- addLog(`Beta Boost: +3 to all stats this climb!`);
- }
-
- // Versatility: stat shift chosen before the climb (regular routes only)
- if (shift) {
- modified = shiftStats(modified, shift);
- addLog(`Versatility: moved ${shift.amount} ${shift.from} → ${shift.to} for this climb`);
- }
-
- return modified;
+async function attemptClimb(route, area) {
+ const wanted = { type: 'climb', area, routeName: route.name };
+ // Not legal: let dispatchAction explain why (an alert locally, a toast online).
+ if (!isLegalNow(wanted)) return dispatchAction(wanted);
+ // A Route Reader picks a stat shift first. Cancelling costs nothing.
+ const choice = await maybeChooseStatShift(currentPlayer().character, route, area);
+ if (!choice) return;
+ dispatchAction(choice.shift ? { ...wanted, shift: choice.shift } : wanted);
 }
 
-// ===== CLIMB RESOLUTION (shared with the engine) =====
-//
-// Local play resolves climbs with the engine's own rules: engine/helpers.js,
-// loaded as a classic script (engine/helpers.browser.js, generated by
-// engine/build-browser-helpers.js) that exposes window.EngineHelpers. Costs,
-// dice, character passives and every gear effectKind therefore behave exactly
-// as they do online and for the bots.
-const Engine = window.EngineHelpers;
-
-const DIE_STAT_LABELS = { strength: 'Strength', technique: 'Technique', focus: 'Focus', flexibility: 'Flexibility' };
-
-// Owned gear cards with the given effectKind.
-function ownedGearWithEffect(char, effectKind) {
- return char.equipment
- .map(name => GEAR_SHOP.find(g => g.name === name))
- .filter(g => g && g.effectKind === effectKind);
+function attemptMilestoneRoute(difficulty) {
+ dispatchAction({ type: 'milestone', difficulty });
 }
 
-// Time and endurance a climb costs this character (Sprinter / Technician
-// passives, Trick Foot Manual, Body Tension Belt).
-function getClimbCosts(char, route) {
- return {
- time: Engine.getEffectiveClimbTimeCost(char, route.time, route),
- endurance: Engine.getEffectiveClimbEnduranceCost(char, route, route.endurance),
+function trainAction(area) {
+ dispatchAction({ type: 'train', areaName: area.name });
+}
+
+function restAction() {
+ dispatchAction({ type: 'rest' });
+}
+
+function purchaseGear(gear) {
+ // EFFECTS: capture the source card position BEFORE the re-render destroys it.
+ const srcCard = document.querySelector(`[data-gear-slot="${gear.name.replace(/"/g, '\\"')}"]`);
+ const srcRect = srcCard && srcCard.getBoundingClientRect();
+ const srcGhost = srcRect ? { left: srcRect.left + srcRect.width / 2, top: srcRect.top + srcRect.height / 2 } : null;
+ dispatchAction({ type: 'buyGear', gearName: gear.name }, (events) => gearPurchaseEffects(events, srcGhost));
+}
+
+// ===== PRESENTING ENGINE EVENTS (local play) =====
+
+// Events that change whose turn it is or end the game. They are presented
+// after the climb-result modal and any level-up popups close.
+const TURN_EVENT_TYPES = ['turn_end', 'round_end', 'round_start', 'turn_start', 'game_end'];
+
+function presentEvents(before, events, afterRender) {
+ events.forEach(e => logEvent(before, e));
+ actionEffects(before, events);
+ pendingPresentation = {
+ levelUps: events.filter(e => e.type === 'level_up'),
+ turnEvents: events.filter(e => TURN_EVENT_TYPES.includes(e.type)),
+ afterRender: afterRender ? () => afterRender(events) : null,
  };
-}
-
-// Pay for and resolve a climb the player has committed to: deduct costs, roll
-// and modify dice, check stats against requirements, award XP, then apply the
-// failure penalty or success heal. Same steps as resolveClimbShared in
-// engine/engine.js. `stats` already include Beta Boost and any stat shift.
-// Mutates char; returns everything the result modal and effects need.
-function resolveLocalClimb(char, route, stats, isMilestone) {
- const costs = getClimbCosts(char, route);
- const enduranceBefore = char.currentEndurance;
- char.timeRemaining -= costs.time;
- char.currentEndurance -= costs.endurance;
-
- const effectRollArray = Engine.buildEffectRollArray(char, route);
- const rng = { rollDie: (sides = 6) => Math.floor(Math.random() * sides) + 1 };
- const diceTrace = [];
- const dice = Engine.rollClimbDice(rng, effectRollArray, char, route, isMilestone, diceTrace);
- const { requirements, appliedModifiers } = Engine.applyDiceToRequirements(char, route, effectRollArray, dice);
- const { success } = Engine.resolveClimbOutcome(char, stats, requirements);
- const xpGained = Engine.computeClimbXp(char, route, success);
- char.xp += xpGained;
-
- let failPenalty = 0;
- let healed = 0;
- if (!success) {
- failPenalty = Engine.getFailureEnduranceExtra(char);
- char.currentEndurance -= failPenalty;
+ if (events.some(e => e.type === 'climb_resolved')) {
+ // Brief anticipation pause so the dice "settle" before the reveal; the
+ // rest is presented when the result modal closes (closeClimbModal).
+ const isMilestone = events.find(e => e.type === 'climb_resolved').payload.isMilestone;
+ const show = () => showClimbResultFromEvents(before, events);
+ if (window.Effects && typeof window.Effects.diceAnticipation === 'function') {
+ window.Effects.diceAnticipation(isMilestone ? 540 : 420).then(show);
  } else {
- const heal = Engine.getSuccessEnduranceHeal(char);
- if (heal > 0) {
- const beforeHeal = char.currentEndurance;
- // Healed endurance is capped at maxEndurance, as in the engine.
- char.currentEndurance = Math.min(char.maxEndurance, char.currentEndurance + heal);
- healed = char.currentEndurance - beforeHeal;
+ show();
  }
+ } else {
+ finishPresentation();
  }
- if (char.currentEndurance < 0) char.currentEndurance = 0;
+}
 
- if (!success && char.key === 'ironLung') {
- const relentlessBonus = Math.floor(route.xpFail * Engine.getXpMultiplier(char) * 0.5);
- addLog(`Relentless: +${relentlessBonus} bonus XP for failing${failPenalty ? `, -${failPenalty} extra Endurance` : ''}`);
+// Level-up popups one at a time, then the turn/round change and a re-render.
+function finishPresentation() {
+ const p = pendingPresentation;
+ if (!p) return;
+ if (p.levelUps.length) {
+ showLevelUpPopup(p.levelUps.shift());
+ return;
  }
+ pendingPresentation = null;
+ p.turnEvents.forEach(turnEffect);
+ renderGameBoard();
+ if (p.afterRender) requestAnimationFrame(p.afterRender);
+ const end = p.turnEvents.find(e => e.type === 'game_end');
+ if (end) {
+ const winner = gameState.players.find(pl => pl.playerNum === end.payload.winner);
+ setTimeout(() => showVictoryScreen(winner), 500);
+ }
+}
 
- // Per-die display rows. A die whose modifier the rules zeroed was negated by
- // a character passive (Free Solo, Technician on nerf dice) or Mountain Mentor.
- const mentor = ownedGearWithEffect(char, 'negateOneNerfDie')[0];
- const diceEffects = effectRollArray.map((effect, i) => {
- const modifier = appliedModifiers[i].modifier;
- const negated = effect.modifier !== 0 && modifier === 0;
- const byAbility = negated && (char.key === 'freeSolo' || (char.key === 'technician' && effect.modifier === 1));
- return {
- die: dice[i], stat: effect.stat, modifier,
- abilityNeutralized: byAbility,
- gearNeutralized: negated && !byAbility && mentor ? mentor.name : null,
- };
- });
+function playerName(state, playerNum) {
+ const p = state.players.find(pl => pl.playerNum === playerNum);
+ return p ? p.character.name : `Player ${playerNum}`;
+}
 
- // Plain-language notes for every gear effect that changed this climb.
- const gearNotes = [];
- const discardedDice = [];
- const charOnlyTime = Engine.getEffectiveClimbTimeCost(char, route.time);
- if (costs.time < charOnlyTime) {
- const names = ownedGearWithEffect(char, 'timeCostReduction').map(g => g.name).join(', ');
- gearNotes.push(`${names}: time cost ${charOnlyTime} → ${costs.time}`);
- }
- if (costs.endurance < route.endurance) {
- const names = ownedGearWithEffect(char, 'enduranceHalvedOnTag').map(g => g.name).join(', ');
- gearNotes.push(`${names}: endurance cost ${route.endurance} → ${costs.endurance}`);
- }
- diceTrace.forEach(t => {
- const dieLabel = `Die ${t.die + 1}`;
- if (t.effectKind === 'rerollOnTag') {
- gearNotes.push(`${t.gear}: re-rolled ${dieLabel} (${t.from} → ${t.to})`);
- } else if (t.effectKind === 'extraDieDiscardOne') {
- discardedDice.push(t.from);
- gearNotes.push(t.die === -1
- ? `${t.gear}: rolled an extra ${t.extra}, discarded it (no die to improve)`
- : `${t.gear}: rolled an extra ${t.extra}, swapped it in for ${dieLabel} (discarded ${t.from})`);
- } else if (t.effectKind === 'treatOneDieAsValue') {
- gearNotes.push(`${t.gear}: ${dieLabel} treated as ${t.to} (rolled ${t.from})`);
- } else if (t.effectKind === 'milestoneBuffDiceBonus' && t.to !== t.from) {
- gearNotes.push(`${t.gear}: buff ${dieLabel} +${t.to - t.from} (${t.from} → ${t.to})`);
- }
- });
- diceEffects.forEach((e, i) => {
- if (e.gearNeutralized) {
- gearNotes.push(`${e.gearNeutralized}: ignored nerf Die ${i + 1} (+${e.die} ${DIE_STAT_LABELS[e.stat]})`);
- }
- });
- if (!success) {
- ownedGearWithEffect(char, 'failBonusXp').forEach(g => gearNotes.push(`${g.name}: +${g.value} XP for the fall`));
- if (char.key === 'ironLung') {
- ownedGearWithEffect(char, 'ignoreFailPenalty').forEach(g => gearNotes.push(`${g.name}: no extra endurance lost for failing`));
- }
- } else if (healed > 0) {
- const names = ownedGearWithEffect(char, 'successHealEndurance').map(g => g.name).join(', ');
- gearNotes.push(`${names}: +${healed} endurance`);
- }
+// The route a climb_resolved event refers to, looked up in the state the climb
+// started from (a round end may already have cleared it from the wall).
+function routeForClimb(before, c) {
+ if (c.isMilestone) return before.milestoneRoutes[c.difficulty].route;
+ return (before.availableRoutes[c.area] || []).find(r => r.name === c.routeName);
+}
 
- return {
- success, xpGained, requirements, diceEffects, gearNotes,
- dice, discardedDice,
- enduranceDelta: char.currentEndurance - enduranceBefore,
- };
+// Game-log line(s) for one engine event.
+function logEvent(before, e) {
+ const p = e.payload;
+ switch (e.type) {
+ case 'ability_activated':
+ addLog(p.ability === 'Beta Boost' ? 'Beta Boost: +3 to all stats this climb!' : `${p.ability}: ${p.effect}`);
+ break;
+ case 'climb_resolved': {
+ if (!p.success && before.players.find(pl => pl.playerNum === p.playerNum)?.character.key === 'ironLung') {
+ addLog(`Relentless: +50% XP for failing${p.failPenalty > 0 ? `, -${p.failPenalty} extra Endurance` : ''}`);
+ }
+ const area = AREA_LABELS[p.area] || p.area;
+ if (p.isMilestone) {
+ addLog(p.success
+ ? ` Player ${p.playerNum} completed the ${p.difficulty.toUpperCase()} milestone: ${p.routeName} (${area})!`
+ : `Player ${p.playerNum} attempted ${p.difficulty} milestone "${p.routeName}" (${area}) but failed. Gained ${p.xpGained} XP.`);
+ } else {
+ addLog(`Player ${p.playerNum} ${p.success ? 'completed' : 'failed'} ${p.routeName} (${p.grade}) - ${p.xpGained} XP gained`);
+ }
+ break;
+ }
+ case 'train_action': {
+ const station = TRAINING_AREAS.find(a => a.name === p.areaName);
+ const boost = station ? p.bonus - station.bonus : 0;
+ const char = gameState.players.find(pl => pl.playerNum === p.playerNum).character;
+ const journal = boost > 0 ? ` (+${boost} from ${char.equipment.filter(n => GEAR_SHOP.find(g => g.name === n)?.effectKind === 'trainingBonusBoost').join(', ')})` : '';
+ addLog(`Player ${p.playerNum} trained at ${p.areaName} - gained +${p.bonus} ${p.stat}${journal} (total training bonus: +${p.totalTrainingBonusAfter[p.stat]})`);
+ break;
+ }
+ case 'rest_action':
+ addLog(`Player ${p.playerNum} rested and recovered endurance to ${p.newEndurance}${p.restBonusApplied > 0 ? ` (+${p.restBonusApplied} gear bonus)` : ''}`);
+ if (p.betaBoostActivated) addLog(`Player ${p.playerNum}: Beta Boost active — +3 to all stats on next climb!`);
+ break;
+ case 'gear_purchased': {
+ const char = gameState.players.find(pl => pl.playerNum === p.playerNum).character;
+ const discount = p.nominalCost - p.cost;
+ addLog(`Player ${p.playerNum} purchased ${p.gearName} for ${p.cost} XP${discount > 0 ? ` (-${discount} discount)` : ''}${p.timeCost === 0 ? ' (free visit)' : ''} (now ${getXPToNextLevel(char)} XP to Level ${char.level + 1})`);
+ break;
+ }
+ case 'level_up': {
+ const o = p.oldStats;
+ const n = p.newStats;
+ addLog(` Player ${p.playerNum} leveled up to Level ${p.newLevel}!`);
+ STAT_KEYS.forEach(k => addLog(` ${STAT_LABELS[k]}: ${o[k]} → ${n[k]} (+${n[k] - o[k]})`));
+ addLog(` Max Endurance: ${p.oldMaxEndurance} → ${p.newMaxEndurance} (+${p.newMaxEndurance - p.oldMaxEndurance})`);
+ break;
+ }
+ case 'turn_start':
+ if (p.round === before.round) addLog(`Turn passes to Player ${p.playerNum} (${p.timeRemaining} time remaining)`);
+ break;
+ case 'round_end':
+ addLog(`Round ${p.round} ended!`);
+ addLog(` Route Clearing: ${AREA_LABELS[p.routesCleared]} routes refreshed and reset`);
+ break;
+ case 'round_start':
+ addLog(`Round ${p.round} begins!`);
+ break;
+ case 'game_end':
+ addLog(` GAME OVER! Player ${p.winner} (${playerName(gameState, p.winner)}) has completed all milestone routes and WINS THE GAME! `);
+ break;
+ }
 }
 
 // Floating "−N END" / "+N END" text for an endurance change.
@@ -1899,130 +1488,126 @@ function formatEnduranceDelta(delta) {
  return `${delta < 0 ? '−' : '+'}${Math.abs(delta)} END`;
 }
 
-// ===== GAME ACTIONS =====
-
-async function attemptClimb(route, area) {
- // Online mode short-circuit: send the matching action to the server
- // instead of mutating local state. Server broadcasts the new state and
- // the renderer updates itself. A Route Reader picks a stat shift first.
- if (window.OnlineMode && window.OnlineMode.active) {
-  const onlinePlayer = gameState.players[gameState.currentPlayerIndex];
-  const choice = onlinePlayer ? await maybeChooseStatShift(onlinePlayer.character, route, area) : { shift: null };
-  if (!choice) return;
-  const action = { type: 'climb', area, routeName: route.name };
-  if (choice.shift) action.shift = choice.shift;
-  return window.OnlineMode.sendAction(action);
- }
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
-
- // Check if player can enter this section. Top Rope is gated per belayer
- // station (1 climber each); other areas use the section-capacity check.
- if (area === 'topRope') {
- if (!canClimbTopRopeStation(route.belayer, currentPlayer.playerNum)) {
- alert(`Belayer ${route.belayer + 1} is occupied by another climber.\n\nWait until routes clear or pick a route at a free belayer.`);
- return;
- }
- } else {
- const locationCheck = canEnterSection(area, currentPlayer.playerNum);
- if (!locationCheck.canEnter) {
- alert(`Cannot climb here!\n\n${locationCheck.reason}`);
- return;
- }
- }
-
- // Initialize player's attempted routes set if needed
- if (!gameState.attemptedRoutes[currentPlayer.playerNum]) {
- gameState.attemptedRoutes[currentPlayer.playerNum] = new Set();
- }
-
- // Check if route already attempted this round
- const routeKey = `${area}:${route.name}`;
- if (gameState.attemptedRoutes[currentPlayer.playerNum].has(routeKey)) {
- alert('You have already attempted this route this round!\n\nYou must wait until next round to try again.');
- return;
- }
-
- // Costs with character passives and gear (Sprinter, Technician, Trick Foot
- // Manual, Body Tension Belt).
- const costs = getClimbCosts(char, route);
- if (char.timeRemaining < costs.time || char.currentEndurance < costs.endurance) {
- alert('Not enough time or endurance!');
- return;
- }
-
- // Calculate total stats (including route-specific gear bonuses)
- let totalStats = computeClimbStats(char, route, area);
-
- // ABILITY: Free Solo — guarantee check against base requirements (no dice since Life or Die negates them)
- if (char.key === 'freeSolo') {
- if (totalStats.strength < route.strength || totalStats.technique < route.technique ||
- totalStats.focus < route.focus || totalStats.flexibility < route.flexibility) {
- alert(' Life or Die: You can only attempt routes you are guaranteed to complete!\n\nYour stats must meet all base requirements.');
- return;
- }
- }
-
- // ABILITY: Route Reader Versatility — choose a stat shift before paying.
- // Cancelling here costs nothing; the once-per-round use is only spent when
- // the climb goes ahead with a shift.
- const shiftChoice = await maybeChooseStatShift(char, route, area);
- if (!shiftChoice) return;
- const shift = shiftChoice.shift;
- if (shift) char.abilityUsed = true;
- const activatedAbility = shift ? 'Versatility' : null;
-
- // Move player to this section and (for Top Rope) occupy the route's belayer
- // station; any other area clears the belayer-station assignment.
- movePlayerToSection(currentPlayer.playerNum, area);
- char.belayerStation = (area === 'topRope') ? route.belayer : null;
-
- // ABILITY: Apply stat modifications (beta boost passive + Versatility shift)
- totalStats = applyAbilityToStats(char, shift, totalStats);
-
- // Mark route as attempted
- gameState.attemptedRoutes[currentPlayer.playerNum].add(routeKey);
-
- // Pay costs, roll dice, resolve and award XP / endurance with the engine's
- // rules (character passives and every gear effect).
- const climb = resolveLocalClimb(char, route, totalStats, false);
- const { success, xpGained } = climb;
-
- // Check for level up
- checkLevelUp(char);
-
- // EFFECTS: floating numbers + chalk puff + dice anticipation + turn log.
- const fxPlayer = currentPlayer.playerNum;
- if (window.Effects) {
- const enduranceBar = window.Effects.locateEnduranceBar(fxPlayer);
- const xpBar = window.Effects.locateXpBar(fxPlayer);
+// Immediate effects for the action itself (before any re-render).
+function actionEffects(before, events) {
+ if (!window.Effects) return;
+ const fx = window.Effects;
+ events.forEach(e => {
+ const p = e.payload;
+ const enduranceBar = p.playerNum ? fx.locateEnduranceBar(p.playerNum) : null;
+ switch (e.type) {
+ case 'climb_resolved': {
+ const xpBar = fx.locateXpBar(p.playerNum);
+ const panel = fx.locatePlayerPanel(p.playerNum);
  if (enduranceBar) {
- window.Effects.chalkPuff(enduranceBar, 'coral');
- window.Effects.floatNumber(enduranceBar, formatEnduranceDelta(climb.enduranceDelta), 'endurance-loss');
+ fx.chalkPuff(enduranceBar, 'coral');
+ fx.floatNumber(enduranceBar, formatEnduranceDelta(p.resourcesDelta.endurance.delta), 'endurance-loss');
  }
- if (xpBar && xpGained > 0) {
- setTimeout(() => window.Effects.floatNumber(xpBar, `+${xpGained} XP`, 'xp'), 220);
+ if (xpBar && p.xpGained > 0) setTimeout(() => fx.floatNumber(xpBar, `+${p.xpGained} XP`, 'xp'), 220);
+ if (p.isMilestone && p.success && panel) {
+ setTimeout(() => fx.floatNumber(panel, `MILESTONE ${p.difficulty.toUpperCase()}!`, 'stat'), 480);
  }
- window.Effects.recordTurnAction({
- kind: success ? 'climb✓' : 'climb✗',
- desc: `${route.name} (${route.grade})`,
- delta: `${xpGained > 0 ? '+' : ''}${xpGained} XP`,
+ fx.recordTurnAction(p.isMilestone
+ ? { kind: p.success ? 'milestone✓' : 'milestone✗', desc: `${p.difficulty} — ${p.routeName}`, delta: `${p.xpGained > 0 ? '+' : ''}${p.xpGained} XP` }
+ : { kind: p.success ? 'climb✓' : 'climb✗', desc: `${p.routeName} (${p.grade})`, delta: `${p.xpGained > 0 ? '+' : ''}${p.xpGained} XP` });
+ break;
+ }
+ case 'train_action': {
+ const panel = fx.locatePlayerPanel(p.playerNum);
+ const cost = -p.resourcesDelta.endurance.delta;
+ if (panel) fx.floatNumber(panel, `+${p.bonus} ${p.stat.slice(0, 3).toUpperCase()}`, 'stat');
+ if (enduranceBar && cost > 0) {
+ fx.chalkPuff(enduranceBar, 'cobalt');
+ setTimeout(() => fx.floatNumber(enduranceBar, `−${cost} END`, 'endurance-loss'), 180);
+ }
+ fx.recordTurnAction({ kind: 'train', desc: `${p.areaName} (+${p.bonus} ${p.stat})`, delta: cost > 0 ? `−${cost} END` : null });
+ break;
+ }
+ case 'rest_action':
+ if (enduranceBar) {
+ fx.chalkPuff(enduranceBar, 'lime');
+ fx.floatNumber(enduranceBar, formatEnduranceDelta(p.enduranceRecovered), 'endurance-gain');
+ }
+ fx.recordTurnAction({
+ kind: 'rest',
+ desc: `Rested${p.restBonusApplied > 0 ? ` (+${p.restBonusApplied} gear)` : ''}`,
+ delta: formatEnduranceDelta(p.enduranceRecovered),
  });
+ break;
+ case 'gear_purchased':
+ fx.recordTurnAction({ kind: 'gear', desc: `Bought ${p.gearName}`, delta: `−${p.cost} XP` });
+ break;
  }
+ });
+}
 
- // Add log with ability notation
- const abilityLog = activatedAbility ? ` (${activatedAbility})`: '';
- addLog(`Player ${currentPlayer.playerNum} ${success ? 'completed': 'failed'} ${route.name} (${route.grade})${abilityLog} - ${xpGained} XP gained`);
+// Turn / round transitions, presented once the board re-renders.
+function turnEffect(e) {
+ if (!window.Effects) return;
+ if (e.type === 'turn_end') window.Effects.turnSummaryCard();
+ if (e.type === 'round_start') window.Effects.roundTransition(e.payload.round);
+ if (e.type === 'turn_start') window.Effects.beginTurn(e.payload.playerNum, playerName(gameState, e.payload.playerNum));
+}
 
- // Show result modal — turn advance happens when modal is closed via closeClimbModal().
- // Brief anticipation pause so the dice "settle" before reveal.
- const showResult = () => showClimbResult(route, [...climb.dice, ...climb.discardedDice], climb.dice,
- totalStats, climb.requirements, climb.diceEffects, success, xpGained, activatedAbility, climb.gearNotes);
- if (window.Effects && typeof window.Effects.diceAnticipation === 'function') {
- window.Effects.diceAnticipation(420).then(showResult);
- } else {
- showResult();
+// Post-render purchase effects: fly the gear from shop to inventory, flip the
+// rotating shop cards, and float the XP cost.
+function gearPurchaseEffects(events, srcGhost) {
+ const bought = events.find(e => e.type === 'gear_purchased');
+ if (!bought || !window.Effects) return;
+ const { playerNum, gearName, cost } = bought.payload;
+ const destInv = document.getElementById(`inventory-${playerNum}`);
+ const srcStub = srcGhost ? { getBoundingClientRect: () => ({ left: srcGhost.left - 60, top: srcGhost.top - 16, width: 120, height: 32, right: 0, bottom: 0 }) } : null;
+ if (srcStub && destInv) window.Effects.flyToInventory(srcStub, destInv, gearName);
+ const xpBar = window.Effects.locateXpBar(playerNum);
+ if (xpBar) window.Effects.floatNumber(xpBar, `−${cost} XP`, 'xp');
+ if (!AscentEngine.ACCESS_CARDS.includes(gearName)) {
+ const rotating = Array.from(document.querySelectorAll('.gear-card:not(.access-gear-card)'));
+ rotating.forEach((c, i) => setTimeout(() => window.Effects.cardFlip(c), i * 60));
  }
+}
+
+// Plain-language line for one entry of climb_resolved.gearEffects.
+function formatGearEffect(g) {
+ const die = `Die ${g.die + 1}`;
+ switch (g.effectKind) {
+ case 'timeCostReduction': return `${g.gear}: time cost ${g.from} → ${g.to}`;
+ case 'enduranceHalvedOnTag': return `${g.gear}: endurance cost ${g.from} → ${g.to}`;
+ case 'rerollOnTag': return `${g.gear}: re-rolled ${die} (${g.from} → ${g.to})`;
+ case 'extraDieDiscardOne':
+ return g.die === -1
+ ? `${g.gear}: rolled an extra ${g.extra}, discarded it (no die to improve)`
+ : `${g.gear}: rolled an extra ${g.extra}, swapped it in for ${die} (discarded ${g.from})`;
+ case 'treatOneDieAsValue': return `${g.gear}: ${die} treated as ${g.to} (rolled ${g.from})`;
+ case 'milestoneBuffDiceBonus': return `${g.gear}: buff ${die} +${g.to - g.from} (${g.from} → ${g.to})`;
+ case 'negateOneNerfDie': return `${g.gear}: ignored nerf ${die} (+${g.value} ${STAT_LABELS[g.stat]})`;
+ case 'failBonusXp': return `${g.gear}: +${g.xp} XP for the fall`;
+ case 'ignoreFailPenalty': return `${g.gear}: no extra endurance lost for failing`;
+ case 'successHealEndurance': return `${g.gear}: +${g.endurance} endurance`;
+ default: return `${g.gear}: ${g.effectKind}`;
+ }
+}
+
+// Build the climb-result modal from a climb's dice_rolled + climb_resolved events.
+function showClimbResultFromEvents(before, events) {
+ const rolled = events.find(e => e.type === 'dice_rolled').payload;
+ const c = events.find(e => e.type === 'climb_resolved').payload;
+ const char = before.players.find(pl => pl.playerNum === c.playerNum).character;
+ const route = routeForClimb(before, c);
+ // A die whose modifier the rules zeroed was negated by Mountain Mentor (listed
+ // in gearEffects) or else by a character passive (Free Solo, Technician).
+ const mentor = new Map(c.gearEffects.filter(g => g.effectKind === 'negateOneNerfDie').map(g => [g.die, g.gear]));
+ const diceEffects = AscentEngine.buildEffectRollArray(char, route).map((effect, i) => {
+ const applied = rolled.modifiers[i];
+ const negated = effect.modifier !== 0 && applied.modifier === 0;
+ return {
+ die: applied.die, stat: effect.stat, modifier: applied.modifier,
+ abilityNeutralized: negated && !mentor.has(i),
+ gearNeutralized: mentor.get(i) || null,
+ };
+ });
+ const versatility = events.some(e => e.type === 'ability_activated' && e.payload.ability === 'Versatility');
+ showClimbResult(route, [...rolled.dice, ...rolled.discardedDice], rolled.dice, c.effectiveStats, c.requirements,
+ diceEffects, c.success, c.xpGained, versatility ? 'Versatility' : null, c.gearEffects.map(formatGearEffect));
 }
 
 // `rolls` lists every die rolled; the first diceUsed.length are the ones
@@ -2127,303 +1712,6 @@ function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffec
  modal.classList.add('show');
 }
 
-function trainAction(area) {
- if (window.OnlineMode && window.OnlineMode.active) {
-  return window.OnlineMode.sendAction({ type: 'train', areaName: area.name });
- }
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
-
- // Check if player can enter this specific training equipment
- const locationCheck = canEnterSection(area.name, currentPlayer.playerNum);
- if (!locationCheck.canEnter) {
- alert(`Cannot train here!\n\n${locationCheck.reason}`);
- return;
- }
-
- if (char.timeRemaining < area.time || char.currentEndurance < area.endurance) {
- alert('Not enough time or endurance!');
- return;
- }
-
- // Move player to this specific training equipment
- movePlayerToSection(currentPlayer.playerNum, area.name);
-
- char.timeRemaining -= area.time;
- char.currentEndurance -= area.endurance;
- // Old Climbing Journal (gear) boosts every training session.
- const trainingBoost = Engine.getTrainingBonusBoost(char);
- const trainingBonus = area.bonus + trainingBoost;
- char.trainingBonuses[area.stat] += trainingBonus;
-
- const statIcons = {
- strength: '',
- technique: '',
- focus: '',
- flexibility: ''
- };
-
- const newTotal = char.trainingBonuses[area.stat];
- addLog(`Player ${currentPlayer.playerNum} trained at ${area.name} - gained +${trainingBonus} ${statIcons[area.stat]} ${area.stat}${trainingBoost ? ` (+${trainingBoost} from ${ownedGearWithEffect(char, 'trainingBonusBoost').map(g => g.name).join(', ')})` : ''} (total training bonus: +${newTotal})`);
-
- // EFFECTS: stat boost + endurance puff + turn log.
- if (window.Effects) {
- const fxPlayer = currentPlayer.playerNum;
- const panel = window.Effects.locatePlayerPanel(fxPlayer);
- const enduranceBar = window.Effects.locateEnduranceBar(fxPlayer);
- if (panel) window.Effects.floatNumber(panel, `+${trainingBonus} ${area.stat.slice(0, 3).toUpperCase()}`, 'stat');
- if (enduranceBar && area.endurance > 0) {
- window.Effects.chalkPuff(enduranceBar, 'cobalt');
- setTimeout(() => window.Effects.floatNumber(enduranceBar, `−${area.endurance} END`, 'endurance-loss'), 180);
- }
- window.Effects.recordTurnAction({
- kind: 'train',
- desc: `${area.name} (+${trainingBonus} ${area.stat})`,
- delta: area.endurance > 0 ? `−${area.endurance} END` : null,
- });
- }
-
- checkTurnEnd();
- renderGameBoard();
-}
-
-function restAction() {
- if (window.OnlineMode && window.OnlineMode.active) {
-  return window.OnlineMode.sendAction({ type: 'rest' });
- }
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
-
- // Check if player can enter rest area
- const locationCheck = canEnterSection('rest', currentPlayer.playerNum);
- if (!locationCheck.canEnter) {
- alert(`Cannot rest here!\n\n${locationCheck.reason}`);
- return;
- }
-
- if (char.timeRemaining < 1) {
- alert('Not enough time to rest!');
- return;
- }
-
- // Move player to rest area
- movePlayerToSection(currentPlayer.playerNum, 'rest');
-
- char.timeRemaining -= 1;
-
- let recovery = char.maxEndurance;
-
- // Calculate rest bonuses from gear
- let restBonus = 0;
- char.equipment.forEach(gearName => {
- const gear = GEAR_SHOP.find(g => g.name === gearName);
- if (gear && gear.restBonus > 0) {
- restBonus += gear.restBonus;
- }
- });
-
- char.currentEndurance = Math.min(char.maxEndurance + restBonus, char.currentEndurance + recovery);
-
- if (restBonus > 0) {
- addLog(`Player ${currentPlayer.playerNum} rested and recovered endurance to ${char.currentEndurance} (+${restBonus} gear bonus)`);
- } else {
- addLog(`Player ${currentPlayer.playerNum} rested and recovered endurance to ${char.currentEndurance}`);
- }
-
- // ABILITY: Route Reader Versatility — resting activates Beta Boost for next climb
- if (char.key === 'routeReader') {
- char.betaBoostActive = true;
- addLog(`Player ${currentPlayer.playerNum}: Beta Boost active — +3 to all stats on next climb!`);
- }
-
- // EFFECTS: endurance gain (positive chalk) + turn log.
- if (window.Effects) {
- const fxPlayer = currentPlayer.playerNum;
- const enduranceBar = window.Effects.locateEnduranceBar(fxPlayer);
- if (enduranceBar) {
- window.Effects.chalkPuff(enduranceBar, 'lime');
- window.Effects.floatNumber(enduranceBar, `+${recovery + restBonus} END`, 'endurance-gain');
- }
- window.Effects.recordTurnAction({
- kind: 'rest',
- desc: `Rested${restBonus > 0 ? ` (+${restBonus} gear)` : ''}`,
- delta: `+${recovery + restBonus} END`,
- });
- }
-
- checkTurnEnd();
- renderGameBoard();
-}
-
-// ===== MILESTONE ROUTE ATTEMPTS =====
-
-function attemptMilestoneRoute(difficulty) {
- if (window.OnlineMode && window.OnlineMode.active) {
-  return window.OnlineMode.sendAction({ type: 'milestone', difficulty });
- }
- if (gameState.gameEnded) {
- alert('Game has ended!');
- return;
- }
-
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
-
- // Check if already completed
- if (char.milestonesCompleted[difficulty]) {
- alert(`You have already completed the ${difficulty} milestone!`);
- return;
- }
-
- const milestone = gameState.milestoneRoutes[difficulty];
- if (!milestone) {
- alert('Milestone route not found!');
- return;
- }
-
- const route = milestone.route;
- const area = milestone.area;
-
- // Check if player can enter this section. Top Rope needs a free belayer
- // station; Lead/others use the section-capacity check.
- if (area === 'topRope') {
- if (pickFreeBelayerStation(currentPlayer.playerNum) === null) {
- alert('All belayers are occupied right now.\n\nWait until routes clear to attempt this milestone.');
- return;
- }
- } else {
- const locationCheck = canEnterSection(area, currentPlayer.playerNum);
- if (!locationCheck.canEnter) {
- alert(`Cannot attempt this milestone route!\n\n${locationCheck.reason}`);
- return;
- }
- }
-
- // Check area access (Free Solo bypasses; Top Rope is open; Lead needs the
- // three access cards).
- const milestoneAccess = checkAreaAccess(area);
- if (!milestoneAccess.hasAccess) {
- alert(`You need ${milestoneAccess.missingItems.join(', ')} to attempt ${area === 'leadClimbing' ? 'Lead Climbing' : 'Top Rope'} routes!`);
- return;
- }
-
- // Costs with character passives and gear (Trick Foot Manual, Body Tension Belt)
- const costs = getClimbCosts(char, route);
- if (char.timeRemaining < costs.time) {
- alert(`Not enough time! This route requires ${costs.time} time units, you have ${char.timeRemaining}.`);
- return;
- }
-
- if (char.currentEndurance < costs.endurance) {
- alert(`Not enough endurance! This route requires ${costs.endurance} endurance, you have ${char.currentEndurance}.`);
- return;
- }
-
- // ABILITY: Free Solo guarantee check — must be able to meet all base requirements
- if (char.key === 'freeSolo') {
- if (!char.gearBonuses) char.gearBonuses = { strength: 0, technique: 0, focus: 0, flexibility: 0 };
- const routeGearBonuses = calculateGearBonuses(route, area);
- const tempStats = {
- strength: char.stats.strength + char.trainingBonuses.strength + char.gearBonuses.strength + routeGearBonuses.strength,
- technique: char.stats.technique + char.trainingBonuses.technique + char.gearBonuses.technique + routeGearBonuses.technique,
- focus: char.stats.focus + char.trainingBonuses.focus + char.gearBonuses.focus + routeGearBonuses.focus,
- flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility + routeGearBonuses.flexibility,
- };
- if (tempStats.strength < route.strength || tempStats.technique < route.technique ||
- tempStats.focus < route.focus || tempStats.flexibility < route.flexibility) {
- alert(' Life or Die: You can only attempt routes you are guaranteed to complete!\n\nYour stats must meet all base requirements.');
- return;
- }
- }
-
- // Move player to this section (important for capacity tracking) and, for Top
- // Rope, occupy a free belayer station.
- movePlayerToSection(currentPlayer.playerNum, area);
- char.belayerStation = (area === 'topRope') ? pickFreeBelayerStation(currentPlayer.playerNum) : null;
-
- // Use the climb function with milestone tracking
- attemptClimbWithMilestone(route, area, difficulty);
-}
-
-function attemptClimbWithMilestone(route, area, difficulty) {
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
-
- // Total stats (base + training + gear), then Beta Boost. No stat shift on
- // milestone routes. The Free Solo guarantee was checked in attemptMilestoneRoute.
- const stats = applyAbilityToStats(char, null, computeClimbStats(char, route, area));
-
- // Pay costs, roll dice, resolve and award XP / endurance with the engine's
- // rules (character passives and every gear effect, incl. Climbing Coach).
- const climb = resolveLocalClimb(char, route, stats, true);
- const { success, xpGained } = climb;
-
- // Check for level up
- checkLevelUp(char);
-
- // If successful, mark milestone complete
- const areaLogLabel = area === 'bouldering' ? 'Bouldering'
-                     : area === 'topRope'    ? 'Top Rope'
-                                             : 'Lead Climbing';
- if (success) {
- char.milestonesCompleted[difficulty] = true;
- addLog(` Player ${currentPlayer.playerNum} completed the ${difficulty.toUpperCase()} milestone: ${route.name} (${areaLogLabel})!`);
-
- // Check for victory
- checkVictory(currentPlayer);
- } else {
- addLog(`Player ${currentPlayer.playerNum} attempted ${difficulty} milestone "${route.name}" (${areaLogLabel}) but failed. Gained ${xpGained} XP.`);
- }
-
- // EFFECTS: floating numbers, chalk puff, dice anticipation, turn log.
- const fxPlayer = currentPlayer.playerNum;
- if (window.Effects) {
- const enduranceBar = window.Effects.locateEnduranceBar(fxPlayer);
- const xpBar = window.Effects.locateXpBar(fxPlayer);
- const panel = window.Effects.locatePlayerPanel(fxPlayer);
- if (enduranceBar) {
- window.Effects.chalkPuff(enduranceBar, 'coral');
- window.Effects.floatNumber(enduranceBar, formatEnduranceDelta(climb.enduranceDelta), 'endurance-loss');
- }
- if (xpBar && xpGained > 0) {
- setTimeout(() => window.Effects.floatNumber(xpBar, `+${xpGained} XP`, 'xp'), 220);
- }
- if (success && panel) {
- setTimeout(() => window.Effects.floatNumber(panel, `MILESTONE ${difficulty.toUpperCase()}!`, 'stat'), 480);
- }
- window.Effects.recordTurnAction({
- kind: success ? 'milestone✓' : 'milestone✗',
- desc: `${difficulty} — ${route.name}`,
- delta: `${xpGained > 0 ? '+' : ''}${xpGained} XP`,
- });
- }
-
- // Show result modal — turn advance happens when modal is closed via closeClimbModal().
- const showResult = () => showClimbResult(route, [...climb.dice, ...climb.discardedDice], climb.dice,
- stats, climb.requirements, climb.diceEffects, success, xpGained, null, climb.gearNotes);
- if (window.Effects && typeof window.Effects.diceAnticipation === 'function') {
- window.Effects.diceAnticipation(540).then(showResult);
- } else {
- showResult();
- }
-}
-
-function checkVictory(player) {
- const milestones = player.character.milestonesCompleted;
-
- if (milestones.beginner && milestones.intermediate && milestones.expert) {
- gameState.gameEnded = true;
- gameState.winner = player;
-
- addLog(` GAME OVER! Player ${player.playerNum} (${player.character.name}) has completed all milestone routes and WINS THE GAME! `);
-
- // Show victory screen after a short delay
- setTimeout(() => {
- showVictoryScreen(player);
- }, 500);
- }
-}
-
 function showVictoryScreen(winner) {
  const modal = document.getElementById('victoryModal');
  const modalBody = document.getElementById('victoryModalBody');
@@ -2478,347 +1766,11 @@ function showVictoryScreen(winner) {
  modal.classList.add('show');
 }
 
-function purchaseGear(gear) {
- if (window.OnlineMode && window.OnlineMode.active) {
-  return window.OnlineMode.sendAction({ type: 'buyGear', gearName: gear.name });
- }
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- const char = currentPlayer.character;
-
- // Check if player can enter gear shop
- const locationCheck = canEnterSection('gearShop', currentPlayer.playerNum);
- if (!locationCheck.canEnter) {
- alert(`Cannot access gear shop!\n\n${locationCheck.reason}`);
- return;
- }
-
- if (char.timeRemaining < 1) {
- alert('Not enough time!');
- return;
- }
-
- // Check prerequisites
- if (gear.prerequisiteLevel && char.level < gear.prerequisiteLevel) {
- alert(`This gear requires Level ${gear.prerequisiteLevel}!\n\nYou are currently Level ${char.level}.`);
- return;
- }
-
- if (gear.prerequisiteItems && gear.prerequisiteItems.length > 0) {
- const missingItems = gear.prerequisiteItems.filter(item => !char.equipment.includes(item));
- if (missingItems.length > 0) {
- alert(`This gear requires the following items:\n\n${missingItems.map(i => ` ${i}`).join('\n')}\n\nPurchase these items first.`);
- return;
- }
- }
-
- // Move player to gear shop
- movePlayerToSection(currentPlayer.playerNum, 'gearShop');
-
- // Apply Non-Locking Carabiner discount on Lead gear purchases
- const leadDiscountItems = ['Locking Carabiner', 'Quickdraws Set'];
- const hasNonLockingCarabiner = char.equipment.includes('Non-Locking Carabiner');
- const carabinerDiscount = (hasNonLockingCarabiner && leadDiscountItems.includes(gear.name)) ? 20: 0;
- const effectiveCost = Math.max(0, gear.cost - carabinerDiscount);
-
- const spendableXP = getSpendableXP(char);
- const xpToGo = getXPToNextLevel(char);
-
- if (spendableXP < effectiveCost) {
- const costDisplay = carabinerDiscount > 0 ? `${effectiveCost} XP (${gear.cost} - 20 Carabiner discount)`: `${effectiveCost} XP`;
- alert(`Not enough spendable XP!\n\nYou have ${spendableXP} XP earned in Level ${char.level}.\nYou need ${costDisplay} to purchase this item.\n\nCurrently ${xpToGo} XP away from Level ${char.level + 1}.`);
- return;
- }
-
- // Check if has Gear Bag for free shop visit
- const hasGearBag = char.equipment.includes('Gear Bag');
- const timeCost = hasGearBag ? 0: 1;
-
- // EFFECTS: capture the source card position BEFORE the re-render destroys it.
- const fxSrcCard = document.querySelector(`[data-gear-slot="${gear.name.replace(/"/g, '\\"')}"]`);
- const fxSrcRect = fxSrcCard && fxSrcCard.getBoundingClientRect();
- const fxSrcGhost = fxSrcRect ? { left: fxSrcRect.left + fxSrcRect.width / 2, top: fxSrcRect.top + fxSrcRect.height / 2 } : null;
- const fxPlayerNum = currentPlayer.playerNum;
- const fxNewlyReplacedSlot = !['Belay Device', 'Locking Carabiner', 'Lead Rope'].includes(gear.name) ? gear.name : null;
-
- char.timeRemaining -= timeCost;
- char.xp -= effectiveCost;
-
- const newXpToGo = getXPToNextLevel(char);
-
- char.equipment.push(gear.name);
-
- // Apply permanent stat bonuses
- if (gear.statEffect === 'endurance') {
- char.maxEndurance += gear.value;
- } else if (gear.statEffect === 'strength' && (gear.name === 'Grip Strength Trainer')) {
- char.gearBonuses.strength += gear.value;
- } else if (gear.statEffect === 'technique' && (gear.name === 'Technique Training System')) {
- char.gearBonuses.technique += gear.value;
- } else if (gear.statEffect === 'focus' && (gear.name === 'Meditation App')) {
- char.gearBonuses.focus += gear.value;
- } else if (gear.statEffect === 'flexibility' && (gear.name === 'Resistance Bands')) {
- char.gearBonuses.flexibility += gear.value;
- } else if (gear.statEffect === 'strengthTech') {
- char.gearBonuses.strength += 2;
- char.gearBonuses.technique += 2;
- } else if (gear.statEffect === 'strengthTechMixed') {
- // Campus Board Training Program: +3 Str, -1 Tech
- char.gearBonuses.strength += 3;
- char.gearBonuses.technique -= 1;
- }
-
- // Handle enduranceBonus property for items like Comfortable Climbing Apparel and Compression Sleeves
- if (gear.enduranceBonus) {
- char.maxEndurance += gear.enduranceBonus;
- }
-
- const discountNote = carabinerDiscount > 0 ? ` (-${carabinerDiscount} Carabiner discount)`: '';
- addLog(`Player ${currentPlayer.playerNum} purchased ${gear.name} for ${effectiveCost} XP${discountNote}${timeCost === 0 ? ' (Gear Bag: free visit)': ''} (now ${newXpToGo} XP to Level ${char.level + 1})`);
-
- // Replace purchased gear with new one
- replaceGearInShop(gear.name);
-
- // EFFECTS: record the purchase for the turn summary.
- if (window.Effects) {
- window.Effects.recordTurnAction({
- kind: 'gear',
- desc: `Bought ${gear.name}`,
- delta: `−${effectiveCost} XP`,
- });
- }
-
- checkTurnEnd();
- renderGameBoard();
-
- // EFFECTS: post-render — fly the gear from shop to inventory, flip the
- // replacement card in the shop, and chalk-puff the player's XP bar.
- if (window.Effects) {
- requestAnimationFrame(() => {
- const destInv = document.getElementById(`inventory-${fxPlayerNum}`);
- // Use the original captured source center so the animation flows from
- // where the shop card USED to be, before the re-render moved it.
- const srcStub = fxSrcGhost ? { getBoundingClientRect: () => ({ left: fxSrcGhost.left - 60, top: fxSrcGhost.top - 16, width: 120, height: 32, right: 0, bottom: 0 }) } : null;
- if (srcStub && destInv) window.Effects.flyToInventory(srcStub, destInv, gear.name);
- const xpBar = window.Effects.locateXpBar(fxPlayerNum);
- if (xpBar) window.Effects.floatNumber(xpBar, `−${effectiveCost} XP`, 'xp');
- // Flip the newly drawn replacement card in the shop, if any.
- if (fxNewlyReplacedSlot) {
- // After replaceGearInShop, the new card occupies the slot. Find the
- // newest gear card that wasn't previously rendered. Simplest: flip
- // any card whose data-gear-slot matches the newly available pool.
- const allShop = document.querySelectorAll('.gear-card');
- allShop.forEach(c => {
- const slot = c.getAttribute('data-gear-slot');
- if (slot && slot !== gear.name && gameState.availableGear.find(g => g.name === slot)) {
- // No surgical way to distinguish "new" from "still there"; flip
- // them all briefly is cheaper and reads as "shop refreshed".
- }
- });
- // Cheap honest version: flip every card in the rotating-gear section.
- const rotating = Array.from(document.querySelectorAll('.gear-card:not(.access-gear-card)'));
- rotating.forEach((c, i) => setTimeout(() => window.Effects.cardFlip(c), i * 60));
- }
- });
- }
-}
-
-function checkLevelUp(char) {
- const currentLevel = char.level;
- if (currentLevel >= 15) return;
-
- const nextLevelXP = XP_TABLE[currentLevel].cumulative;
- if (char.xp >= nextLevelXP) {
- // Store old stats before leveling up
- const oldStats = {
- strength: char.stats.strength,
- technique: char.stats.technique,
- focus: char.stats.focus,
- flexibility: char.stats.flexibility,
- maxEndurance: char.maxEndurance
- };
-
- char.level++;
-
- // Update stats based on growth
- updateCharacterStatsForLevel(char);
-
- // Store for animated level-up popup
- const playerNum = gameState.players.find(p => p.character === char).playerNum;
- gameState.pendingLevelUp = { char, oldStats, newLevel: char.level, playerNum };
-
- // Log level up with stat changes
- addLog(` Player ${playerNum} leveled up to Level ${char.level}!`);
- addLog(` Strength: ${oldStats.strength} → ${char.stats.strength} (+${char.stats.strength - oldStats.strength})`);
- addLog(` Technique: ${oldStats.technique} → ${char.stats.technique} (+${char.stats.technique - oldStats.technique})`);
- addLog(` Focus: ${oldStats.focus} → ${char.stats.focus} (+${char.stats.focus - oldStats.focus})`);
- addLog(` Flexibility: ${oldStats.flexibility} → ${char.stats.flexibility} (+${char.stats.flexibility - oldStats.flexibility})`);
- addLog(` Max Endurance: ${oldStats.maxEndurance} → ${char.maxEndurance} (+${char.maxEndurance - oldStats.maxEndurance})`);
- }
-}
-
-function updateCharacterStatsForLevel(char) {
- // Update stats based on growth for current level
- const charTemplate = CHARACTERS[char.key];
- char.stats.strength = Math.round(charTemplate.startingStats.strength + charTemplate.growth.strength * (char.level - 1));
- char.stats.technique = Math.round(charTemplate.startingStats.technique + charTemplate.growth.technique * (char.level - 1));
- char.stats.focus = Math.round(charTemplate.startingStats.focus + charTemplate.growth.focus * (char.level - 1));
- char.stats.flexibility = Math.round(charTemplate.startingStats.flexibility + charTemplate.growth.flexibility * (char.level - 1));
- // Permanent gear max-endurance (e.g. Locking Carabiner +5) is added back so it
- // survives the level-up recompute. Mirrors engine/helpers.js getGearMaxEnduranceBonus.
- char.maxEndurance = Math.round(charTemplate.startingEndurance + charTemplate.growth.endurance * (char.level - 1))
- + getGearMaxEnduranceBonus(char);
-}
-
-function getGearMaxEnduranceBonus(char) {
- let bonus = 0;
- for (const name of char.equipment || []) {
- const gear = GEAR_SHOP.find(g => g.name === name);
- if (!gear) continue;
- if (gear.statEffect === 'endurance') bonus += gear.value;
- if (typeof gear.enduranceBonus === 'number') bonus += gear.enduranceBonus;
- }
- return bonus;
-}
-
-function getSpendableXP(char) {
- // Returns XP available to spend within current level (without leveling down)
- // This is all XP earned within the current level
- const currentLevelThreshold = XP_TABLE[char.level - 1].cumulative;
- const xpInCurrentLevel = char.xp - currentLevelThreshold;
- return xpInCurrentLevel;
-}
-
 function getXPToNextLevel(char) {
  // Returns how much more XP is needed to reach the next level
  if (char.level >= 15) return 0;
  const nextLevelThreshold = XP_TABLE[char.level].cumulative;
  return nextLevelThreshold - char.xp;
-}
-
-function checkTurnEnd() {
- // After any action, determine which player has the most time remaining
- determineNextPlayer();
-}
-
-function determineNextPlayer() {
- // Find the maximum time remaining among all players
- let maxTime = -1;
- gameState.players.forEach((player) => {
- if (player.character.timeRemaining > maxTime) {
- maxTime = player.character.timeRemaining;
- }
- });
-
- // If all players have 0 or less time, end the round
- if (maxTime <= 0) {
- endRound();
- return;
- }
-
- // Check if current player still has the most time (handles ties by keeping current player)
- const currentPlayer = gameState.players[gameState.currentPlayerIndex];
- if (currentPlayer.character.timeRemaining === maxTime) {
- // Current player keeps their turn
- renderGameBoard();
- return;
- }
-
- // Find the next player with the most time remaining
- let nextPlayerIndex = -1;
- for (let i = 0; i < gameState.players.length; i++) {
- if (gameState.players[i].character.timeRemaining === maxTime) {
- nextPlayerIndex = i;
- break;
- }
- }
-
- // Set the current player to the one with the most time
- if (nextPlayerIndex !== -1 && nextPlayerIndex !== gameState.currentPlayerIndex) {
- // EFFECTS: show the prior player's turn-end summary, then reset for the new player.
- if (window.Effects) {
- window.Effects.turnSummaryCard();
- const nextPlayer = gameState.players[nextPlayerIndex];
- window.Effects.beginTurn(nextPlayer.playerNum, nextPlayer.character.name);
- }
- gameState.currentPlayerIndex = nextPlayerIndex;
- addLog(`Turn passes to Player ${gameState.players[nextPlayerIndex].playerNum} (${maxTime} time remaining)`);
- renderGameBoard();
- return;
- }
-
- renderGameBoard();
-}
-
-function endRound() {
- addLog(`Round ${gameState.round} ended!`);
-
- // Route clearing
- clearRoutes();
-
- // Reset player time, abilities, and locations (training bonuses are permanent
- // and not reset). The route-clearing rotation moves every player back to the
- // Lobby automatically and frees their belayer station (RuleModifications).
- gameState.players.forEach(player => {
- const hasApproachShoes = player.character.equipment.includes('Approach Shoes');
- player.character.timeRemaining = 10 + (hasApproachShoes ? 1: 0);
- player.character.abilityUsed = false;
- player.character.location = 'lobby'; // Return all players to lobby
- player.character.belayerStation = null;
- });
-
- // Clear all attempted routes for new round
- gameState.attemptedRoutes = {};
-
- // RuleModifications: belayer count is fixed at N − 1 from round 1 — no
- // time-based unlock ramp.
-
- gameState.round++;
- gameState.currentPlayerIndex = 0;
-
- addLog(`Round ${gameState.round} begins!`);
-
- // EFFECTS: round transition wipe + turn log reset for new player.
- if (window.Effects) {
- // Flush whatever turn log was pending for the previous player.
- window.Effects.turnSummaryCard();
- window.Effects.roundTransition(gameState.round);
- const firstPlayer = gameState.players[gameState.currentPlayerIndex];
- if (firstPlayer) window.Effects.beginTurn(firstPlayer.playerNum, firstPlayer.character.name);
- }
-
- renderGameBoard();
-}
-
-function clearRoutes() {
- // Route clearing mechanic:
- // Position 0: between bouldering and lead → clear lead climbing (next clockwise)
- // Position 1: between lead and top rope → clear top rope (next clockwise)
- // Position 2: between top rope and bouldering → clear bouldering (next clockwise)
-
- const positionNames = ['Bouldering ↔ Lead Climbing', 'Lead Climbing ↔ Top Rope', 'Top Rope ↔ Bouldering'];
- addLog(` Route Clearing: Token is at ${positionNames[gameState.routeClearingPosition]}`);
-
- // Clear the next area in clockwise rotation
- if (gameState.routeClearingPosition === 0) {
- // Token between bouldering and lead → clear lead climbing
- const leadPool = [...regularRoutePool('leadClimbing')].sort(() => Math.random() - 0.5);
- gameState.availableRoutes.leadClimbing = leadPool.slice(0, 5);
- addLog(' Lead climbing routes refreshed and reset');
- } else if (gameState.routeClearingPosition === 1) {
- // Token between lead and top rope → clear top rope (all belayer stations
- // refresh together: 2 routes × belayerCount).
- gameState.availableRoutes.topRope = drawTopRopeStations();
- addLog(' Top rope routes refreshed and reset');
- } else {
- // Token between top rope and bouldering → clear bouldering
- const boulderingPool = [...regularRoutePool('bouldering')].sort(() => Math.random() - 0.5);
- gameState.availableRoutes.bouldering = boulderingPool.slice(0, 5);
- addLog(' Bouldering routes refreshed and reset');
- }
-
- // Move the token clockwise to the next position
- gameState.routeClearingPosition = (gameState.routeClearingPosition + 1) % 3;
- addLog(` Route clearing token moves to ${positionNames[gameState.routeClearingPosition]}`);
 }
 
 function closeModal() {
@@ -2827,33 +1779,20 @@ function closeModal() {
 
 function closeClimbModal() {
  document.getElementById('climbModal').classList.remove('show');
- if (gameState.gameEnded) return; // Victory screen handles itself
- if (gameState.pendingLevelUp) {
- showLevelUpPopup();
- } else {
- advanceTurn();
- }
+ finishPresentation();
 }
 
-function advanceTurn() {
- checkTurnEnd();
- renderGameBoard();
-}
-
-function showLevelUpPopup() {
- const { char, oldStats, newLevel, playerNum } = gameState.pendingLevelUp;
-
+// Level-up popup for one level_up event.
+function showLevelUpPopup(levelUp) {
+ const p = levelUp.payload;
  const statRows = [
- { icon: '', name: 'Strength', old: oldStats.strength, now: char.stats.strength },
- { icon: '', name: 'Technique', old: oldStats.technique, now: char.stats.technique },
- { icon: '', name: 'Focus', old: oldStats.focus, now: char.stats.focus },
- { icon: '', name: 'Flexibility', old: oldStats.flexibility, now: char.stats.flexibility },
- { icon: '', name: 'Max Endurance',old: oldStats.maxEndurance,now: char.maxEndurance }
+ ...STAT_KEYS.map(k => ({ name: STAT_LABELS[k], old: p.oldStats[k], now: p.newStats[k] })),
+ { name: 'Max Endurance', old: p.oldMaxEndurance, now: p.newMaxEndurance },
  ].map(row => {
  const diff = row.now - row.old;
  const diffStr = diff > 0 ? `<span class="stat-up">+${diff}</span>`: `<span>${diff}</span>`;
  return `<tr>
- <td>${row.icon} ${row.name}</td>
+ <td> ${row.name}</td>
  <td>${row.old}</td>
  <td>${row.now}</td>
  <td>${diffStr}</td>
@@ -2863,9 +1802,9 @@ function showLevelUpPopup() {
  document.getElementById('levelUpBody').innerHTML = `
  <div class="level-up-headline"> LEVEL UP! </div>
  <div style="font-size: 1.1em; color: #2c3e50; margin-bottom: 5px;">
- Player ${playerNum} — ${char.name}
+ Player ${p.playerNum} — ${playerName(gameState, p.playerNum)}
  </div>
- <div class="level-badge">${newLevel}</div>
+ <div class="level-badge">${p.newLevel}</div>
  <table class="stat-table">
  <thead>
  <tr>
@@ -2890,8 +1829,7 @@ function showLevelUpPopup() {
 
 function closeLevelUpModal() {
  document.getElementById('levelUpModal').classList.remove('show');
- gameState.pendingLevelUp = null;
- advanceTurn();
+ finishPresentation();
 }
 
 // ---------------------------------------------------------------------------
@@ -2909,7 +1847,7 @@ function toggleLogPanel() {
 // The shop is always-visible per the latest design pass — the previous
 // toggle / auto-open behavior was removed. We keep the affordability badge
 // as a passive signal on the title row, but never collapse the panel.
-function syncShopCollapseState(char, spendableXP) {
+function syncShopCollapseState() {
  const panel = document.querySelector('.store-panel');
  if (!panel) return;
  panel.classList.remove('collapsed');
@@ -2924,24 +1862,8 @@ function syncShopCollapseState(char, spendableXP) {
   title.appendChild(hint);
  }
 
- // Compute affordability across BOTH access cards and the rotating selection.
- const owned = new Set(char.equipment);
- const hasGearBag = owned.has('Gear Bag');
- const canVisit = hasGearBag || char.timeRemaining >= 1;
- const accessNames = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
- const candidates = [
-  ...GEAR_SHOP.filter(g => accessNames.includes(g.name)),
-  ...gameState.availableGear,
- ];
- const affordable = candidates.some(gear => {
-  if (owned.has(gear.name)) return false;
-  if (!canVisit) return false;
-  if (gear.cost > spendableXP) return false;
-  if (gear.prerequisiteLevel && char.level < gear.prerequisiteLevel) return false;
-  if (gear.prerequisiteItems && gear.prerequisiteItems.some(i => !owned.has(i))) return false;
-  return true;
- });
-
+ // Affordable = the engine would let the current player buy something now.
+ const affordable = legalActionsNow().some(a => a.type === 'buyGear');
  hint.textContent = 'AFFORDABLE';
  hint.style.display = affordable ? 'inline-block' : 'none';
 }
