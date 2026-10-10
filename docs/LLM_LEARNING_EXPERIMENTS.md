@@ -1,3 +1,12 @@
+> **Status: CLOSED — learning record only (2026-10-10).**
+> This program is dead. Nothing in it is part of the game, the CPU opponents, or the
+> playtest pipeline; its scripts (`sim/generate-training-data.js`, `training/`) are kept
+> for reference only and are not maintained. What carried forward is the *lessons*.
+> One caveat on the numbers below: the rollout search used as "ground truth" (E10, E12)
+> agrees with itself only ~17% of the time under reseeding, so the agreement figures are
+> weak evidence either way — see `docs/CPU_PLAYTEST_AUDIT.md` (F2). The playtest bot that
+> replaced this work is `sim/agents/planner.js` (audit §8).
+
 # Can an LLM Learn to Play All-In Ascent?
 ## Complete Experimental Record — Methodology, Rationale, Outcomes, and Redesign Blueprint
 

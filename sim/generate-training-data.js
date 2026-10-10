@@ -1,3 +1,12 @@
+// ============================================================================
+// DEAD CODE — archived LLM learning program (closed 2026-10-10).
+// Kept as a record of the experiment only. Not used by the game, the CPU
+// opponents, or the playtest pipeline, and not maintained. Its labels came
+// from the rollout search, which the CPU audit found too noisy to serve as
+// ground truth (docs/CPU_PLAYTEST_AUDIT.md, F2). See
+// docs/LLM_LEARNING_EXPERIMENTS.md for what was learned.
+// ============================================================================
+//
 // AlphaZero-style training-data generator (distillation pipeline, phase Z1).
 //
 // Runs pure-rollout games (no LLM anywhere — ~1s/decision, no thermal load)
@@ -61,6 +70,12 @@ const MAX_STEPS = Number(args['max-steps'] || 900);
 // pilot ground to r70+ with no end in sight). Pre-cap decisions are still
 // good labels; post-cap stalemate grinding is low-value and unboundedly slow.
 const MAX_ROUNDS = Number(args['max-rounds'] || 45);
+// Playout-step cap inside the rollout evaluator. Stalemate-prone states make
+// every playout run to the ceiling instead of terminating (~200 steps for a
+// finishable game): seed-12 spent 3.8 HOURS on one game at the old 600 cap.
+// The value function scores horizon states by milestones+XP, so truncated
+// playouts stay informative (AlphaZero-style truncated evaluation).
+const MAX_PLAYOUT_STEPS = Number(args['max-playout-steps'] || 300);
 const OUT_DIR = args.out || `training-data/gen-${new Date().toISOString().slice(0, 10)}`;
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -119,7 +134,8 @@ for (let g = 0; g < GAMES; g++) {
     if (s.currentPlayerIndex === collectSeatIndex) {
       const player = s.players[collectSeatIndex];
       const { evals, bestIndex } = await evaluateActions(
-        s, legal, collectSeatIndex, { rolloutsPerAction: ROLLOUTS });
+        s, legal, collectSeatIndex,
+        { rolloutsPerAction: ROLLOUTS, maxPlayoutSteps: MAX_PLAYOUT_STEPS });
 
       // Build the exact tournament prompt (index mode, no strategy block —
       // matches a fresh-game turn; strategy-conditioned prompts are a later

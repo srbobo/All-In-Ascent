@@ -1,3 +1,12 @@
+// ============================================================================
+// DEAD CODE — archived LLM learning program (closed 2026-10-10).
+// Kept as a record of the experiment only. Not used by the game, the CPU
+// opponents, or the playtest pipeline, and not maintained. Its labels came
+// from the rollout search, which the CPU audit found too noisy to serve as
+// ground truth (docs/CPU_PLAYTEST_AUDIT.md, F2). See
+// docs/LLM_LEARNING_EXPERIMENTS.md for what was learned.
+// ============================================================================
+//
 // Split generated pairs into train/valid/test — BY GAME, never by example.
 // Examples within a game are heavily correlated (same trajectory, adjacent
 // states); an example-level split leaks near-duplicates into test and
@@ -24,9 +33,12 @@ if (!pairsPath || !outDir) {
 fs.mkdirSync(outDir, { recursive: true });
 
 const pairs = fs.readFileSync(pairsPath, 'utf8').trim().split('\n').map(JSON.parse);
+// Group by SEED, not gameId — seeds are globally unique across generation
+// runs (the run was split into run1 + run1b after the playout-cap patch),
+// while gameId restarts at 0 per run and would merge unrelated games.
 const byGame = new Map();
 for (const p of pairs) {
-  const id = p.meta.gameId;
+  const id = p.meta.seed;
   if (!byGame.has(id)) byGame.set(id, []);
   byGame.get(id).push(p);
 }

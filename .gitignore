@@ -11,3 +11,11 @@ results/
 # PartyKit dev-server local state (Durable Object cache, etc.) — regenerated on
 # every `partykit dev` run, never useful in version control.
 .partykit/
+
+# Archived LLM learning program (dead — see training/README.md): generated
+# datasets, LoRA adapter weights and the Python venv. Large and regenerable.
+training-data/
+training/adapters/
+training/data/
+training/pilot-split/
+training/.venv/

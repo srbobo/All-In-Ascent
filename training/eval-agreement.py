@@ -1,3 +1,12 @@
+# ============================================================================
+# DEAD CODE — archived LLM learning program (closed 2026-10-10).
+# Kept as a record of the experiment only. Not used by the game, the CPU
+# opponents, or the playtest pipeline, and not maintained. Its labels came
+# from the rollout search, which the CPU audit found too noisy to serve as
+# ground truth (docs/CPU_PLAYTEST_AUDIT.md, F2). See
+# docs/LLM_LEARNING_EXPERIMENTS.md for what was learned.
+# ============================================================================
+#
 # Agreement eval: does the model's action_index match the rollout-best label?
 #
 # Used twice in the distillation pipeline:
