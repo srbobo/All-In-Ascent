@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>All-In Ascent — Rulebook</title>
+<title>All-In Ascent Rulebook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;700&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:ital,wght@0,400;0,500;0,700;1,400;1,500&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -27,22 +27,18 @@
     --ink:        #2a1d12;
     --ink-soft:   #5a4530;
     --tape-cream: #f8f0dc;
+    --paper:      #fffaf0;
   }
 
-  /* Sandstone wall body */
   body {
     font-family: 'Hanken Grotesk', sans-serif;
     color: var(--ink);
     background-color: var(--wall-base);
     background-image:
-      radial-gradient(circle at 50% 50%,
-        rgba(36,20,8,0.45) 1px, rgba(36,20,8,0.18) 2px, transparent 3px),
-      radial-gradient(ellipse 80% 60% at 20% 10%,
-        rgba(255,220,170,0.22), transparent 60%),
-      radial-gradient(ellipse 70% 70% at 90% 95%,
-        rgba(60,35,15,0.28), transparent 70%),
-      radial-gradient(ellipse 40% 30% at 35% 60%,
-        rgba(180,140,90,0.25), transparent 70%);
+      radial-gradient(circle at 50% 50%, rgba(36,20,8,0.45) 1px, rgba(36,20,8,0.18) 2px, transparent 3px),
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(255,220,170,0.22), transparent 60%),
+      radial-gradient(ellipse 70% 70% at 90% 95%, rgba(60,35,15,0.28), transparent 70%),
+      radial-gradient(ellipse 40% 30% at 35% 60%, rgba(180,140,90,0.25), transparent 70%);
     background-size: 72px 72px, auto, auto, auto;
     background-attachment: fixed, fixed, fixed, fixed;
     line-height: 1.6;
@@ -56,36 +52,41 @@
     mix-blend-mode: multiply; opacity: 0.6;
   }
 
-  /* Tape-cream container — pinned to the wall */
   .page {
-    position: relative;
-    z-index: 1;
-    max-width: 880px;
-    margin: 0 auto;
+    position: relative; z-index: 1;
+    max-width: 900px; margin: 0 auto;
     background: var(--tape-cream);
     border-radius: 12px;
-    box-shadow:
-      0 12px 32px rgba(40,20,10,0.32),
-      0 24px 48px rgba(40,20,10,0.16),
-      inset 0 1px 0 rgba(255,255,255,0.5);
+    box-shadow: 0 12px 32px rgba(40,20,10,0.32), 0 24px 48px rgba(40,20,10,0.16), inset 0 1px 0 rgba(255,255,255,0.5);
     overflow: hidden;
   }
   .page::before {
     content: ""; position: absolute; inset: 0;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.25 0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
-    mix-blend-mode: multiply; opacity: 0.35;
-    pointer-events: none;
+    mix-blend-mode: multiply; opacity: 0.35; pointer-events: none;
   }
   .page > * { position: relative; }
 
-  /* Ink slab header */
-  header {
-    background: var(--ink);
-    color: var(--chalk);
-    padding: 48px 56px 40px;
-    text-align: center;
+  /* ---------- Holds (from the Grit & Holds system) ---------- */
+  .hold {
+    display: inline-block;
+    border-radius: 58% 42% 55% 45% / 48% 60% 40% 52%;
+    --hc: var(--c, var(--coral));
+    background: radial-gradient(ellipse at 30% 28%, color-mix(in srgb, var(--hc) 55%, white) 0%, var(--hc) 45%, color-mix(in srgb, var(--hc) 70%, black) 100%);
+    box-shadow: inset 3px 6px 12px rgba(255,255,255,0.35), inset -5px -8px 14px rgba(0,0,0,0.35), 4px 5px 10px rgba(40,20,10,0.4);
     position: relative;
-    overflow: hidden;
+  }
+  .hold::after {
+    content: ""; position: absolute; width: 18%; height: 18%; left: 41%; top: 41%;
+    border-radius: 50%; background: rgba(20,10,4,0.75);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.25);
+  }
+
+  /* ---------- Cover ---------- */
+  header {
+    background: var(--ink); color: var(--chalk);
+    padding: 64px 56px 48px; text-align: center;
+    position: relative; overflow: hidden;
   }
   header::after {
     content: ""; position: absolute; inset: 0;
@@ -93,429 +94,934 @@
     pointer-events: none; opacity: 0.85;
   }
   header > * { position: relative; z-index: 1; }
+  header .deco { position: absolute; z-index: 0; }
   header h1 {
-    font-family: 'Bricolage Grotesque', sans-serif;
-    font-weight: 800;
+    font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800;
     font-variation-settings: "wdth" 110, "opsz" 96;
-    font-size: clamp(2.4rem, 5.5vw, 4rem);
-    line-height: 0.9;
-    letter-spacing: -0.04em;
-    color: var(--chalk);
-    margin-bottom: 8px;
+    font-size: clamp(2.6rem, 7vw, 4.6rem); line-height: 0.9; letter-spacing: -0.04em;
+    color: var(--chalk); margin-bottom: 14px;
   }
   header h1 em { font-style: italic; font-weight: 500; color: var(--coral); }
+  header .tagline {
+    font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700;
+    font-size: clamp(1.05rem, 2.6vw, 1.4rem); color: var(--marigold); letter-spacing: 0.01em;
+  }
+  header .strap { margin-top: 10px; color: rgba(244,237,224,0.8); font-style: italic; }
   header .eyebrow {
-    font-family: 'Geist Mono', monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.32em;
-    text-transform: uppercase;
-    color: rgba(244,237,224,0.72);
-    margin-top: 8px;
+    font-family: 'Geist Mono', monospace; font-size: 0.72rem; letter-spacing: 0.32em;
+    text-transform: uppercase; color: rgba(244,237,224,0.6); margin-top: 22px;
   }
-  header .eyebrow::before { content: "▸ "; color: var(--coral); margin-right: 0.4rem; }
-  header .nav-links {
-    margin-top: 22px;
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
+  header .nav-links { margin-top: 22px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   header .nav-link {
-    display: inline-block;
-    padding: 8px 18px;
-    background: var(--chalk);
-    color: var(--ink);
-    border: 2px solid var(--chalk);
-    border-radius: 100px;
-    text-decoration: none;
-    font-family: 'Bricolage Grotesque', sans-serif;
-    font-weight: 700;
-    font-size: 0.92em;
-    letter-spacing: 0.02em;
-    box-shadow: 2px 3px 0 rgba(0,0,0,0.4);
-    transition: transform 0.15s, box-shadow 0.15s;
+    display: inline-block; padding: 8px 18px;
+    background: var(--chalk); color: var(--ink); border: 2px solid var(--chalk); border-radius: 100px;
+    text-decoration: none; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 0.92em;
+    box-shadow: 2px 3px 0 rgba(0,0,0,0.4); transition: transform 0.15s, box-shadow 0.15s;
   }
-  header .nav-link:hover {
-    transform: translate(-1px, -1px);
-    box-shadow: 3px 4px 0 rgba(0,0,0,0.45);
-  }
+  header .nav-link:hover { transform: translate(-1px, -1px); box-shadow: 3px 4px 0 rgba(0,0,0,0.45); }
 
-  /* Content body */
+  /* ---------- Body type ---------- */
   main { padding: 48px 56px 56px; }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Bricolage Grotesque', sans-serif;
-    color: var(--ink);
-    margin-top: 1.8em;
-    margin-bottom: 0.5em;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    font-weight: 800;
+  h1, h2, h3, h4 {
+    font-family: 'Bricolage Grotesque', sans-serif; color: var(--ink);
+    margin-top: 1.8em; margin-bottom: 0.5em; line-height: 1.15; letter-spacing: -0.02em; font-weight: 800;
   }
-  main > h1:first-child, main > h2:first-child { margin-top: 0; }
-  h1 {
-    font-size: 2em;
-    border-bottom: 2px solid rgba(40,20,10,0.2);
-    padding-bottom: 8px;
-  }
+  main > h2:first-child { margin-top: 0; }
   h2 {
-    font-size: 1.55em;
-    padding-bottom: 6px;
-    border-bottom: 2px dashed rgba(40,20,10,0.2);
+    font-size: 1.7em; padding-bottom: 6px;
+    border-bottom: 3px solid var(--ink);
+    display: flex; align-items: center; gap: 12px;
   }
-  h3 {
-    font-size: 1.18em;
-    color: var(--ink);
-    font-weight: 700;
+  h2::before {
+    content: ""; flex: none; width: 22px; height: 22px;
+    border-radius: 58% 42% 55% 45% / 48% 60% 40% 52%;
+    background: radial-gradient(ellipse at 30% 28%, #ffd2c4 0%, var(--coral) 45%, #a83a20 100%);
+    box-shadow: inset 2px 3px 5px rgba(255,255,255,0.35), inset -2px -3px 5px rgba(0,0,0,0.35), 2px 2px 4px rgba(40,20,10,0.35);
   }
-  h3 em { font-style: italic; font-weight: 500; color: var(--raspberry); }
-  h4 {
-    font-size: 1rem;
-    color: var(--ink-soft);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 700;
-    font-family: 'Geist Mono', monospace;
-  }
-
-  p { margin: 0.7em 0; color: var(--ink); }
+  h3 { font-size: 1.2em; font-weight: 700; }
+  p { margin: 0.7em 0; }
   ul, ol { margin: 0.7em 0 0.7em 1.6em; }
   li { margin: 0.3em 0; }
+  li > ul, li > ol { margin-top: 0.3em; }
   a { color: var(--cobalt); text-decoration: none; border-bottom: 1px solid rgba(44,102,207,0.4); }
   a:hover { border-bottom-color: var(--cobalt); }
+  hr { border: none; border-top: 1px dashed rgba(40,20,10,0.25); margin: 2.4em 0; }
+  code { background: rgba(40,20,10,0.08); padding: 1px 7px; border-radius: 4px; font-family: 'Geist Mono', monospace; font-size: 0.85em; color: var(--raspberry); }
+  .ok { color: #3f7a10; font-weight: 700; }
+  .no { color: #c23a1c; font-weight: 700; }
 
-  hr {
-    border: none;
-    border-top: 1px dashed rgba(40,20,10,0.25);
-    margin: 2.2em 0;
-  }
-  blockquote {
-    background: white;
-    border-left: 4px solid var(--marigold);
-    padding: 14px 20px;
-    margin: 1.2em 0;
-    border-radius: 4px;
-    box-shadow: 2px 3px 0 var(--ink), 2px 3px 12px rgba(40,20,10,0.12);
-    color: var(--ink);
-    font-size: 0.95em;
-  }
-  code {
-    background: rgba(40,20,10,0.08);
-    padding: 1px 7px;
-    border-radius: 4px;
-    font-family: 'Geist Mono', monospace;
-    font-size: 0.85em;
-    color: var(--raspberry);
-  }
+  /* ---------- Tables ---------- */
+  .table-wrap { overflow-x: auto; margin: 1.2em 0; padding: 0 5px 6px 0; }
   table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 1.2em 0;
-    font-size: 0.92em;
-    background: white;
-    border: 2px solid var(--ink);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 3px 4px 0 var(--ink);
+    width: 100%; border-collapse: collapse; font-size: 0.92em; background: white;
+    border: 2px solid var(--ink); border-radius: 8px; overflow: hidden; box-shadow: 3px 4px 0 var(--ink);
   }
-  th, td {
-    padding: 10px 14px;
-    border: 1px solid rgba(40,20,10,0.12);
-    text-align: left;
-    vertical-align: top;
-  }
-  th {
-    background: var(--ink);
-    color: var(--chalk);
-    font-family: 'Bricolage Grotesque', sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    font-size: 0.88em;
-  }
-  tbody tr:nth-child(odd) { background: rgba(248,240,220,0.4); }
+  th, td { padding: 9px 13px; border: 1px solid rgba(40,20,10,0.12); text-align: left; vertical-align: top; }
+  th { background: var(--ink); color: var(--chalk); font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 0.88em; letter-spacing: 0.02em; }
+  tbody tr:nth-child(odd) { background: rgba(248,240,220,0.45); }
 
-  ol.toc-list, ul.toc-list { padding-left: 1.4em; }
-  /* Anchor offset */
+  /* ---------- Callouts ---------- */
+  .callout {
+    --accent: var(--marigold);
+    position: relative; background: var(--paper);
+    border: 2px solid var(--ink); border-left: 8px solid var(--accent);
+    border-radius: 6px; padding: 22px 22px 14px; margin: 1.6em 0 1.4em;
+    box-shadow: 3px 4px 0 var(--ink);
+    font-size: 0.97em;
+  }
+  .callout p:first-of-type { margin-top: 0.2em; }
+  .callout .tape {
+    position: absolute; top: -13px; left: 14px;
+    background: var(--accent); color: var(--ink);
+    font-family: 'Geist Mono', monospace; font-weight: 700; font-size: 0.72rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    padding: 3px 12px; transform: rotate(-1.5deg);
+    box-shadow: 1px 2px 0 rgba(40,20,10,0.35);
+    opacity: 0.95;
+  }
+  .callout.golden   { --accent: var(--coral); font-size: 1.12em; text-align: center; }
+  .callout.remember { --accent: var(--marigold); }
+  .callout.example  { --accent: var(--cobalt); background: #f4f7ff; }
+  .callout.example .tape { color: white; }
+  .callout.offwall  { --accent: var(--teal); background: #f0fbf9; font-style: italic; }
+  .callout.offwall strong { font-style: normal; }
+  .callout.coach    { --accent: var(--lime); }
+  .callout.forgot   { --accent: var(--raspberry); }
+  .callout.forgot .tape { color: white; }
+  .callout.variant  { --accent: var(--violet); }
+  .callout.variant .tape { color: white; }
+  .callout.lore {
+    background: var(--ink); color: var(--chalk); border-color: var(--ink); border-left-color: var(--coral);
+    font-size: 1.06em; line-height: 1.7; padding: 28px 30px 18px;
+    box-shadow: 4px 5px 0 var(--wall-deep);
+  }
+  .callout.lore p { color: var(--chalk); }
+  .callout.lore strong { color: var(--marigold); }
+  .callout.plain { --accent: var(--wall-shade); }
+
+  /* ---------- Figures ---------- */
+  .fig { margin: 1.6em 0; }
+  .fig svg { display: block; width: 100%; height: auto; }
+  .fig-scroll { overflow-x: auto; }
+  .fig-gym-map .fig-scroll svg { min-width: 540px; }
+  .fig-dice .fig-scroll svg { min-width: 520px; max-width: 680px; }
+  .fig-round-flow .fig-scroll svg { min-width: 560px; }
+  figcaption { font-size: 0.86em; color: var(--ink-soft); margin-top: 8px; text-align: center; }
+  .fig-split { display: grid; grid-template-columns: minmax(200px, 290px) 1fr; gap: 24px; align-items: center; }
+  .anatomy { margin: 0; padding-left: 0; list-style: none; counter-reset: a; }
+  .anatomy li { counter-increment: a; position: relative; padding-left: 38px; margin: 0.55em 0; }
+  .anatomy li::before {
+    content: counter(a); position: absolute; left: 0; top: 0;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--coral); border: 1.5px solid var(--ink);
+    font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 0.8em;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ---------- Climber spreads ---------- */
+  .climber {
+    --c: var(--coral);
+    margin: 2.2em 0; border: 2px solid var(--ink); border-radius: 12px; overflow: hidden;
+    background: var(--paper); box-shadow: 4px 5px 0 var(--ink);
+  }
+  .climber-card { background: color-mix(in srgb, var(--c) 16%, var(--paper)); border-bottom: 2px solid var(--ink); padding: 20px 22px 18px; }
+  .cc-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .cc-hold { width: 54px; height: 54px; flex: none; }
+  .cc-title { flex: 1; min-width: 160px; }
+  .cc-arch { font-family: 'Geist Mono', monospace; font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
+  .cc-name { margin: 0; font-size: 1.7em; font-weight: 800; letter-spacing: -0.03em; }
+  .cc-cx { display: flex; align-items: center; gap: 8px; font-size: 0.85em; }
+  .cc-cx-label { font-family: 'Geist Mono', monospace; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
+  .cc-cx-word { font-weight: 700; }
+  .pips { display: inline-flex; gap: 3px; }
+  .pip { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--ink); background: transparent; }
+  .pip.on { background: var(--c); }
+  .cc-stats { margin-top: 16px; display: grid; gap: 7px; }
+  .cc-row { display: grid; grid-template-columns: 40px 1fr 36px 64px; align-items: center; gap: 10px; }
+  .cc-abbr { font-family: 'Geist Mono', monospace; font-weight: 700; font-size: 0.78rem; }
+  .cc-bar { height: 12px; background: rgba(40,20,10,0.1); border: 1.5px solid var(--ink); border-radius: 3px; overflow: hidden; }
+  .cc-bar span { display: block; height: 100%; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 70%, white) 0%, var(--c) 55%, color-mix(in srgb, var(--c) 80%, black) 100%); }
+  .cc-row.end { margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(40,20,10,0.25); }
+  .cc-row.end .cc-bar span { background: repeating-linear-gradient(90deg, var(--c) 0 8px, color-mix(in srgb, var(--c) 70%, white) 8px 10px); }
+  .cc-val { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; text-align: right; }
+  .cc-grow { font-family: 'Geist Mono', monospace; font-size: 0.78rem; color: var(--ink-soft); }
+  .cc-grow small { font-size: 0.85em; opacity: 0.8; }
+  .climber-body { padding: 4px 24px 14px; }
+  .climber-body .callout.plain {
+    border: none; box-shadow: none; background: transparent; padding: 6px 0 0; margin: 0.8em 0 0.4em;
+    font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.3em; font-weight: 700; color: var(--c);
+    filter: brightness(0.8);
+  }
+  .climber-body ul { list-style: none; margin-left: 0; }
+  li.edge, li.price { display: flex; gap: 10px; align-items: baseline; }
+  .pm {
+    flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--ink);
+    display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95em;
+    transform: translateY(3px);
+  }
+  li.edge .pm { background: var(--lime); }
+  li.price .pm { background: var(--coral); }
+
   h1[id], h2[id], h3[id] { scroll-margin-top: 16px; }
 
-  /* Print friendliness */
   @media print {
-    body { background: white; }
+    body { background: white; padding: 0; }
     body::before { display: none; }
     .page { box-shadow: none; }
     header .nav-links { display: none; }
+    .climber, .callout, .fig { break-inside: avoid; }
   }
-  /* Mobile */
   @media (max-width: 720px) {
-    main { padding: 28px 24px 40px; }
-    header { padding: 32px 24px 28px; }
-    header h1 { font-size: 1.9em; }
+    body { padding: 0; }
+    .page { border-radius: 0; }
+    main { padding: 28px 16px 40px; }
+    header { padding: 44px 16px 32px; }
+    .fig-split { grid-template-columns: 1fr; }
+    .fig-split svg { max-width: 280px; margin: 0 auto; }
+    .climber-body { padding: 4px 16px 12px; }
+    .cc-row { grid-template-columns: 36px 1fr 30px 56px; gap: 8px; }
+    h2 { font-size: 1.4em; }
+    table { font-size: 0.82em; }
+    th, td { padding: 7px 9px; }
   }
 </style>
 </head>
 <body>
 <div class="page">
   <header>
+    <span class="hold deco" style="--c:var(--coral);width:70px;height:58px;left:6%;top:18%;transform:rotate(-14deg)"></span>
+    <span class="hold deco" style="--c:var(--teal);width:44px;height:52px;left:9%;bottom:12%;transform:rotate(22deg)"></span>
+    <span class="hold deco" style="--c:var(--violet);width:62px;height:48px;right:7%;top:24%;transform:rotate(10deg)"></span>
+    <span class="hold deco" style="--c:var(--marigold);width:38px;height:34px;right:9%;bottom:12%"></span>
+    <span class="hold deco" style="--c:var(--cobalt);width:30px;height:36px;right:28%;top:10%;transform:rotate(-30deg)"></span>
     <h1>All-In <em>Ascent.</em></h1>
+    <p class="tagline">Try. Fall. Get Stronger. Send.</p>
+    <p class="strap">A climbing game of grit, gear, and good beta for 1–4 players, set at Alpine Indoors.</p>
     <p class="eyebrow">Alpine Indoors · Official Rulebook</p>
     <div class="nav-links">
       <a class="nav-link" href="index.html">Back to Game</a>
-      <a class="nav-link" href="#table-of-contents">Table of Contents</a>
+      <a class="nav-link" href="#table-of-contents">Contents</a>
+      <a class="nav-link" href="#quick-reference">Quick Reference</a>
     </div>
   </header>
   <main>
-<h1 id="all-in-ascent">ALL-IN ASCENT</h1>
-<h2 id="alpine-indoors-rock-climbing-board-game">Alpine Indoors Rock Climbing Board Game</h2>
-<h3 id="official-rulebook-engine-v040">Official Rulebook — Engine v0.4.0</h3>
-<hr>
 <h2 id="table-of-contents">TABLE OF CONTENTS</h2>
-<ol><li><a href="#game-overview">Game Overview</a></li><li><a href="#game-components">Game Components</a></li><li><a href="#setup">Setup</a></li><li><a href="#objective">Objective</a></li><li><a href="#characters">Characters</a></li><li><a href="#understanding-your-character">Understanding Your Character</a></li><li><a href="#how-to-play">How to Play</a></li><li><a href="#actions-you-can-take">Actions You Can Take</a></li><li><a href="#climbing-routes">Climbing Routes</a></li><li><a href="#route-specialty-tags">Route Specialty Tags</a></li><li><a href="#the-dice-system">The Dice System</a></li><li><a href="#training">Training</a></li><li><a href="#the-gear-shop">The Gear Shop</a></li><li><a href="#resting">Resting</a></li><li><a href="#leveling-up">Leveling Up</a></li><li><a href="#route-clearing-system">Route Clearing System</a></li><li><a href="#special-rules">Special Rules</a></li><li><a href="#winning-the-game">Winning the Game</a></li><li><a href="#strategy-tips">Strategy Tips</a></li><li><a href="#quick-reference">Quick Reference</a></li></ol>
+<p><strong>Learn to Play</strong></p>
+<ol><li><a href="#welcome-to-alpine-indoors">Welcome to Alpine Indoors</a></li><li><a href="#how-to-win">How to Win</a></li><li><a href="#whats-in-the-box">What's in the Box</a></li><li><a href="#words-to-know">Words to Know</a></li><li><a href="#the-golden-rules">The Golden Rules</a></li><li><a href="#setup">Setup</a></li><li><a href="#meet-the-climbers">Meet the Climbers</a></li><li><a href="#how-a-round-works">How a Round Works</a></li><li><a href="#your-actions">Your Actions</a></li><li><a href="#climbing-a-route">Climbing a Route</a></li><li><a href="#your-first-round">Your First Round</a></li><li><a href="#the-gym">The Gym</a></li><li><a href="#xp-and-leveling-up">XP and Leveling Up</a></li><li><a href="#the-gear-shop">The Gear Shop</a></li><li><a href="#end-of-the-round">End of the Round</a></li><li><a href="#ringing-the-bell">Ringing the Bell</a></li></ol>
+<p><strong>Reference</strong></p>
+<ol start="17"><li><a href="#coachs-corner">Coach's Corner</a></li><li><a href="#clarifications-and-faq">Clarifications and FAQ</a></li><li><a href="#gear-card-reference">Gear Card Reference</a></li><li><a href="#tables">Tables</a></li><li><a href="#quick-reference">Quick Reference</a></li></ol>
 <hr>
-<h2 id="game-overview">GAME OVERVIEW</h2>
-<p>Welcome to<strong>All-In Ascent</strong>, where you step into the climbing shoes of an aspiring rock climber at Alpine Indoors climbing gym! Over multiple rounds, you'll attempt challenging routes, train your body, purchase essential gear, and level up your character from beginner to elite climber.</p>
-<p><strong>Players:</strong>1–4 <strong>Win condition:</strong>First player to complete all 3 Milestone Routes <strong>Complexity:</strong>Medium</p>
+<h2 id="welcome-to-alpine-indoors">WELCOME TO ALPINE INDOORS</h2>
+<aside class="callout lore"><p>The old freight warehouse on the edge of town smells like rubber, chalk, and burnt coffee. Its walls are covered in a riot of color: coral crimps, teal slopers, violet volumes as big as armchairs. This is <strong>Alpine Indoors</strong>, and tonight the chalkboard by the front desk lists three new <strong>Milestone</strong> routes. One easy. One hard. One that nobody has sent.</p>
+<p>Every night after closing, the <strong>Setter</strong> strips one wall bare and bolts up something new. Every morning, the regulars are back — training on the boards, swapping beta, falling off, chalking up, and trying again.</p>
+<p>At the top of the tallest wall hangs a brass bell. The first climber to send all three Milestones gets to ring it.</p></aside>
+<p>In <strong>All-In Ascent</strong>, you are one of those regulars. You will climb routes to earn experience, train your body on the boards, buy gear that bends the rules, and rest when your forearms give out. Every climb costs <strong>Time</strong> and <strong>Endurance</strong>. Every climb — even a fall — teaches you something.</p>
+<p>Some days you send. Most days you fall. The climber who learns fastest wins.</p>
 <hr>
-<h2 id="game-components">GAME COMPONENTS</h2>
-<p>-<strong>5 unique characters</strong>, each with one special ability -<strong>72 route cards</strong>across three climbing areas: -<strong>Bouldering</strong>(26 routes, V0–V12) -<strong>Top Rope</strong>(23 routes, 5.6–5.13c) -<strong>Lead Climbing</strong>(23 routes, 5.8–5.14a)</p>
-<ul><li>Each route may carry one<strong>specialty tag</strong>: Pinch/Crimp, Toe/Heel Hook, Roof/Sloper, Dynamic, or untagged</li></ul>
-<p>-<strong>4 core stats</strong>: Strength, Technique, Focus, Flexibility -<strong>Endurance system</strong>— separate stamina pool that drains with effort -<strong>4 training equipment cards</strong>— one per stat -<strong>17 gear cards</strong>in the shop (3 access cards + 14 permanent-passive cards) -<strong>2 six-sided dice</strong>(more on some climbs — see Dice System) -<strong>3 Milestone Route cards</strong>drawn at game start: one Beginner, one Intermediate, one Expert -<strong>Route Clearing Token</strong>(rotates 0 → 1 → 2 → 0) -<strong>Top Rope belayer stations</strong>— N − 1 stations for N players (e.g. 2 in a 3-player game), fixed for the whole game; each station holds 2 routes and admits one climber -<strong>XP and Level trackers</strong>per player</p>
+<h2 id="how-to-win">HOW TO WIN</h2>
+<aside class="callout golden"><span class="tape">Golden Rule</span><p><strong>The first climber to send all 3 Milestone routes wins immediately.</strong></p></aside>
+<p>There is no round limit. Milestones are shared: everyone races up the same three routes, but each climber must send them for themselves.</p>
+<hr>
+<h2 id="whats-in-the-box">WHAT'S IN THE BOX</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>Count</th><th>What it's for</th></tr></thead>
+<tbody><tr><td>Climber boards</td><td>5</td><td>Your character: starting stats, growth, and ability</td></tr>
+<tr><td>Climber standees</td><td>5</td><td>Shows where you are standing in the gym</td></tr>
+<tr><td>Gym board</td><td>1</td><td>The Lobby, three climbing walls, Training Area, Rest Area, Gear Shop, Milestone board, and Setter's track</td></tr>
+<tr><td>Route cards</td><td>72</td><td>26 Bouldering · 23 Top Rope · 23 Lead</td></tr>
+<tr><td>Gear cards</td><td>17</td><td>3 Lead access cards + 14 permanent upgrades</td></tr>
+<tr><td>Training station tiles</td><td>4</td><td>Campus Board, MoonBoard, Grip Board, Balance &amp; Core</td></tr>
+<tr><td>Setter's token</td><td>1</td><td>Shows which wall gets reset at the end of the round</td></tr>
+<tr><td>Six-sided dice</td><td>5</td><td>3 green <strong>Beta dice</strong> and 2 red <strong>Crux dice</strong></td></tr>
+<tr><td>Player tracker sheets</td><td>4</td><td>Track Time, Endurance, XP, Level, and training bonuses</td></tr>
+<tr><td>Milestone markers</td><td>12</td><td>3 per player, to mark your sends</td></tr>
+<tr><td>"Tried" markers</td><td>20</td><td>Mark routes you have already attempted this round</td></tr></tbody>
+</table></div>
+<hr>
+<h2 id="words-to-know">WORDS TO KNOW</h2>
+<p>These words appear in <strong>bold</strong> throughout the rules. Each one means exactly one thing.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody><tr><td><strong>Climber</strong></td><td>You, the character you play.</td></tr>
+<tr><td><strong>Send</strong></td><td>Succeed on a climb.</td></tr>
+<tr><td><strong>Fall</strong></td><td>Fail a climb. You still earn some XP.</td></tr>
+<tr><td><strong>Time</strong></td><td>Your action budget. You get <strong>10 Time</strong> every round.</td></tr>
+<tr><td><strong>Endurance</strong></td><td>Your stamina. Climbing and training spend it. Resting refills it.</td></tr>
+<tr><td><strong>XP</strong></td><td>Experience. Earned from every climb. Spent on gear. Raises your <strong>Level</strong>.</td></tr>
+<tr><td><strong>Stats</strong></td><td>Your four abilities: <strong>Strength</strong>, <strong>Technique</strong>, <strong>Focus</strong>, <strong>Flexibility</strong>.</td></tr>
+<tr><td><strong>Requirement</strong></td><td>The four numbers on a route card. Meet or beat all four to send.</td></tr>
+<tr><td><strong>Beta die</strong> (green)</td><td>A helpful die. <strong>Subtract</strong> it from a requirement.</td></tr>
+<tr><td><strong>Crux die</strong> (red)</td><td>A harmful die. <strong>Add</strong> it to a requirement.</td></tr>
+<tr><td><strong>Milestone</strong></td><td>One of the three shared routes you must send to win.</td></tr>
+<tr><td><strong>Tag</strong></td><td>A specialty icon on a route (Crimp, Dynamic, Hook, or Roof). Some gear cares about tags.</td></tr>
+<tr><td><strong>Station</strong></td><td>A spot that holds only <strong>one</strong> climber at a time.</td></tr>
+<tr><td><strong>Lobby</strong></td><td>Where every climber starts each round.</td></tr></tbody>
+</table></div>
+<hr>
+<h2 id="the-golden-rules">THE GOLDEN RULES</h2>
+<p>When in doubt, come back here.</p>
+<ol><li><strong>The card beats the rulebook.</strong> If a climber board or gear card contradicts these rules, the card wins.</li><li><strong>Can't pay, can't play.</strong> You need enough <strong>Time</strong> and <strong>Endurance</strong> to <em>start</em> an action.</li><li><strong>Pay first, then roll.</strong> You pay a climb's costs whether you send or fall.</li><li><strong>Meet or beat.</strong> A stat <em>equal</em> to its requirement passes.</li><li><strong>You stand where you last acted.</strong> Your standee stays at your last action's spot until you do something somewhere else.</li></ol>
 <hr>
 <h2 id="setup">SETUP</h2>
-<ol><li>Choose the number of players (1–4).</li><li>Each player picks a character (no duplicates allowed).</li></ol>
-<p>3.<strong>Three Milestone Routes are randomly drawn</strong>from the route deck, with two constraints:</p>
-<ul><li>One<strong>Beginner</strong>route (V0–V2 / 5.6–5.8 / Lead 5.8–5.9)</li><li>One<strong>Intermediate</strong>route (V3–V7 / 5.9–5.11c / Lead 5.10a–5.11c)</li><li>One<strong>Expert</strong>route (V8–V12 / 5.12a–5.13c / Lead 5.12a–5.14a)</li><li><strong>All three milestones must come from DIFFERENT climbing areas</strong> (one Bouldering, one Top Rope, one Lead — in any combination). Sort the route deck by tier, then draw cards in order: Beginner first, then Intermediate from a different area, then Expert from the third remaining area. If a drawn card matches an already-taken area, set it aside and draw again; reshuffle set-asides back at the end.</li></ul>
-<ol><li>Deal<strong>5 random routes</strong>into Bouldering and Lead Climbing. Set up the Top Rope area as<strong>N − 1 belayer stations</strong>(N = player count), dealing<strong>2 random routes to each station</strong>.</li><li>Deal<strong>3 random non-access gear cards</strong>into the gear shop. The 3 access cards (Belay Device, Locking Carabiner, Lead Rope) are always available for purchase.</li><li>Place the<strong>Route Clearing Token</strong>at Position 0.</li><li>Set up the<strong>N − 1 Top Rope belayer stations</strong>(none in a 1-player game).</li><li>Each player begins with:</li></ol>
-<ul><li>Level 1</li><li>0 XP</li><li>10 Time Units</li><li>Character-specific starting stats and endurance</li><li>No equipment</li><li>0/3 Milestones complete</li></ul>
+<figure class="fig fig-gym-map"><div class="fig-scroll"><svg viewBox="0 0 800 470" role="img" aria-label="Setup diagram of the gym board, lettered A to H">
+  <rect x="2" y="2" width="796" height="466" rx="14" fill="#d8bf95" stroke="#2a1d12" stroke-width="2"/>
+  <g>
+  <rect x="20" y="20" width="236" height="120" rx="10" fill="#f8f0dc" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="24" cy="24" r="13" fill="#2a1d12"/><text x="24" y="29" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">A</text></g>
+  <text x="44" y="44" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12">Bouldering</text>
+  <text x="44" y="60" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#5a4530">5 routes · anyone · unlimited</text>
+</g>
+  <rect x="36" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="36" y="78" width="34" height="9" rx="2" fill="#ff6845"/><rect x="78" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="78" y="78" width="34" height="9" rx="2" fill="#ff6845"/><rect x="120" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="120" y="78" width="34" height="9" rx="2" fill="#ff6845"/><rect x="162" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="162" y="78" width="34" height="9" rx="2" fill="#ff6845"/><rect x="204" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="204" y="78" width="34" height="9" rx="2" fill="#ff6845"/>
+  <g>
+  <rect x="282" y="20" width="236" height="120" rx="10" fill="#f8f0dc" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="286" cy="24" r="13" fill="#2a1d12"/><text x="286" y="29" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">B</text></g>
+  <text x="306" y="44" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12">Top Rope</text>
+  <text x="306" y="60" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#5a4530">belayer stations · 1 climber each</text>
+</g>
+  <rect x="298" y="70" width="96" height="66" rx="6" fill="none" stroke="#1fb8a6" stroke-width="2" stroke-dasharray="5 3"/>
+  <text x="346" y="132" text-anchor="middle" font-family="Geist Mono, monospace" font-size="9" fill="#5a4530">STATION 1</text>
+  <rect x="306" y="76" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="306" y="76" width="34" height="9" rx="2" fill="#1fb8a6"/><rect x="352" y="76" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="352" y="76" width="34" height="9" rx="2" fill="#1fb8a6"/>
+  <rect x="406" y="70" width="96" height="66" rx="6" fill="none" stroke="#1fb8a6" stroke-width="2" stroke-dasharray="5 3"/>
+  <text x="454" y="132" text-anchor="middle" font-family="Geist Mono, monospace" font-size="9" fill="#5a4530">STATION 2</text>
+  <rect x="414" y="76" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="414" y="76" width="34" height="9" rx="2" fill="#1fb8a6"/><rect x="460" y="76" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="460" y="76" width="34" height="9" rx="2" fill="#1fb8a6"/>
+  <g>
+  <rect x="544" y="20" width="236" height="120" rx="10" fill="#f8f0dc" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="548" cy="24" r="13" fill="#2a1d12"/><text x="548" y="29" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">C</text></g>
+  <text x="568" y="44" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12">Lead</text>
+  <text x="568" y="60" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#5a4530">5 routes · 3 access cards · 1 climber</text>
+</g>
+  <rect x="560" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="560" y="78" width="34" height="9" rx="2" fill="#2c66cf"/><rect x="602" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="602" y="78" width="34" height="9" rx="2" fill="#2c66cf"/><rect x="644" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="644" y="78" width="34" height="9" rx="2" fill="#2c66cf"/><rect x="686" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="686" y="78" width="34" height="9" rx="2" fill="#2c66cf"/><rect x="728" y="78" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="728" y="78" width="34" height="9" rx="2" fill="#2c66cf"/>
+  <g>
+  <rect x="20" y="166" width="236" height="118" rx="10" fill="#f8f0dc" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="24" cy="170" r="13" fill="#2a1d12"/><text x="24" y="175" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">D</text></g>
+  <text x="44" y="190" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12">Training Area</text>
+  <text x="44" y="206" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#5a4530">4 stations · 1 climber each</text>
+</g>
+  <rect x="34" y="222" width="48" height="48" rx="8" fill="#ffae28" stroke="#2a1d12" stroke-width="1.5"/><text x="58" y="250" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">Campus</text><rect x="89" y="222" width="48" height="48" rx="8" fill="#ffae28" stroke="#2a1d12" stroke-width="1.5"/><text x="113" y="250" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">Moon</text><rect x="144" y="222" width="48" height="48" rx="8" fill="#ffae28" stroke="#2a1d12" stroke-width="1.5"/><text x="168" y="250" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">Grip</text><rect x="199" y="222" width="48" height="48" rx="8" fill="#ffae28" stroke="#2a1d12" stroke-width="1.5"/><text x="223" y="250" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">Core</text>
+  <g>
+  <rect x="282" y="166" width="236" height="118" rx="10" fill="#2a1d12" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="286" cy="170" r="13" fill="#2a1d12"/><text x="286" y="175" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">E</text></g>
+  <text x="306" y="190" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12"></text>
+  
+</g>
+  <text x="400" y="214" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="22" fill="#f4ede0">Lobby</text>
+  <text x="400" y="234" text-anchor="middle" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#d8bf95">every round starts here</text>
+  <g><circle cx="376" cy="256" r="7" fill="#1fb8a6" stroke="#2a1d12" stroke-width="1.5"/><path d="M367 276 Q376 256 385 276 Z" fill="#1fb8a6" stroke="#2a1d12" stroke-width="1.5"/></g><g><circle cx="400" cy="256" r="7" fill="#2c66cf" stroke="#2a1d12" stroke-width="1.5"/><path d="M391 276 Q400 256 409 276 Z" fill="#2c66cf" stroke="#2a1d12" stroke-width="1.5"/></g><g><circle cx="424" cy="256" r="7" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><path d="M415 276 Q424 256 433 276 Z" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/></g>
+  <g>
+  <rect x="544" y="166" width="236" height="118" rx="10" fill="#f8f0dc" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="548" cy="170" r="13" fill="#2a1d12"/><text x="548" y="175" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">F</text></g>
+  <text x="568" y="190" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12">Gear Shop</text>
+  <text x="568" y="206" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#5a4530">3 access cards + 3-card market</text>
+</g>
+  <rect x="560" y="222" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="560" y="222" width="34" height="9" rx="2" fill="#2a1d12"/><rect x="598" y="222" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="598" y="222" width="34" height="9" rx="2" fill="#2a1d12"/><rect x="636" y="222" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="636" y="222" width="34" height="9" rx="2" fill="#2a1d12"/><line x1="676" y1="222" x2="676" y2="268" stroke="#5a4530" stroke-dasharray="3 3"/><rect x="684" y="222" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="684" y="222" width="34" height="9" rx="2" fill="#b6d62d"/><rect x="714" y="222" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="714" y="222" width="34" height="9" rx="2" fill="#b6d62d"/><rect x="744" y="222" width="34" height="46" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="744" y="222" width="34" height="9" rx="2" fill="#b6d62d"/>
+  <g>
+  <rect x="20" y="310" width="236" height="140" rx="10" fill="#f8f0dc" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="24" cy="314" r="13" fill="#2a1d12"/><text x="24" y="319" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">G</text></g>
+  <text x="44" y="334" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12">Rest Area</text>
+  <text x="44" y="350" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#5a4530">1 Time · refill Endurance · unlimited</text>
+</g>
+  <path d="M60 410 q20 -26 40 0 t40 0 t40 0" fill="none" stroke="#1fb8a6" stroke-width="4" stroke-linecap="round"/>
+  <g>
+  <rect x="282" y="310" width="236" height="140" rx="10" fill="#f8f0dc" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="286" cy="314" r="13" fill="#2a1d12"/><text x="286" y="319" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">H</text></g>
+  <text x="306" y="334" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12">Milestones</text>
+  <text x="306" y="350" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#5a4530">the three routes everyone races</text>
+</g>
+  <rect x="308" y="362" width="46" height="62" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="308" y="362" width="46" height="9" rx="2" fill="#d8347d"/><text x="331" y="406" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">BEG</text><rect x="374" y="362" width="46" height="62" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="374" y="362" width="46" height="9" rx="2" fill="#d8347d"/><text x="397" y="406" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">INT</text><rect x="440" y="362" width="46" height="62" rx="4" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><rect x="440" y="362" width="46" height="9" rx="2" fill="#d8347d"/><text x="463" y="406" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">EXP</text>
+  <g>
+  <rect x="544" y="310" width="236" height="140" rx="10" fill="#f8f0dc" stroke="#2a1d12" stroke-width="2"/>
+  <g><circle cx="548" cy="314" r="13" fill="#2a1d12"/><text x="548" y="319" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="14" fill="#f4ede0">I</text></g>
+  <text x="568" y="334" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="15" fill="#2a1d12">Setter's Track</text>
+  <text x="568" y="350" font-family="Hanken Grotesk, sans-serif" font-size="11.5" fill="#5a4530">resets one wall each round</text>
+</g>
+  <rect x="560" y="376" width="62" height="30" rx="15" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><text x="591" y="395" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">Lead</text><rect x="632" y="376" width="62" height="30" rx="15" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><text x="663" y="395" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">Top Rope</text><rect x="704" y="376" width="62" height="30" rx="15" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><text x="735" y="395" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#2a1d12">Boulder</text>
+  <path d="M622 391 h8 M694 391 h8" stroke="#2a1d12" stroke-width="2"/>
+  <path d="M735 410 q0 22 -72 22 q-72 0 -72 -22" fill="none" stroke="#2a1d12" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2a1d12"/></marker></defs>
+  <text x="663" y="447" text-anchor="middle" font-family="Hanken Grotesk, sans-serif" font-size="10.5" fill="#5a4530">token starts on Lead</text>
+</svg></div>
+<figcaption>The gym board for a 3-player game: <strong>2</strong> Top Rope belayer stations (one fewer than the number of players).</figcaption></figure>
+<ol><li><strong>Lay out the gym.</strong> Place the gym board in the middle of the table. Place the 4 training station tiles on the Training Area.</li><li><strong>Choose climbers.</strong> Each player takes a climber board and matching standee. Place every standee in the <strong>Lobby</strong>. First game? Try the <strong>Iron Lung</strong> or the <strong>Technician</strong> — see <a href="#meet-the-climbers">Meet the Climbers</a>.</li><li><strong>Draw the Milestones.</strong> Every route card that can be a Milestone shows a <strong>Milestone badge</strong>: Beginner, Intermediate, or Expert. Draw three Milestones, each from a <strong>different wall</strong>:<ul><li>Draw 1 random <strong>Beginner</strong> route from any wall.</li><li>Draw 1 random <strong>Intermediate</strong> route from a different wall.</li><li>Draw 1 random <strong>Expert</strong> route from the last remaining wall.</li><li>Place them face up on the Milestone board. They stay out of the route decks for the whole game.</li></ul></li><li><strong>Deal the walls.</strong> Shuffle each wall's deck separately.<ul><li><strong>Bouldering:</strong> deal 5 routes face up.</li><li><strong>Lead:</strong> deal 5 routes face up.</li><li><strong>Top Rope:</strong> create <strong>belayer stations</strong> — one fewer than the number of players. Deal <strong>2 routes</strong> to each station. <em>(3 players = 2 stations = 4 Top Rope routes.)</em></li></ul></li><li><strong>Stock the Gear Shop.</strong> Place the 3 Lead access cards (Belay Device, Locking Carabiner, Lead Rope) face up — they are always for sale. Shuffle the other 14 gear cards and deal <strong>3</strong> face up as the market.</li><li><strong>Set the Setter.</strong> Place the Setter's token on <strong>Lead</strong> on the reset track.</li><li><strong>Prepare your tracker.</strong> Each player starts at:<ul><li><strong>Level 1</strong> and <strong>0 XP</strong></li><li><strong>10 Time</strong></li><li><strong>Endurance</strong> at your climber's starting maximum</li><li><strong>0</strong> training bonuses, no gear, no Milestones</li></ul></li></ol>
+<aside class="callout variant"><span class="tape">Solo Game</span><p>Play with <strong>1 belayer station</strong> (the <strong>Auto-Belay</strong>). Everything else is the same. Try to ring the bell in as few rounds as you can.</p></aside>
 <hr>
-<h2 id="objective">OBJECTIVE</h2>
-<p><strong>Be the FIRST player to successfully complete all 3 Milestone Routes — and WIN.</strong></p>
-<p>There is no round limit. The game runs until a player completes all three milestones — pace your investments for the long game.</p>
+<h2 id="meet-the-climbers">MEET THE CLIMBERS</h2>
+<p>Every climber plays by the same rules — then breaks exactly one of them. Each climber board shows:</p>
+<ul><li><strong>Starting stats</strong> and starting <strong>Endurance</strong>.</li><li><strong>Growth</strong> — how much each stat rises every time you level up.</li><li><strong>Ability</strong> — what makes this climber special. A <strong>+</strong> is an edge. A <strong>–</strong> is the price.</li><li><strong>Complexity</strong> — how hard the climber is to play <em>well</em>. It is not how strong they are.</li></ul>
+<aside class="callout variant"><span class="tape">First Game</span><p>Pick the <strong>Iron Lung</strong> and the <strong>Technician</strong>. Their abilities are always on, and there's nothing to remember mid-climb. Try the <strong>Free Solo</strong> once you know the routes.</p></aside>
+<section class="climber" style="--c:var(--teal)"><div class="climber-card">
+  <div class="cc-head">
+    <span class="hold cc-hold" aria-hidden="true"></span>
+    <div class="cc-title">
+      <div class="cc-arch">Endurance Athlete</div>
+      <h3 id="the-iron-lung" class="cc-name">The Iron Lung</h3>
+    </div>
+    <div class="cc-cx" title="Complexity: how hard to play well">
+      <span class="cc-cx-label">Complexity</span>
+      <span class="pips"><span class="pip on"></span><span class="pip"></span><span class="pip"></span></span>
+      <span class="cc-cx-word">Low</span>
+    </div>
+  </div>
+  <div class="cc-stats">
+    
+    <div class="cc-row">
+      <span class="cc-abbr" title="Strength">STR</span>
+      <span class="cc-bar"><span style="width:53.3%"></span></span>
+      <span class="cc-val">16</span>
+      <span class="cc-grow">+2.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Technique">TEC</span>
+      <span class="cc-bar"><span style="width:56.7%"></span></span>
+      <span class="cc-val">17</span>
+      <span class="cc-grow">+2.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Focus">FOC</span>
+      <span class="cc-bar"><span style="width:63.3%"></span></span>
+      <span class="cc-val">19</span>
+      <span class="cc-grow">+3<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Flexibility">FLX</span>
+      <span class="cc-bar"><span style="width:46.7%"></span></span>
+      <span class="cc-val">14</span>
+      <span class="cc-grow">+2<small>/lvl</small></span>
+    </div>
+    <div class="cc-row end">
+      <span class="cc-abbr" title="Endurance">END</span>
+      <span class="cc-bar"><span style="width:92.3%"></span></span>
+      <span class="cc-val">120</span>
+      <span class="cc-grow">+8<small>/lvl</small></span>
+    </div>
+  </div>
+</div><div class="climber-body"><blockquote class="callout plain"><p><em>"Fall seven times. Chalk up eight."</em></p></blockquote>
+<p>The first one in and the last one out. The Iron Lung is not the strongest climber at Alpine Indoors, or the smartest. They simply never stop trying — and every fall makes them better.</p>
+<p><strong>Ability — Relentless</strong></p>
+<ul><li class="edge"><span class="pm">+</span><span>When you <strong>fall</strong>, earn <strong>50% more XP</strong>.</span></li><li class="price"><span class="pm">–</span><span>When you <strong>fall</strong>, lose <strong>5 extra Endurance</strong>.</span></li></ul>
+<p><strong>Plays like:</strong> a grinder. Throw yourself at routes slightly above your level, fall forward, and level up faster than anyone. <strong>Watch out for:</strong> the extra Endurance loss. Rest often, or buy <strong>Mental Anchor</strong> to cancel it.</p></div></section>
+<section class="climber" style="--c:var(--cobalt)"><div class="climber-card">
+  <div class="cc-head">
+    <span class="hold cc-hold" aria-hidden="true"></span>
+    <div class="cc-title">
+      <div class="cc-arch">Precision Specialist</div>
+      <h3 id="the-technician" class="cc-name">The Technician</h3>
+    </div>
+    <div class="cc-cx" title="Complexity: how hard to play well">
+      <span class="cc-cx-label">Complexity</span>
+      <span class="pips"><span class="pip on"></span><span class="pip"></span><span class="pip"></span></span>
+      <span class="cc-cx-word">Low</span>
+    </div>
+  </div>
+  <div class="cc-stats">
+    
+    <div class="cc-row">
+      <span class="cc-abbr" title="Strength">STR</span>
+      <span class="cc-bar"><span style="width:40.0%"></span></span>
+      <span class="cc-val">12</span>
+      <span class="cc-grow">+1.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Technique">TEC</span>
+      <span class="cc-bar"><span style="width:86.7%"></span></span>
+      <span class="cc-val">26</span>
+      <span class="cc-grow">+4.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Focus">FOC</span>
+      <span class="cc-bar"><span style="width:60.0%"></span></span>
+      <span class="cc-val">18</span>
+      <span class="cc-grow">+2.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Flexibility">FLX</span>
+      <span class="cc-bar"><span style="width:46.7%"></span></span>
+      <span class="cc-val">14</span>
+      <span class="cc-grow">+2<small>/lvl</small></span>
+    </div>
+    <div class="cc-row end">
+      <span class="cc-abbr" title="Endurance">END</span>
+      <span class="cc-bar"><span style="width:76.9%"></span></span>
+      <span class="cc-val">100</span>
+      <span class="cc-grow">+5<small>/lvl</small></span>
+    </div>
+  </div>
+</div><div class="climber-body"><blockquote class="callout plain"><p><em>"Every hold has a right answer."</em></p></blockquote>
+<p>The Technician climbs like a chess player — slow, silent, and three moves ahead. They waste nothing. But all that care takes time.</p>
+<p><strong>Ability — Perfect Beta</strong></p>
+<ul><li class="edge"><span class="pm">+</span><span>Ignore every red <strong>Crux die</strong>.</span></li><li class="edge"><span class="pm">+</span><span>Every requirement is <strong>5 lower</strong> for you.</span></li><li class="price"><span class="pm">–</span><span>Every climb costs <strong>1 extra Time</strong>.</span></li></ul>
+<p><strong>Plays like:</strong> a sharpshooter. Fewer climbs, but almost all of them sends. Routes that look brutal on paper are often within reach. <strong>Watch out for:</strong> low Strength. Strength-heavy overhangs are your weak spot.</p></div></section>
+<section class="climber" style="--c:var(--coral)"><div class="climber-card">
+  <div class="cc-head">
+    <span class="hold cc-hold" aria-hidden="true"></span>
+    <div class="cc-title">
+      <div class="cc-arch">Speed Climber</div>
+      <h3 id="the-sprinter" class="cc-name">The Sprinter</h3>
+    </div>
+    <div class="cc-cx" title="Complexity: how hard to play well">
+      <span class="cc-cx-label">Complexity</span>
+      <span class="pips"><span class="pip on"></span><span class="pip on"></span><span class="pip"></span></span>
+      <span class="cc-cx-word">Medium</span>
+    </div>
+  </div>
+  <div class="cc-stats">
+    
+    <div class="cc-row">
+      <span class="cc-abbr" title="Strength">STR</span>
+      <span class="cc-bar"><span style="width:73.3%"></span></span>
+      <span class="cc-val">22</span>
+      <span class="cc-grow">+4<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Technique">TEC</span>
+      <span class="cc-bar"><span style="width:46.7%"></span></span>
+      <span class="cc-val">14</span>
+      <span class="cc-grow">+2<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Focus">FOC</span>
+      <span class="cc-bar"><span style="width:40.0%"></span></span>
+      <span class="cc-val">12</span>
+      <span class="cc-grow">+1.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Flexibility">FLX</span>
+      <span class="cc-bar"><span style="width:53.3%"></span></span>
+      <span class="cc-val">16</span>
+      <span class="cc-grow">+2.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row end">
+      <span class="cc-abbr" title="Endurance">END</span>
+      <span class="cc-bar"><span style="width:65.4%"></span></span>
+      <span class="cc-val">85</span>
+      <span class="cc-grow">+3<small>/lvl</small></span>
+    </div>
+  </div>
+</div><div class="climber-body"><blockquote class="callout plain"><p><em>"Why hang around?"</em></p></blockquote>
+<p>The Sprinter is all fast-twitch muscle. They flash routes before anyone else finishes chalking up — and occasionally fly off the wall in a blur of limbs.</p>
+<p><strong>Ability — Flash Speed</strong></p>
+<ul><li class="edge"><span class="pm">+</span><span>Every climb costs <strong>2 less Time</strong> (minimum 1).</span></li><li class="price"><span class="pm">–</span><span>A <strong>send</strong> earns only <strong>half XP</strong>.</span></li><li class="price"><span class="pm">–</span><span>Roll <strong>1 extra red Crux die</strong> on <strong>Focus</strong> on every climb.</span></li></ul>
+<p><strong>Plays like:</strong> volume. Fit twice as many climbs into a round as anyone else, and use the extra attempts to cover the half XP. <strong>Watch out for:</strong> Focus. Your extra Crux die makes Focus-heavy routes risky, and Focus grows slowly for you.</p></div></section>
+<section class="climber" style="--c:var(--violet)"><div class="climber-card">
+  <div class="cc-head">
+    <span class="hold cc-hold" aria-hidden="true"></span>
+    <div class="cc-title">
+      <div class="cc-arch">Problem Solver</div>
+      <h3 id="the-route-reader" class="cc-name">The Route Reader</h3>
+    </div>
+    <div class="cc-cx" title="Complexity: how hard to play well">
+      <span class="cc-cx-label">Complexity</span>
+      <span class="pips"><span class="pip on"></span><span class="pip on"></span><span class="pip"></span></span>
+      <span class="cc-cx-word">Medium</span>
+    </div>
+  </div>
+  <div class="cc-stats">
+    
+    <div class="cc-row">
+      <span class="cc-abbr" title="Strength">STR</span>
+      <span class="cc-bar"><span style="width:50.0%"></span></span>
+      <span class="cc-val">15</span>
+      <span class="cc-grow">+2<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Technique">TEC</span>
+      <span class="cc-bar"><span style="width:63.3%"></span></span>
+      <span class="cc-val">19</span>
+      <span class="cc-grow">+3.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Focus">FOC</span>
+      <span class="cc-bar"><span style="width:73.3%"></span></span>
+      <span class="cc-val">22</span>
+      <span class="cc-grow">+4<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Flexibility">FLX</span>
+      <span class="cc-bar"><span style="width:46.7%"></span></span>
+      <span class="cc-val">14</span>
+      <span class="cc-grow">+1.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row end">
+      <span class="cc-abbr" title="Endurance">END</span>
+      <span class="cc-bar"><span style="width:84.6%"></span></span>
+      <span class="cc-val">110</span>
+      <span class="cc-grow">+7<small>/lvl</small></span>
+    </div>
+  </div>
+</div><div class="climber-body"><blockquote class="callout plain"><p><em>"I've already climbed it. In my head."</em></p></blockquote>
+<p>The Route Reader spends more time sitting on the mats, staring at the wall, than climbing it. Then they get up and float.</p>
+<p><strong>Ability — Versatility</strong></p>
+<ul><li class="edge"><span class="pm">+</span><span>You <strong>send</strong> if <strong>3 of your 4 stats</strong> meet their requirements.</span></li><li class="edge"><span class="pm">+</span><span>When you <strong>Rest</strong>, gain a <strong>Beta Boost</strong>: <strong>+3 to all stats</strong> on your next climb.</span></li><li class="edge"><span class="pm">+</span><span><strong>Once per round</strong>, before a regular (non-Milestone) climb, you may move <strong>up to 10 points</strong> from one stat to another <strong>for that climb only</strong>.</span></li></ul>
+<p><strong>Plays like:</strong> a problem solver. Ignore your worst stat, rest before big attempts, and reshape yourself to fit the route. <strong>Watch out for:</strong> overthinking. Your edges are flexible, not big. Use them every round.</p></div></section>
+<section class="climber" style="--c:var(--raspberry)"><div class="climber-card">
+  <div class="cc-head">
+    <span class="hold cc-hold" aria-hidden="true"></span>
+    <div class="cc-title">
+      <div class="cc-arch">Risk Taker</div>
+      <h3 id="the-free-solo" class="cc-name">The Free Solo</h3>
+    </div>
+    <div class="cc-cx" title="Complexity: how hard to play well">
+      <span class="cc-cx-label">Complexity</span>
+      <span class="pips"><span class="pip on"></span><span class="pip on"></span><span class="pip on"></span></span>
+      <span class="cc-cx-word">High</span>
+    </div>
+  </div>
+  <div class="cc-stats">
+    
+    <div class="cc-row">
+      <span class="cc-abbr" title="Strength">STR</span>
+      <span class="cc-bar"><span style="width:36.7%"></span></span>
+      <span class="cc-val">11</span>
+      <span class="cc-grow">+1.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Technique">TEC</span>
+      <span class="cc-bar"><span style="width:76.7%"></span></span>
+      <span class="cc-val">23</span>
+      <span class="cc-grow">+4<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Focus">FOC</span>
+      <span class="cc-bar"><span style="width:66.7%"></span></span>
+      <span class="cc-val">20</span>
+      <span class="cc-grow">+3<small>/lvl</small></span>
+    </div>
+    <div class="cc-row">
+      <span class="cc-abbr" title="Flexibility">FLX</span>
+      <span class="cc-bar"><span style="width:53.3%"></span></span>
+      <span class="cc-val">16</span>
+      <span class="cc-grow">+2.5<small>/lvl</small></span>
+    </div>
+    <div class="cc-row end">
+      <span class="cc-abbr" title="Endurance">END</span>
+      <span class="cc-bar"><span style="width:76.9%"></span></span>
+      <span class="cc-val">100</span>
+      <span class="cc-grow">+6<small>/lvl</small></span>
+    </div>
+  </div>
+</div><div class="climber-body"><blockquote class="callout plain"><p><em>"No rope. No doubt."</em></p></blockquote>
+<p>Nobody has ever seen the Free Solo fall. That is because the Free Solo never gets on a route they are not certain of.</p>
+<p><strong>Ability — Life or Die</strong></p>
+<ul><li class="edge"><span class="pm">+</span><span>Climb <strong>Lead</strong> routes <strong>without</strong> the Lead access cards.</span></li><li class="edge"><span class="pm">+</span><span>Ignore <strong>all</strong> dice, green and red. You <strong>never fall</strong>.</span></li><li class="price"><span class="pm">–</span><span>You may only attempt a route if your stats — <strong>base + training + permanent gear</strong> — already meet <strong>every</strong> requirement.</span></li></ul>
+<p><strong>Plays like:</strong> a planner. Train hard, then collect guaranteed sends. Every climb is a sure thing — if you're allowed to start it. <strong>Watch out for:</strong> a slow start. Until training catches you up, very few routes are open to you. You still need a free belayer station for Top Rope.</p></div></section>
 <hr>
-<h2 id="characters">CHARACTERS</h2>
-<p>There are<strong>5 playable characters</strong>. Each has a unique stat profile, a unique passive ability, and a different optimal strategy.</p>
-<h3 id="the-technician-precision-specialist">The Technician (Precision Specialist)</h3>
-<p>A movement artist who reads sequences perfectly and wastes no energy on inefficient beta. -<strong>Starting stats:</strong>Str 12 / Tech 26 / Focus 18 / Flex 14 -<strong>Starting endurance:</strong>100 -<strong>Growth per level:</strong>+1.5 Str / +4.5 Tech / +2.5 Focus / +2 Flex / +5 endurance -<strong>Passive — Perfect Beta:</strong>All nerf dice on every climb are negated (treated as 0). All stat requirements are reduced by 5. Climbs cost +1 extra time.</p>
-<h3 id="the-sprinter-speed-climber">The Sprinter (Speed Climber)</h3>
-<p>Climbs explosively with dynamic movements. Burns bright but fast. -<strong>Starting stats:</strong>Str 22 / Tech 14 / Focus 12 / Flex 16 -<strong>Starting endurance:</strong>85 -<strong>Growth per level:</strong>+4 Str / +2 Tech / +1.5 Focus / +2.5 Flex / +3 endurance -<strong>Passive — Flash Speed:</strong>Time cost of every climb is reduced by 2 (minimum 1), but successful climbs grant only 50% of normal XP. Rolls one extra d6 nerf die applied to Focus on every climb.</p>
-<h3 id="the-iron-lung-endurance-athlete">The Iron Lung (Endurance Athlete)</h3>
-<p>Tackles challenges head-on with determination. -<strong>Starting stats:</strong>Str 16 / Tech 17 / Focus 19 / Flex 14 -<strong>Starting endurance:</strong>120 -<strong>Growth per level:</strong>+2.5 Str / +2.5 Tech / +3 Focus / +2 Flex / +8 endurance -<strong>Passive — Relentless:</strong>On a failed climb, earn 50% more XP than the base fail XP. Lose an extra 5 endurance on every failure.</p>
-<h3 id="the-free-solo-risk-taker">The Free Solo (Risk Taker)</h3>
-<p>Dares the impossible — but only when the stats are bulletproof. -<strong>Starting stats:</strong>Str 11 / Tech 23 / Focus 20 / Flex 16 -<strong>Starting endurance:</strong>100 -<strong>Growth per level:</strong>+1.5 Str / +4 Tech / +3 Focus / +2.5 Flex / +6 endurance -<strong>Passive — Life or Die:</strong>Can attempt Lead routes WITHOUT owning the access cards (Belay Device, Locking Carabiner, Lead Rope). (Top Rope is open to everyone now.) All dice roll effects are negated (no luck swing).<strong>Can ONLY attempt climbs where your effective stats — base + training + permanent gear bonuses — already meet every requirement.</strong></p>
-<h3 id="the-route-reader-problem-solver">The Route Reader (Problem Solver)</h3>
-<p>Studies routes meticulously before attempting. Knowledge is power. -<strong>Starting stats:</strong>Str 15 / Tech 19 / Focus 22 / Flex 14 -<strong>Starting endurance:</strong>110 -<strong>Growth per level:</strong>+2 Str / +3.5 Tech / +4 Focus / +1.5 Flex / +7 endurance -<strong>Passive — Versatility:</strong>When you Rest, you gain a<strong>Beta Boost</strong>(+3 to all stats on your next climb). On any climb,<strong>only 3 of your 4 stats need to meet the requirement</strong>to succeed. Once per round you may<strong>redistribute up to 10 stat points</strong>between any two attributes (lasts until end of round).</p>
+<h2 id="how-a-round-works">HOW A ROUND WORKS</h2>
+<p>The game is played in <strong>rounds</strong>. There are no fixed turns. Instead, you spend <strong>Time</strong>, and <strong>the climber with the most Time left always acts next</strong>.</p>
+<figure class="fig fig-round-flow"><div class="fig-scroll"><svg viewBox="0 0 700 150" role="img" aria-label="Time track: Cal has 9 Time, Ben 8, Ana 6, so Cal acts next">
+  <rect x="30" y="72" width="620" height="8" rx="4" fill="#d8bf95" stroke="#2a1d12" stroke-width="1.5"/>
+  <line x1="40" y1="70" x2="40" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="40" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">10</text><line x1="100" y1="70" x2="100" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="100" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">9</text><line x1="160" y1="70" x2="160" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="160" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">8</text><line x1="220" y1="70" x2="220" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="220" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">7</text><line x1="280" y1="70" x2="280" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="280" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">6</text><line x1="340" y1="70" x2="340" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="340" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">5</text><line x1="400" y1="70" x2="400" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="400" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">4</text><line x1="460" y1="70" x2="460" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="460" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">3</text><line x1="520" y1="70" x2="520" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="520" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">2</text><line x1="580" y1="70" x2="580" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="580" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">1</text><line x1="640" y1="70" x2="640" y2="82" stroke="#2a1d12" stroke-width="2"/><text x="640" y="100" text-anchor="middle" font-family="Geist Mono, monospace" font-size="12" fill="#5a4530">0</text>
+  <g><circle cx="100" cy="40" r="7" fill="#8857d4" stroke="#2a1d12" stroke-width="1.5"/><path d="M91 60 Q100 40 109 60 Z" fill="#8857d4" stroke="#2a1d12" stroke-width="1.5"/></g><text x="100" y="26" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="13" fill="#2a1d12">Cal</text><g><circle cx="160" cy="40" r="7" fill="#2c66cf" stroke="#2a1d12" stroke-width="1.5"/><path d="M151 60 Q160 40 169 60 Z" fill="#2c66cf" stroke="#2a1d12" stroke-width="1.5"/></g><text x="160" y="26" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="13" fill="#2a1d12">Ben</text><g><circle cx="280" cy="40" r="7" fill="#1fb8a6" stroke="#2a1d12" stroke-width="1.5"/><path d="M271 60 Q280 40 289 60 Z" fill="#1fb8a6" stroke="#2a1d12" stroke-width="1.5"/></g><text x="280" y="26" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="13" fill="#2a1d12">Ana</text>
+  <text x="100" y="132" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="13" fill="#c23a1c">▲ acts next</text>
+  <text x="650" y="132" text-anchor="end" font-family="Hanken Grotesk, sans-serif" font-size="12" fill="#5a4530">← more Time · TIME LEFT · less Time →</text>
+</svg></div>
+<figcaption>The Time track after three actions from the example below. Whoever is furthest left acts next.</figcaption></figure>
+<ol><li>Every climber starts the round with <strong>10 Time</strong> (11 with Approach Shoes).</li><li>The climber with the <strong>most Time left</strong> takes <strong>one action</strong> and pays its Time cost.</li><li>Check again: whoever now has the most Time acts next.<ul><li><strong>Tied?</strong> If you just acted and are tied for most, you keep going. Otherwise, the tied climber earliest in seat order goes.</li></ul></li><li>A climber with <strong>0 Time</strong> is done for the round.</li><li>When <strong>every</strong> climber is at 0 Time, the round ends. See <a href="#end-of-the-round">End of the Round</a>.</li></ol>
+<aside class="callout example"><span class="tape">Example</span><p>Three climbers start with 10 Time. Ana (seat 1) climbs a route for 4 Time and drops to 6. Ben and Cal are tied at 10, so Ben (seat 2) goes next and trains for 2 Time, dropping to 8. Cal still has 10 and rests for 1, dropping to 9. Cal still has the most Time, so Cal acts again.</p></aside>
+<aside class="callout remember"><span class="tape">Remember</span><p>Big actions don't skip the line — they just push you to the back of it. A 7-Time climb means everyone else catches up before you act again.</p></aside>
 <hr>
-<h2 id="understanding-your-character">UNDERSTANDING YOUR CHARACTER</h2>
-<h3 id="the-four-core-stats">The Four Core Stats</h3>
-<p>-<strong>Strength</strong>— Power moves, overhang routes, pulling -<strong>Technique</strong>— Footwork, body positioning, slab climbing, precision -<strong>Focus</strong>— Mental control, lead climbing, complex sequences -<strong>Flexibility</strong>— Reach, high steps, body positioning</p>
-<h3 id="endurance">Endurance</h3>
-<p>A separate pool from XP/level. Every climb, train, and rest action moves your endurance. -<strong>Current Endurance:</strong>how much you have right now -<strong>Max Endurance:</strong>the cap (grows when you level up; gear may also raise it)</p>
-<h3 id="time-units">Time Units</h3>
-<p>Each round, every player has<strong>10 Time Units</strong>(+1 if you own Approach Shoes). When you run out of time, your turn ends; the round continues with other players.</p>
-<table>
-<thead><tr><th>Action</th><th>Time cost</th></tr></thead>
-<tbody><tr><td>Climb (typical)</td><td>2–8</td></tr>
-<tr><td>Climb (with Sprinter passive)</td><td>1–6</td></tr>
-<tr><td>Train</td><td>2</td></tr>
-<tr><td>Rest</td><td>1</td></tr>
-<tr><td>Buy gear</td><td>1 (free with Approach Shoes?<strong>No</strong>— Approach Shoes adds extra time at round start, not at shop)</td></tr></tbody>
-</table>
-<blockquote><strong>Note:</strong>there is no per-round purchase limit on gear. You can buy as many items as you can afford if you have time.</blockquote>
+<h2 id="your-actions">YOUR ACTIONS</h2>
+<p>On your turn, take <strong>one</strong> action. You may take the same action as often as you like, as long as you can pay for it.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Action</th><th>Time</th><th>Endurance</th><th>Where your standee goes</th></tr></thead>
+<tbody><tr><td><strong>Climb</strong> a route</td><td>On the card (2–8)</td><td>On the card</td><td>That wall (or belayer station)</td></tr>
+<tr><td><strong>Attempt a Milestone</strong></td><td>On the card</td><td>On the card</td><td>That Milestone's wall</td></tr>
+<tr><td><strong>Train</strong></td><td>2</td><td>8–15</td><td>That training station</td></tr>
+<tr><td><strong>Rest</strong></td><td>1</td><td>Refill</td><td>Rest Area</td></tr>
+<tr><td><strong>Buy Gear</strong></td><td>1</td><td>—</td><td>Gear Shop</td></tr>
+<tr><td><strong>Call It a Day</strong></td><td>All remaining</td><td>—</td><td>Stays put</td></tr></tbody>
+</table></div>
+<h3 id="climb">Climb</h3>
+<p>Attempt a face-up route on any wall you can access. See <a href="#climbing-a-route">Climbing a Route</a>.</p>
+<ul><li>You may attempt each regular route <strong>only once per round</strong>. Place a "Tried" marker on it.</li></ul>
+<h3 id="attempt-a-milestone">Attempt a Milestone</h3>
+<p>Exactly like a climb, but on one of the three Milestone routes.</p>
+<ul><li><strong>No once-per-round limit.</strong> Try a Milestone as often as you can pay for it.</li><li>You still need access to its wall and a free spot (see <a href="#the-gym">The Gym</a>).</li></ul>
+<h3 id="train">Train</h3>
+<p>Move to a training station and permanently raise one stat by <strong>+5</strong>.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Station</th><th>Stat</th><th>Time</th><th>Endurance</th></tr></thead>
+<tbody><tr><td><strong>Campus Board</strong></td><td>Strength</td><td>2</td><td>15</td></tr>
+<tr><td><strong>Continuous MoonBoard</strong></td><td>Technique</td><td>2</td><td>12</td></tr>
+<tr><td><strong>Grip Board</strong></td><td>Focus</td><td>2</td><td>10</td></tr>
+<tr><td><strong>Balance &amp; Core</strong></td><td>Flexibility</td><td>2</td><td>8</td></tr></tbody>
+</table></div>
+<ul><li>Training bonuses <strong>last the whole game</strong> and stack. Train Strength three times: +15 Strength.</li><li>Each training station is a <strong>Station</strong>: it holds one climber. While someone stands there, no one else can use it.</li></ul>
+<h3 id="rest">Rest</h3>
+<p>Move to the Rest Area and spend <strong>1 Time</strong>. Refill your Endurance to your maximum.</p>
+<ul><li>Some gear adds a <strong>rest bonus</strong> that lets you rest <em>above</em> your maximum.</li><li>Any number of climbers may rest at once.</li></ul>
+<h3 id="buy-gear">Buy Gear</h3>
+<p>Move to the Gear Shop, spend <strong>1 Time</strong>, and pay the card's cost in <strong>XP</strong>. See <a href="#the-gear-shop">The Gear Shop</a>.</p>
+<h3 id="call-it-a-day">Call It a Day</h3>
+<p>Set your Time to 0. You are done for this round.</p>
 <hr>
-<h2 id="how-to-play">HOW TO PLAY</h2>
-<p>The game proceeds in<strong>rounds</strong>. Within a round:</p>
-<p>1.<strong>Player turns advance by time-remaining priority.</strong>The player with the most time remaining acts next. Ties resolve by player order. When a player has 0 time left, they're skipped. 2.<strong>A round ends</strong>when every player has 0 time remaining (or has explicitly chosen End Turn). 3.<strong>At round end:</strong></p>
-<ul><li>The Route Clearing Token rotates: 0 → 1 → 2 → 0</li><li>All routes in the cleared area are replaced with new random routes (when Top Rope clears, every belayer station refreshes together)</li></ul>
-<p>-<strong>All players return to the Lobby</strong>, freeing every belayer station</p>
-<ul><li>Each player's time units reset to 10 (+1 if they own Approach Shoes)</li></ul>
-<p>-<strong>Endurance carries over</strong>between rounds (no automatic refill) -<strong>Training bonuses PERSIST across rounds</strong>(they accumulate over the whole game)</p>
-<ul><li>Once-per-round abilities (e.g. Route Reader's stat redistribute) reset</li><li>Belayer count is<strong>fixed at N − 1</strong>all game — there is no round-based unlock.</li></ul>
-<p>The game ends as soon as any one player completes their 3rd milestone. There is no round limit.</p>
+<h2 id="climbing-a-route">CLIMBING A ROUTE</h2>
+<p>This is the heart of the game. Every climb follows the same five steps.</p>
+<figure class="fig fig-route-card"><div class="fig-split"><svg viewBox="0 0 290 380" role="img" aria-label="Anatomy of the Power Pulley route card">
+  <rect x="50" y="14" width="190" height="352" rx="14" fill="#fffaf0" stroke="#2a1d12" stroke-width="2.5"/>
+  <rect x="50" y="14" width="190" height="64" rx="14" fill="#ff6845"/><rect x="50" y="62" width="190" height="16" fill="#ff6845"/>
+  <text x="66" y="42" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="18" fill="#2a1d12">Power Pulley</text>
+  <text x="66" y="64" font-family="Geist Mono, monospace" font-size="11" font-weight="700" fill="#2a1d12">BOULDERING · V0</text>
+  <circle cx="218" cy="40" r="13" fill="#fffaf0" stroke="#2a1d12" stroke-width="1.5"/><text x="218" y="45" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="12" fill="#2a1d12">B</text>
+  <rect x="66" y="88" width="88" height="20" rx="10" fill="#8857d4"/><text x="110" y="102" text-anchor="middle" font-family="Geist Mono, monospace" font-size="10" font-weight="700" fill="#fff">PINCH/CRIMP</text>
+  
+      <text x="72" y="140" font-family="Geist Mono, monospace" font-size="12" font-weight="700" fill="#5a4530">STR</text>
+      <text x="170" y="140" text-anchor="end" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="20" fill="#2a1d12">22</text>
+      <rect x="182" y="124" width="20" height="20" rx="4" fill="#b6d62d" stroke="#2a1d12" stroke-width="1.5"/><text x="192" y="139" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="13" fill="#2a1d12">−</text>
+      <text x="72" y="172" font-family="Geist Mono, monospace" font-size="12" font-weight="700" fill="#5a4530">TEC</text>
+      <text x="170" y="172" text-anchor="end" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="20" fill="#2a1d12">14</text>
+      <rect x="182" y="156" width="20" height="20" rx="4" fill="#b6d62d" stroke="#2a1d12" stroke-width="1.5"/><text x="192" y="171" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="13" fill="#2a1d12">−</text>
+      <text x="72" y="204" font-family="Geist Mono, monospace" font-size="12" font-weight="700" fill="#5a4530">FOC</text>
+      <text x="170" y="204" text-anchor="end" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="20" fill="#2a1d12">10</text>
+      
+      <text x="72" y="236" font-family="Geist Mono, monospace" font-size="12" font-weight="700" fill="#5a4530">FLX</text>
+      <text x="170" y="236" text-anchor="end" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="20" fill="#2a1d12">12</text>
+      
+  <line x1="66" y1="258" x2="224" y2="258" stroke="#2a1d12" stroke-opacity="0.25" stroke-dasharray="4 3"/>
+  <text x="72" y="284" font-family="Geist Mono, monospace" font-size="11" fill="#5a4530">TIME</text><text x="170" y="285" text-anchor="end" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="18" fill="#2a1d12">2</text>
+  <text x="72" y="310" font-family="Geist Mono, monospace" font-size="11" fill="#5a4530">ENDURANCE</text><text x="170" y="311" text-anchor="end" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="18" fill="#2a1d12">14</text>
+  <rect x="66" y="324" width="76" height="30" rx="6" fill="#b6d62d" stroke="#2a1d12" stroke-width="1.5"/><text x="104" y="344" text-anchor="middle" font-family="Geist Mono, monospace" font-size="11" font-weight="700" fill="#2a1d12">SEND 28</text>
+  <rect x="150" y="324" width="74" height="30" rx="6" fill="#f4ede0" stroke="#2a1d12" stroke-width="1.5"/><text x="187" y="344" text-anchor="middle" font-family="Geist Mono, monospace" font-size="11" font-weight="700" fill="#2a1d12">FALL 10</text>
+  <g><circle cx="30" cy="46" r="11" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><text x="30" y="50" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="12" fill="#2a1d12">1</text></g><g><circle cx="262" cy="40" r="11" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><text x="262" y="44" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="12" fill="#2a1d12">2</text></g><g><circle cx="30" cy="98" r="11" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><text x="30" y="102" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="12" fill="#2a1d12">3</text></g><g><circle cx="30" cy="186" r="11" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><text x="30" y="190" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="12" fill="#2a1d12">4</text></g><g><circle cx="262" cy="160" r="11" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><text x="262" y="164" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="12" fill="#2a1d12">5</text></g><g><circle cx="30" cy="296" r="11" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><text x="30" y="300" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="12" fill="#2a1d12">6</text></g><g><circle cx="262" cy="339" r="11" fill="#ff6845" stroke="#2a1d12" stroke-width="1.5"/><text x="262" y="343" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="12" fill="#2a1d12">7</text></g>
+</svg>
+<ol class="anatomy">
+  <li><strong>Name, wall, and grade.</strong></li>
+  <li><strong>Milestone badge.</strong> B, I, or E — only on routes that can be Milestones.</li>
+  <li><strong>Tag.</strong> Matters only for specialty gear.</li>
+  <li><strong>Requirements.</strong> Meet or beat all four to send.</li>
+  <li><strong>Dice icons.</strong> Roll one die per icon. Green subtracts; red adds.</li>
+  <li><strong>Costs.</strong> Time and Endurance, paid before you roll.</li>
+  <li><strong>XP.</strong> Send XP if you succeed, Fall XP if you don't.</li>
+</ol></div></figure>
+<h3 id="step-1-choose">Step 1 — Choose</h3>
+<p>Pick a face-up route you are allowed to try:</p>
+<ul><li>You have <strong>access</strong> to its wall (Lead needs the access cards — see <a href="#the-gym">The Gym</a>).</li><li>There is <strong>room</strong> for you (Top Rope stations and Lead hold one climber).</li><li>You haven't <strong>tried</strong> it this round (Milestones are exempt).</li><li>You can <strong>pay</strong> its Time and Endurance.</li></ul>
+<h3 id="step-2-pay-and-move">Step 2 — Pay and Move</h3>
+<p>Pay the route's <strong>Time</strong> and <strong>Endurance</strong>. Move your standee to that wall. Mark the route "Tried."</p>
+<h3 id="step-3-roll">Step 3 — Roll</h3>
+<p>Roll <strong>one die for each dice icon</strong> on the route card.</p>
+<ul><li><strong>Green Beta die:</strong> <strong>subtract</strong> the number from that stat's requirement. <em>The route just got easier.</em></li><li><strong>Red Crux die:</strong> <strong>add</strong> the number to that stat's requirement. <em>The route just got harder.</em></li></ul>
+<p>No dice icons? Don't roll. It's a pure test of skill.</p>
+<figure class="fig fig-dice"><div class="fig-scroll"><svg viewBox="0 0 680 160" role="img" aria-label="A green Beta die subtracts from a requirement; a red Crux die adds to it">
+  
+      <rect x="20" y="12" width="56" height="56" rx="10" fill="#b6d62d" stroke="#2a1d12" stroke-width="2.5"/><circle cx="34" cy="26" r="5" fill="#2a1d12"/><circle cx="62" cy="26" r="5" fill="#2a1d12"/><circle cx="34" cy="54" r="5" fill="#2a1d12"/><circle cx="62" cy="54" r="5" fill="#2a1d12"/>
+      <text x="96" y="34" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="16" fill="#2a1d12">Beta die (green)</text>
+      <text x="96" y="54" font-family="Hanken Grotesk, sans-serif" font-size="12.5" fill="#5a4530">Subtract. The route gets easier.</text>
+      <text x="420" y="48" font-family="Geist Mono, monospace" font-size="14" font-weight="700" fill="#5a4530">STR</text>
+      <text x="470" y="50" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="24" fill="#2a1d12">22</text>
+      <text x="512" y="50" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="24" fill="#5c7a00">− 4</text>
+      <text x="570" y="50" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="24" fill="#2a1d12">→ 18</text>
+  
+      <rect x="20" y="88" width="56" height="56" rx="10" fill="#ff6845" stroke="#2a1d12" stroke-width="2.5"/><circle cx="34" cy="102" r="5" fill="#2a1d12"/><circle cx="62" cy="102" r="5" fill="#2a1d12"/><circle cx="48" cy="116" r="5" fill="#2a1d12"/><circle cx="34" cy="130" r="5" fill="#2a1d12"/><circle cx="62" cy="130" r="5" fill="#2a1d12"/>
+      <text x="96" y="110" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="16" fill="#2a1d12">Crux die (red)</text>
+      <text x="96" y="130" font-family="Hanken Grotesk, sans-serif" font-size="12.5" fill="#5a4530">Add. The route gets harder.</text>
+      <text x="420" y="124" font-family="Geist Mono, monospace" font-size="14" font-weight="700" fill="#5a4530">FOC</text>
+      <text x="470" y="126" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="24" fill="#2a1d12">10</text>
+      <text x="512" y="126" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="24" fill="#c23a1c">+ 5</text>
+      <text x="570" y="126" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="24" fill="#2a1d12">→ 15</text>
+</svg></div></figure>
+<h3 id="step-4-compare">Step 4 — Compare</h3>
+<p>Add up each of your stats: <strong>base stat + training bonus + gear bonus.</strong> Compare each one to its requirement.</p>
+<ul><li><strong>All four meet or beat</strong> their requirement: you <strong>send</strong>!</li><li><strong>Any one is short:</strong> you <strong>fall</strong>.</li></ul>
+<h3 id="step-5-score">Step 5 — Score</h3>
+<ul><li><strong>Send:</strong> gain the route's <strong>Send XP</strong> (the bigger number).</li><li><strong>Fall:</strong> gain the route's <strong>Fall XP</strong> (the smaller number).</li><li>If it was a <strong>Milestone</strong> and you sent it, place one of your Milestone markers on it.</li></ul>
+<aside class="callout example"><span class="tape">Example</span><p>The Sprinter (Strength 22, Technique 14, Focus 12, Flexibility 16) tries <strong>Power Pulley</strong>, a V0 boulder.<br><em>Requirements:</em> Strength 22 · Technique 14 · Focus 10 · Flexibility 12. <em>Dice:</em> a green die on Strength and a green die on Technique — plus the Sprinter's extra red die on Focus.<br><strong>Pay:</strong> 2 Time − 2 (Flash Speed) = <strong>1 Time</strong> (the minimum), and <strong>14 Endurance</strong>.<br><strong>Roll:</strong> green 4 (Strength), green 2 (Technique), red 5 (Focus).<br><strong>New requirements:</strong> Strength 22 − 4 = <strong>18</strong>. Technique 14 − 2 = <strong>12</strong>. Focus 10 + 5 = <strong>15</strong>. Flexibility <strong>12</strong>.<br><strong>Compare:</strong> Strength 22 <span class="ok">✓</span> · Technique 14 <span class="ok">✓</span> · Focus 12 <span class="no">✗</span> · Flexibility 16 <span class="ok">✓</span>. <strong>Fall!</strong><br><strong>Score:</strong> Fall XP is 10, halved by Flash Speed: <strong>5 XP</strong>. A red 2 or lower would have been a send worth 14 XP.</p></aside>
+<aside class="callout remember"><span class="tape">Remember</span><p>Your stats are the sum of three things: your <strong>base stat</strong> (from your level), your <strong>training bonus</strong>, and your <strong>gear bonus</strong>. Add them up before you compare.</p></aside>
+<aside class="callout offwall"><span class="tape">Off the Wall</span><p>Climbers call the hardest move on a route the <strong>crux</strong>, and advice on how to climb it <strong>beta</strong>. Asking for beta is polite. Giving beta nobody asked for is how gym feuds start.</p></aside>
 <hr>
-<h2 id="actions-you-can-take">ACTIONS YOU CAN TAKE</h2>
-<p>On your turn you may take any of these actions, repeatedly, in any order, as long as you have the resources:</p>
-<p>-<strong>Climb a route</strong>— see <a href="#climbing-routes">Climbing Routes</a> -<strong>Attempt a Milestone</strong>— same mechanic as climb, but on the milestone routes (no per-round attempt limit) -<strong>Train</strong>— see <a href="#training">Training</a> -<strong>Buy gear</strong>— see <a href="#the-gear-shop">The Gear Shop</a> -<strong>Rest</strong>— see <a href="#resting">Resting</a> -<strong>End your turn</strong>— voluntarily forfeit any remaining time units this round</p>
+<h2 id="your-first-round">YOUR FIRST ROUND</h2>
+<p>Here is a full round for two new climbers, <strong>Ivy</strong> (Iron Lung) and <strong>Theo</strong> (Technician). The Bouldering wall shows <strong>Beginner's Fortune</strong>, <strong>Open Door</strong>, and <strong>Power Pulley</strong>, among others. Follow along to see the rules working together.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>Who</th><th>Time left</th><th>Action</th><th>Why</th></tr></thead>
+<tbody><tr><td>1</td><td>Ivy</td><td>10 → 8</td><td>Climbs <strong>Beginner's Fortune</strong> (15/15/15/10). <strong>Send</strong>, +25 XP.</td><td>Ivy's stats already beat every requirement. A free send.</td></tr>
+<tr><td>2</td><td>Theo</td><td>10 → 7</td><td>Climbs <strong>Beginner's Fortune</strong> too. <strong>Send</strong>, +25 XP.</td><td>Bouldering has unlimited room. Perfect Beta drops it to 10/10/10/5, but costs Theo 1 extra Time.</td></tr>
+<tr><td>3</td><td>Ivy</td><td>8 → 6</td><td>Trains at the <strong>Campus Board</strong>. Strength 16 → 21.</td><td>Open Door needs 18 Strength. Train the gap.</td></tr>
+<tr><td>4</td><td>Theo</td><td>7 → 5</td><td>Trains at the <strong>Grip Board</strong>. Focus +5.</td><td>Theo wanted Strength too, but Ivy is still standing at the Campus Board. It's blocked.</td></tr>
+<tr><td>5</td><td>Ivy</td><td>6 → 4</td><td>Climbs <strong>Open Door</strong> (18/14/12/14, no dice). <strong>Send</strong>, +25 XP.</td><td>Strength 21 now clears 18. Ivy leaves the Campus Board.</td></tr>
+<tr><td>6</td><td>Theo</td><td>5 → 3</td><td>Trains at the <strong>Campus Board</strong>. Strength 12 → 17.</td><td>Ivy left, so the station is free.</td></tr>
+<tr><td>7</td><td>Ivy</td><td>4 → 2</td><td>Climbs <strong>Power Pulley</strong> (22 Strength, green die on Strength). <strong>Send</strong>, +28 XP.</td><td>Any green roll drops Strength to 21 or less. Ivy can't miss.</td></tr>
+<tr><td>8</td><td>Theo</td><td>3 → 0</td><td>Climbs <strong>Open Door</strong>. <strong>Send</strong>, +25 XP.</td><td>Perfect Beta makes it 13/9/7/9, and Strength 17 now clears it. Theo is done.</td></tr>
+<tr><td>9</td><td>Ivy</td><td>2 → 1</td><td><strong>Rests.</strong> Endurance 67 → 120.</td><td>Endurance doesn't refill between rounds. Rest before the round ends.</td></tr>
+<tr><td>10</td><td>Ivy</td><td>1 → 0</td><td><strong>Calls it a day.</strong></td><td>Nothing else costs just 1 Time.</td></tr></tbody>
+</table></div>
+<p><strong>End of round:</strong> The Setter resets the Lead wall, both standees return to the Lobby, and Time resets to 10. Ivy has <strong>78 XP</strong> and full Endurance. Theo has <strong>50 XP</strong> and 51 Endurance — Theo's first action next round should probably be a rest.</p>
 <hr>
-<h2 id="climbing-routes">CLIMBING ROUTES</h2>
-<h3 id="bouldering-v0v12">Bouldering (V0–V12)</h3>
-<p>Short, powerful problems without ropes. -<strong>No equipment required</strong>to attempt. Always accessible to all players.</p>
-<ul><li>5 routes available at any time, drawn from the bouldering deck (26 cards total)</li><li>Time cost: 2–6. Endurance cost: 12–100. XP rewards: 25–100 success / 8–95 fail</li></ul>
-<h3 id="top-rope-56513c">Top Rope (5.6–5.13c)</h3>
-<p>Roped climbing with a belay from above. -<strong>No equipment required</strong>— Top Rope is open to all players. -<strong>Belayer stations:</strong>the area is split into<strong>N − 1 belayer stations</strong>(N = player count), each holding<strong>2 routes</strong>and admitting<strong>one climber at a time</strong>. You join a belayer by attempting one of its two routes; you may switch to another station's routes only if that station is free. A station another player occupies<strong>blocks both of its routes</strong>for you until the routes clear (or that player returns to the Lobby at round end).</p>
-<ul><li>2 routes per station (so 2 × (N − 1) visible total; 23 in deck)</li><li>Time cost: 3–7. Endurance cost: 15–100. XP rewards: 30–100 success / 10–88 fail</li></ul>
-<h3 id="lead-climbing-58514a">Lead Climbing (5.8–5.14a)</h3>
-<p>The highest-stakes discipline — clip the rope as you ascend. -<strong>Required equipment:</strong>Belay Device + Locking Carabiner + Lead Rope -<strong>Single belayer:</strong>only<strong>one climber at a time</strong>may be in Lead Climbing.</p>
-<ul><li>5 routes available at a time (23 in deck)</li><li>Time cost: 4–8. Endurance cost: 25–100. XP rewards: 40–100 success / 15–98 fail</li></ul>
-<h3 id="free-solo-exception">Free Solo Exception</h3>
-<p>The Free Solo character bypasses the Lead access-card requirement — they can attempt Lead routes from turn 1 without owning Belay Device, Locking Carabiner, or Lead Rope. (Top Rope needs no gear from anyone.) The trade-off is severe: see the character description above.</p>
+<h2 id="the-gym">THE GYM</h2>
+<p>Alpine Indoors has three climbing walls. Each has its own deck, its own feel, and its own rules for getting on.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Wall</th><th>Grades</th><th>Face-up routes</th><th>Access</th><th>Room</th></tr></thead>
+<tbody><tr><td><strong>Bouldering</strong></td><td>V0–V12</td><td>5</td><td>Anyone</td><td>Unlimited</td></tr>
+<tr><td><strong>Top Rope</strong></td><td>5.6–5.13c</td><td>2 per belayer station</td><td>Anyone</td><td>1 climber per station</td></tr>
+<tr><td><strong>Lead</strong></td><td>5.8–5.14a</td><td>5</td><td>Lead access cards</td><td>1 climber</td></tr></tbody>
+</table></div>
+<h3 id="bouldering-the-cave">Bouldering — the Cave</h3>
+<p>Short, powerful problems over thick mats. No rope, no partner, no waiting. <strong>Anyone</strong> can boulder, and there's always room.</p>
+<h3 id="top-rope-the-belay-line">Top Rope — the Belay Line</h3>
+<p>Roped climbs with a partner holding the rope from below. Top Rope is split into <strong>belayer stations</strong> — one fewer than the number of players. Each station holds <strong>2 routes</strong> and <strong>one climber</strong>.</p>
+<ul><li>To climb a Top Rope route, its station must be <strong>free</strong> (or already yours).</li><li>If another climber stands at a station, <strong>both</strong> of its routes are blocked for you.</li><li>A Top Rope <strong>Milestone</strong> may be attempted at <strong>any free station</strong>. You stand at that station afterward.</li></ul>
+<h3 id="lead-the-big-wall">Lead — the Big Wall</h3>
+<p>The tallest wall, where you clip the rope as you climb. Lead needs all <strong>three access cards</strong>: <strong>Belay Device</strong>, <strong>Locking Carabiner</strong>, and <strong>Lead Rope</strong>. (The Free Solo ignores this.) Only <strong>one</strong> climber can be on Lead at a time.</p>
+<aside class="callout offwall"><span class="tape">Off the Wall</span><p>On top rope, the rope runs through an anchor <em>above</em> you, so a fall is a gentle sit. On lead, you clip the rope in as you climb, so a fall can drop you several meters before the rope catches. That's why Lead needs the most gear — and the most nerve.</p></aside>
+<aside class="callout offwall"><span class="tape">Off the Wall</span><p>Boulders are graded <strong>V0</strong> (easiest) to <strong>V17</strong>. Rope climbs use the Yosemite Decimal System, from <strong>5.0</strong> up to <strong>5.15</strong>. The letters split each number into four steps: 5.11a is easier than 5.11d.</p></aside>
+<h3 id="route-tags">Route Tags</h3>
+<p>Most routes carry one <strong>tag</strong>. Tags do nothing by themselves — they only matter for gear that names them.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Tag</th><th>Style</th><th>Routes</th></tr></thead>
+<tbody><tr><td><strong>Pinch/Crimp</strong></td><td>Tiny, finger-ripping holds</td><td>16</td></tr>
+<tr><td><strong>Dynamic</strong></td><td>Jumps, lunges, and dynos</td><td>14</td></tr>
+<tr><td><strong>Toe/Heel Hook</strong></td><td>Clever footwork</td><td>9</td></tr>
+<tr><td><strong>Roof/Sloper</strong></td><td>Steep ceilings and round holds</td><td>8</td></tr>
+<tr><td><em>(no tag)</em></td><td>A straight test of stats</td><td>25</td></tr></tbody>
+</table></div>
+<aside class="callout coach"><span class="tape">Coach's Tip</span><p>Check your Milestones' tags at setup. If two share a tag, the matching gear card is worth a lot.</p></aside>
 <hr>
-<h2 id="route-specialty-tags">ROUTE SPECIALTY TAGS</h2>
-<p>Every route is<strong>either tagged or untagged</strong>. The four specialty tags are:</p>
-<table>
-<thead><tr><th>Tag</th><th>Theme</th><th>Routes in deck</th></tr></thead>
-<tbody><tr><td><strong>Pinch/Crimp</strong></td><td>Finger-intensive holds</td><td>16 (22%)</td></tr>
-<tr><td><strong>Dynamic</strong></td><td>Explosive, dyno, jump moves</td><td>14 (19%)</td></tr>
-<tr><td><strong>Toe/Heel Hook</strong></td><td>Footwork-driven, slab-style</td><td>9 (13%)</td></tr>
-<tr><td><strong>Roof/Sloper</strong></td><td>Body tension, gymnastic</td><td>8 (11%)</td></tr>
-<tr><td><strong>(untagged)</strong></td><td>Pure stat checks, varied</td><td>25 (35%)</td></tr></tbody>
-</table>
-<p>Tags do nothing on their own. They're a hook for<strong>gear cards</strong>— four specialty gear cards each target one tag and grant a specific advantage on tagged routes only. See <a href="#the-gear-shop">The Gear Shop</a> for details.</p>
-<blockquote><strong>Strategic note:</strong>when the milestone routes are revealed at game start, check their tags. If two milestones share a tag, the matching specialty card becomes especially valuable.</blockquote>
-<hr>
-<h2 id="the-dice-system">THE DICE SYSTEM</h2>
-<h3 id="how-a-climb-works">How a climb works</h3>
-<p>1.<strong>Pay costs first</strong>— the time and endurance cost are deducted whether you succeed or fail. 2.<strong>Look up the route's <code>rollEffect</code></strong>— a list of dice modifiers, e.g. <code>[{stat: 'technique', modifier: -1}, {stat: 'strength', modifier: +1}]</code>. 3.<strong>Roll dice</strong>— number of dice = max(2, number of effects in <code>rollEffect</code>). The Sprinter rolls one ADDITIONAL die targeting Focus with a +1 (nerf) modifier on every climb. 4.<strong>Apply each die to its stat:</strong></p>
-<ul><li>Modifier<strong>−1</strong>(buff, green):<strong>subtract</strong>the die value from the stat requirement (easier!)</li><li>Modifier<strong>+1</strong>(nerf, red):<strong>add</strong>the die value to the stat requirement (harder!)</li><li>Modifier<strong>0</strong>: no change</li></ul>
-<p>5.<strong>Compute your effective stats:</strong> <code>effective = base stat + training bonus + permanent gear bonus + per-route gear bonus</code> 6.<strong>Apply character-ability adjustments</strong>(Route Reader's Beta Boost, Technician's −5 blanket, etc.). 7.<strong>Compare:</strong>does each effective stat meet or exceed each modified requirement? -<strong>Success</strong>if all 4 stats pass (3 of 4 for Route Reader) -<strong>Failure</strong>otherwise 8.<strong>Earn XP</strong>— success XP if you cleared, fail XP if you didn't. Iron Lung adds +50% to fail XP. Sprinter halves success XP.</p>
-<h3 id="character-specific-dice-rules">Character-specific dice rules</h3>
-<p>-<strong>Technician:</strong>Every nerf die (+1 modifier) is treated as a 0. Every requirement is reduced by 5 (floored at 0). -<strong>Sprinter:</strong>Adds an extra Focus-nerf die. -<strong>Free Solo:</strong>Every dice modifier is treated as 0. Effectively no luck swing — but Free Solo can only attempt climbs where they already pass on stats alone. -<strong>Route Reader:</strong>Only 3 of 4 stats need to pass.</p>
-<h3 id="one-attempt-per-round-rule-regular-routes-only">One-attempt-per-round rule (regular routes only)</h3>
-<p>You can only attempt each specific regular route once per round. After a success or failure, that route is "marked attempted" and you must wait until next round to retry — or the route may be cleared by then.<strong>Milestone routes are NOT subject to this rule</strong>— you may retry them as many times as you like.</p>
-<hr>
-<h2 id="training">TRAINING</h2>
-<p>The training area has 4 stations. Training grants<strong>permanent bonuses</strong>to a stat that<strong>accumulate over the entire game</strong>(not just one round).</p>
-<table>
-<thead><tr><th>Station</th><th>Boosts</th><th>Time</th><th>Endurance</th><th>Bonus</th></tr></thead>
-<tbody><tr><td>Campus Board</td><td>Strength</td><td>2</td><td>15</td><td>+5</td></tr>
-<tr><td>Continuous MoonBoard</td><td>Technique</td><td>2</td><td>12</td><td>+5</td></tr>
-<tr><td>Grip Board</td><td>Focus</td><td>2</td><td>10</td><td>+5</td></tr>
-<tr><td>Balance and Core</td><td>Flexibility</td><td>2</td><td>8</td><td>+5</td></tr></tbody>
-</table>
-<p>-<strong>Capacity:</strong>one player per station per round. If another player took a station this round, you can't use it until next round. -<strong>Stacking:</strong>training bonuses accumulate game-wide. Train Strength three times → +15 permanent strength training bonus. -<strong>Per-round persistence:</strong>unlike older versions of this game, training bonuses do<strong>NOT</strong>reset at round end. They stay until game end. -<strong>Affected by gear:</strong>Old Climbing Journal upgrades every training session from +5 to +6.</p>
+<h2 id="xp-and-leveling-up">XP AND LEVELING UP</h2>
+<p>You earn <strong>XP</strong> from every climb. XP does two jobs: it <strong>raises your Level</strong>, and it's the <strong>money</strong> you spend on gear.</p>
+<h3 id="leveling-up">Leveling Up</h3>
+<p>When your XP reaches the next threshold, you level up immediately:</p>
+<ul><li>Your stats rise by your climber's <strong>Growth</strong> numbers (round to the nearest whole number).</li><li>Your maximum Endurance rises by your Endurance growth.</li><li>Training bonuses and gear stay.</li></ul>
+<div class="table-wrap"><table>
+<thead><tr><th>Level</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th></tr></thead>
+<tbody><tr><td><strong>Total XP</strong></td><td>100</td><td>250</td><td>450</td><td>700</td><td>1,000</td><td>1,350</td><td>1,750</td><td>2,200</td><td>2,700</td><td>3,250</td><td>3,850</td><td>4,500</td><td>5,200</td><td>6,000</td></tr></tbody>
+</table></div>
+<p>Level 15 is the maximum.</p>
+<h3 id="spending-xp-use-it-or-lose-it">Spending XP — Use It or Lose It</h3>
+<p>You may only spend XP you've earned <strong>since your current Level began</strong>.</p>
+<ul><li>Spending XP moves you <strong>backward</strong> on the XP track — but never below the start of your current Level. You never lose a Level.</li><li>When you level up, any XP left over from the old Level is <strong>locked in</strong>. It counts toward your Level, but you can't spend it anymore.</li></ul>
+<aside class="callout example"><span class="tape">Example</span><p>The Iron Lung is Level 2 (which starts at 100 XP) and has 230 XP. They can spend up to <strong>130 XP</strong>. They buy Mental Anchor for 130 and drop back to 100 XP — still Level 2, but now 150 XP away from Level 3 again.</p></aside>
+<aside class="callout remember"><span class="tape">Remember</span><p>Every XP you spend is XP you must earn again to level up. Buy gear when it will pay you back.</p></aside>
 <hr>
 <h2 id="the-gear-shop">THE GEAR SHOP</h2>
-<p>The shop contains<strong>17 cards total</strong>: 3 access cards (always available) and 14 permanent-passive cards (3 visible at any time, refreshed when bought).</p>
-<p>You spend XP from your<strong>current level</strong>to buy gear. This is the XP you've earned since your last level-up — it does NOT carry over when you level up.</p>
-<h3 id="access-cards-always-visible-gate-lead-climbing">Access cards (always visible, gate Lead Climbing)</h3>
-<table>
+<p>Gear cards are <strong>permanent</strong>. Once you own one, it works for the rest of the game. There are no charges and nothing to discard.</p>
+<p><strong>To buy:</strong> Move to the Gear Shop, spend <strong>1 Time</strong>, and pay the cost in spendable <strong>XP</strong>. You may buy as many cards per round as you can afford.</p>
+<ul><li><strong>Lead access cards</strong> (3) are always for sale and must be bought in order: <strong>Belay Device → Locking Carabiner → Lead Rope</strong>.</li><li><strong>The market</strong> shows 3 other cards. When you buy one, refill the empty slot from the gear deck.</li><li>There is only <strong>one copy</strong> of each card. Once someone owns it, no one else can buy it.</li></ul>
+<p>Gear comes in three families:</p>
+<ul><li><strong>Access</strong> — unlocks Lead climbing.</li><li><strong>Specialty</strong> — powerful, but only on routes with a matching <strong>tag</strong>.</li><li><strong>Boost &amp; Fix</strong> — always on. More Time, faster recovery, better training, kinder dice.</li></ul>
+<p>See the <a href="#gear-card-reference">Gear Card Reference</a> for every card.</p>
+<hr>
+<h2 id="end-of-the-round">END OF THE ROUND</h2>
+<p>When every climber has 0 Time, the round ends. Do these steps in order:</p>
+<ol><li><strong>The Setter resets a wall.</strong> Discard every face-up route on the wall the Setter's token points to and deal fresh ones. (For Top Rope, redeal every belayer station.) Then move the token to the next wall: <strong>Lead → Top Rope → Bouldering → Lead…</strong></li><li><strong>Back to the Lobby.</strong> Return every standee to the Lobby. All stations are free again.</li><li><strong>Reset Time</strong> to 10 (11 with Approach Shoes).</li><li><strong>Clear</strong> all "Tried" markers and reset once-per-round abilities.</li></ol>
+<p><strong>What carries over:</strong> Endurance (it does <strong>not</strong> refill on its own), XP, Level, training bonuses, gear, and Milestones.</p>
+<aside class="callout remember"><span class="tape">Remember</span><p>Watch the Setter's token. A route you're saving for next round might not survive the night.</p></aside>
+<hr>
+<h2 id="ringing-the-bell">RINGING THE BELL</h2>
+<p>The moment a climber sends their <strong>third Milestone</strong>, the game ends and that climber wins. Ring the bell!</p>
+<ul><li>Milestones can be sent in <strong>any order</strong>.</li><li>Each climber's Milestones are their own. Sending one doesn't take it from anyone else.</li></ul>
+<hr>
+<h2 id="coachs-corner">COACH'S CORNER</h2>
+<p><strong>General tips</strong></p>
+<ol><li><strong>Read your Milestones first.</strong> Their walls tell you whether you need Lead access cards. Their tags tell you which specialty gear to watch for.</li><li><strong>If a Milestone is on Lead, start saving early.</strong> The three access cards cost 250 XP together.</li><li><strong>Train your biggest gap, not your lowest stat.</strong> Compare your stats to your Milestone requirements. Fix whatever is furthest behind.</li><li><strong>Levels beat gear.</strong> A level-up raises every stat, forever. Don't spend XP so freely that you never level.</li><li><strong>Watch the belay line.</strong> In a crowded game, Top Rope stations and the Lead wall can get blocked. Plan a backup climb.</li></ol>
+<p><strong>Climber tips</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Climber</th><th>Coach says…</th></tr></thead>
+<tbody><tr><td><strong>Iron Lung</strong></td><td>Buy <strong>Mental Anchor</strong> early — it erases your only drawback. Then fall up the grades.</td></tr>
+<tr><td><strong>Technician</strong></td><td>Try routes that look too hard. Crux dice can't touch you, and −5 everywhere adds up.</td></tr>
+<tr><td><strong>Sprinter</strong></td><td>Climb a lot. Half XP on sends means you need volume. Avoid routes with heavy Focus requirements.</td></tr>
+<tr><td><strong>Route Reader</strong></td><td>Rest before Milestone attempts for the +3 Beta Boost. Stack rest-bonus gear. Use your stat shift every round.</td></tr>
+<tr><td><strong>Free Solo</strong></td><td>Train first, climb later. Every point of training opens new routes, and every route you start is a guaranteed send.</td></tr></tbody>
+</table></div>
+<hr>
+<h2 id="clarifications-and-faq">CLARIFICATIONS AND FAQ</h2>
+<aside class="callout forgot"><span class="tape">Commonly Forgotten Rules</span><ol><li>Endurance does <strong>not</strong> refill at the end of the round. Rest.</li><li>You need enough Endurance to <em>start</em> a climb or training session.</li><li>Everyone returns to the <strong>Lobby</strong> at the end of every round.</li><li>A station (training, belayer, or Lead) is blocked while someone <strong>stands</strong> there.</li><li>Each regular route: once per round. Milestones: no limit.</li><li>Spending XP sets back your progress toward the next Level.</li><li>Leftover XP is locked in when you level up.</li></ol></aside>
+<p><strong>Can my Endurance go below 0?</strong> No. It stops at 0. But you can't <em>start</em> a climb or training session without enough Endurance to pay for it.</p>
+<p><strong>Can I rest when my Endurance is already full?</strong> Yes. It costs 1 Time. For the Route Reader, it still grants the Beta Boost.</p>
+<p><strong>Does the Iron Lung's extra Endurance loss stop me from climbing?</strong> No. You only need enough Endurance to pay the route's printed cost. The extra 5 is lost after the fall (down to 0).</p>
+<p><strong>Do requirements go below 0?</strong> No. A requirement can't drop below 0.</p>
+<p><strong>The Technician ignores Crux dice. Does it still roll them?</strong> Roll them if you like — they simply don't count. Beta dice still help.</p>
+<p><strong>Does the Free Solo need a belayer station for Top Rope?</strong> Yes. Life or Die skips gear, not other climbers.</p>
+<p><strong>Do gear "on specific routes" bonuses count for the Free Solo's check?</strong> No. Only base stats, training, and <em>permanent</em> gear bonuses count toward deciding whether the Free Solo may start a climb.</p>
+<p><strong>Can the Route Reader's stat shift be used on a Milestone?</strong> No. It only works on regular routes.</p>
+<p><strong>Does the Beta Boost last more than one climb?</strong> No. It applies to your very next climb (regular or Milestone), then ends.</p>
+<p><strong>I own gear that changes dice. In what order do they apply?</strong> Roll, then apply re-rolls and extra dice, then "treat a die as" effects, then +1 effects. When a card says "your choice," you choose.</p>
+<p><strong>How does Power Tap Belt work with three dice?</strong> Roll your three dice as usual, then roll one extra. You may swap the extra die in for any one of your dice. The die you don't use is discarded. You always end with the same number of dice the route shows.</p>
+<p><strong>Does Climbing Coach make red dice worse?</strong> No. It only adds +1 to green Beta dice, so it always helps.</p>
+<p><strong>Can I attempt a Milestone that someone else already sent?</strong> Yes. Milestones are never "taken."</p>
+<p><strong>What if the gear deck runs out?</strong> Leave the empty market slot empty.</p>
+<hr>
+<h2 id="gear-card-reference">GEAR CARD REFERENCE</h2>
+<h3 id="access-cards-always-for-sale">Access cards — always for sale</h3>
+<div class="table-wrap"><table>
 <thead><tr><th>Card</th><th>Cost</th><th>Effect</th></tr></thead>
-<tbody><tr><td>Belay Device</td><td>70</td><td>Part of the Lead system. −2 Strength on Lead routes</td></tr>
-<tr><td>Locking Carabiner</td><td>60</td><td>Part of the Lead system. +5 max endurance (requires Belay Device)</td></tr>
-<tr><td>Lead Rope</td><td>120</td><td>Unlocks Lead. −3 Strength on Lead routes (requires Belay Device + Locking Carabiner)</td></tr></tbody>
-</table>
-<blockquote><strong>Free Solo</strong>ignores all three — they can attempt Lead from turn 1 without buying any of these. (Top Rope needs no gear from anyone.)</blockquote>
-<h3 id="specialty-cards-target-tagged-routes">Specialty cards (target tagged routes)</h3>
-<table>
+<tbody><tr><td><strong>Belay Device</strong></td><td>70</td><td>First Lead card. +2 Strength on Lead routes.</td></tr>
+<tr><td><strong>Locking Carabiner</strong></td><td>60</td><td>Needs Belay Device. +5 maximum Endurance.</td></tr>
+<tr><td><strong>Lead Rope</strong></td><td>120</td><td>Needs both above. <strong>Unlocks Lead.</strong> +3 Strength on Lead routes.</td></tr></tbody>
+</table></div>
+<h3 id="specialty-cards-only-on-matching-tags">Specialty cards — only on matching tags</h3>
+<div class="table-wrap"><table>
 <thead><tr><th>Card</th><th>Cost</th><th>Tag</th><th>Effect</th></tr></thead>
-<tbody><tr><td>Crimp Sequence Decoder</td><td>130</td><td>Pinch/Crimp</td><td>On Pinch/Crimp climbs, re-roll one die of your choice</td></tr>
-<tr><td>Trick Foot Manual</td><td>110</td><td>Toe/Heel Hook</td><td>Toe/Heel Hook climbs cost 1 less time (minimum 1)</td></tr>
-<tr><td>Body Tension Belt</td><td>150</td><td>Roof/Sloper</td><td>Roof/Sloper climbs cost half endurance (round up)</td></tr>
-<tr><td>Power Tap Belt</td><td>120</td><td>Dynamic</td><td>On Dynamic climbs, roll an extra die and use the best 2</td></tr></tbody>
-</table>
-<h3 id="boost-fix-cards-permanent-passive-abilities">Boost & Fix cards (permanent passive abilities)</h3>
-<table>
+<tbody><tr><td><strong>Crimp Sequence Decoder</strong></td><td>130</td><td>Pinch/Crimp</td><td>Re-roll one die of your choice.</td></tr>
+<tr><td><strong>Trick Foot Manual</strong></td><td>110</td><td>Toe/Heel Hook</td><td>These climbs cost 1 less Time (minimum 1).</td></tr>
+<tr><td><strong>Body Tension Belt</strong></td><td>150</td><td>Roof/Sloper</td><td>These climbs cost half Endurance (round up).</td></tr>
+<tr><td><strong>Power Tap Belt</strong></td><td>120</td><td>Dynamic</td><td>Roll 1 extra die, then discard any one die.</td></tr></tbody>
+</table></div>
+<h3 id="boost-fix-cards-always-on">Boost &amp; Fix cards — always on</h3>
+<div class="table-wrap"><table>
 <thead><tr><th>Card</th><th>Cost</th><th>Effect</th></tr></thead>
-<tbody><tr><td>Approach Shoes</td><td>55</td><td>+1 time at round start (every round)</td></tr>
-<tr><td>Beta Reading Book</td><td>100</td><td>When you Rest, restore +10 endurance</td></tr>
-<tr><td>Pre-Climb Stretching</td><td>90</td><td>When you Rest, restore +12 endurance</td></tr>
-<tr><td>Power Spotting</td><td>90</td><td>Successful climbs restore +5 endurance</td></tr>
-<tr><td>Confidence Building</td><td>110</td><td>Failed climbs grant +10 bonus XP</td></tr>
-<tr><td>Old Climbing Journal</td><td>100</td><td>Training sessions give +6 instead of +5</td></tr>
-<tr><td>Mental Anchor</td><td>130</td><td>Failed climbs no longer cost extra endurance (cancels Iron Lung's −5 fail penalty)</td></tr>
-<tr><td>Sequence Memorization</td><td>150</td><td>On every climb, treat one die as a 1 (your choice after rolling)</td></tr>
-<tr><td>Climbing Coach</td><td>180</td><td>On milestone climbs, every die is +1</td></tr>
-<tr><td>Mountain Mentor</td><td>200</td><td>On every climb, treat one nerf die as 0</td></tr></tbody>
-</table>
-<blockquote><strong>Permanent means permanent.</strong>Every card here applies for the rest of the game once bought. There are no consumables, no charges, no reset markers.</blockquote>
-<blockquote><strong>Stacking:</strong>rest-bonus cards stack — owning both Beta Reading Book (+10) and Pre-Climb Stretching (+12) gives +22 rest endurance.</blockquote>
+<tbody><tr><td><strong>Approach Shoes</strong></td><td>55</td><td>+1 Time at the start of every round.</td></tr>
+<tr><td><strong>Pre-Climb Stretching</strong></td><td>90</td><td>Rest bonus +12.</td></tr>
+<tr><td><strong>Power Spotting</strong></td><td>90</td><td>After a send, regain 5 Endurance (up to your maximum).</td></tr>
+<tr><td><strong>Beta Reading Book</strong></td><td>100</td><td>Rest bonus +10.</td></tr>
+<tr><td><strong>Old Climbing Journal</strong></td><td>100</td><td>Training gives +6 instead of +5.</td></tr>
+<tr><td><strong>Confidence Building</strong></td><td>110</td><td>+10 XP whenever you fall.</td></tr>
+<tr><td><strong>Mental Anchor</strong></td><td>130</td><td>Falls never cost extra Endurance.</td></tr>
+<tr><td><strong>Sequence Memorization</strong></td><td>150</td><td>On every climb, after rolling, change one die to a 1.</td></tr>
+<tr><td><strong>Climbing Coach</strong></td><td>180</td><td>On Milestone climbs, add +1 to every green Beta die (maximum 6).</td></tr>
+<tr><td><strong>Mountain Mentor</strong></td><td>200</td><td>On every climb, ignore one red Crux die.</td></tr></tbody>
+</table></div>
+<p>Rest bonuses stack. Owning Pre-Climb Stretching and Beta Reading Book lets you rest up to 22 above your maximum.</p>
 <hr>
-<h2 id="resting">RESTING</h2>
-<p>When endurance is low, visit the rest area.</p>
-<ol><li>Spend<strong>1 time unit</strong>.</li><li>Restore endurance up to your<strong>Max Endurance + Rest Bonus from gear</strong>, where the heal amount equals your full Max Endurance.</li><li>The Route Reader gains a<strong>Beta Boost</strong>(+3 to all stats on the next climb) immediately upon resting.</li></ol>
-<p><strong>Worked example</strong>— Iron Lung at Max 120, current 30:</p>
-<ul><li>No gear: heal up to min(120 + 0, 30 + 120) =<strong>120</strong>(full restore)</li><li>With Beta Reading Book (+10 rest): heal up to min(120 + 10, 30 + 120) =<strong>130</strong>(above max!)</li><li>With Pre-Climb Stretching (+12 rest) AND Beta Reading Book (+10): heal up to min(120 + 22, 30 + 120) =<strong>142</strong></li></ul>
-<hr>
-<h2 id="leveling-up">LEVELING UP</h2>
-<p>Earning XP raises your level, which automatically raises your stats and max endurance.</p>
-<table>
-<thead><tr><th>Level</th><th>Cumulative XP needed</th><th>XP for THIS level only</th></tr></thead>
-<tbody><tr><td>1 → 2</td><td>100</td><td>100</td></tr>
-<tr><td>2 → 3</td><td>250</td><td>150</td></tr>
-<tr><td>3 → 4</td><td>450</td><td>200</td></tr>
-<tr><td>4 → 5</td><td>700</td><td>250</td></tr>
-<tr><td>5 → 6</td><td>1,000</td><td>300</td></tr>
-<tr><td>6 → 7</td><td>1,350</td><td>350</td></tr>
-<tr><td>7 → 8</td><td>1,750</td><td>400</td></tr>
-<tr><td>8 → 9</td><td>2,200</td><td>450</td></tr>
-<tr><td>9 → 10</td><td>2,700</td><td>500</td></tr>
-<tr><td>10 → 11</td><td>3,250</td><td>550</td></tr>
-<tr><td>11 → 12</td><td>3,850</td><td>600</td></tr>
-<tr><td>12 → 13</td><td>4,500</td><td>650</td></tr>
-<tr><td>13 → 14</td><td>5,200</td><td>700</td></tr>
-<tr><td>14 → 15</td><td>6,000</td><td>800</td></tr>
-<tr><td><strong>Level 15</strong></td><td>—</td><td>(cap)</td></tr></tbody>
-</table>
-<p>When you level up:</p>
-<ul><li>All four stats increase by your character's growth rate (e.g. Technician +4.5 Tech)</li><li>Max endurance increases by your character's endurance growth rate</li></ul>
-<p>-<strong>Spendable XP for gear continues to accumulate from total XP</strong>— it does NOT reset to 0 at level-up. Whatever you had before the level-up, you keep.</p>
-<hr>
-<h2 id="route-clearing-system">ROUTE CLEARING SYSTEM</h2>
-<p>The gym is dynamic. Routes get cleared and reset throughout the game.</p>
-<p>The<strong>Route Clearing Token</strong>sits at one of three positions: -<strong>Position 0</strong>→ next round-end clears Lead Climbing (then advances to position 1) -<strong>Position 1</strong>→ next round-end clears Top Rope (then advances to position 2) -<strong>Position 2</strong>→ next round-end clears Bouldering (then advances back to position 0)</p>
-<p>When Bouldering or Lead is cleared, its 5 visible routes are discarded and 5 new routes are drawn at random from that area's deck. When Top Rope is cleared, <strong>all belayer stations refresh together</strong> — every station's 2 routes are redrawn.</p>
-<p><strong>At every round end, all players return to the Lobby</strong>, which frees all belayer stations for the next round.</p>
-<p><strong>Belayer count is fixed</strong>at N − 1 (N = player count) for the whole game. There is no round-based belayer unlock.</p>
-<hr>
-<h2 id="special-rules">SPECIAL RULES</h2>
-<h3 id="section-capacity">Section capacity</h3>
-<ul><li>Bouldering: unlimited</li><li>Top Rope: N − 1 belayer stations, <strong>1 climber per station</strong> (a station is blocked while another player holds it)</li><li>Lead Climbing: a single belayer — <strong>1 climber at a time</strong></li><li>Training equipment: 1 player per station per round (exclusive)</li><li>Gear Shop: unlimited</li><li>Rest area: unlimited</li></ul>
-<h3 id="one-attempt-per-round-regular-routes">One-attempt-per-round (regular routes)</h3>
-<p>You may attempt each specific regular route only once per round. Milestone routes have no such limit — attempt them as often as you like.</p>
-<h3 id="special-abilities-are-passive">Special abilities are PASSIVE</h3>
-<p>Every character's special ability in this version is a<strong>passive</strong>that fires automatically. There are no "activate once per round" buttons. The only "active" character power is Route Reader's once-per-round stat redistribution (and the Beta Boost is also automatic when they rest).</p>
-<h3 id="free-solos-strict-guarantee">Free Solo's strict guarantee</h3>
-<p>Free Solo's "Life or Die" passive lets it bypass equipment<strong>but</strong>restricts it to climbs where its<strong>effective stats — base plus training plus permanent gear bonuses — meet every requirement.</strong>Per-route gear bonuses (e.g. Crimp Sequence Decoder's re-roll) do NOT count toward the guarantee. You can NEVER attempt a route where any stat is short, no matter how favorable the dice.</p>
-<hr>
-<h2 id="winning-the-game">WINNING THE GAME</h2>
-<p><strong>The first player to complete all 3 Milestone Routes wins immediately.</strong></p>
-<p>Milestone routes:</p>
-<ul><li>Are randomly drawn at game start: <strong>one per difficulty tier AND one per climbing area</strong> (Beginner / Intermediate / Expert, and Bouldering / Top Rope / Lead — every game guarantees mastery of all three areas)</li><li>Are visible to all players from turn 1</li><li>Use the same climb mechanics as regular routes</li></ul>
-<p>-<strong>Have no per-round attempt limit</strong>— retry as often as you can afford</p>
-<ul><li>Are tracked individually per player — your milestones complete for YOU only</li><li>Can be attempted in any order</li></ul>
-<p>There is no round limit — the game continues until a player completes all three milestones.</p>
-<h3 id="climbing-area-requirements-still-apply">Climbing area requirements still apply</h3>
-<p>A milestone in the Top Rope deck needs no gear, but it still requires a <strong>free belayer station</strong> to attempt (you cannot top-rope without a belayer). A milestone in the Lead deck still requires the full Lead system (Belay Device + Locking Carabiner + Lead Rope, or the Free Solo passive) and the single Lead belayer slot.</p>
-<hr>
-<h2 id="strategy-tips">STRATEGY TIPS</h2>
-<h3 id="general">General</h3>
-<p>1.<strong>Read the milestone tags FIRST.</strong>If two milestones share a tag, the matching specialty gear card is your highest-value purchase. 2.<strong>Buy the Lead access cards EARLY if a milestone is in Lead.</strong>Top Rope is open to everyone, but Lead still requires Belay Device + Locking Carabiner + Lead Rope (Free Solo excepted). If your milestone is in Lead, that path is structurally mandatory. Also watch belayer contention: Top Rope stations and the single Lead slot can be blocked by opponents. 3.<strong>Train the stat with the LARGEST gap</strong>to your milestone requirements — not the lowest absolute stat. The lowest stat may not be the bottleneck. 4.<strong>Level up matters more than spendable XP.</strong>Level-ups grant permanent stat increases that compound. 5.<strong>Watch the Route Clearing Token.</strong>A route you've been planning to attempt may disappear next round.</p>
-<h3 id="per-character">Per character</h3>
-<table>
-<thead><tr><th>Character</th><th>Key tip</th></tr></thead>
-<tbody><tr><td><strong>Technician</strong></td><td>High Tech + nerf-die immunity → attempt routes that look brutal on paper. The +1 time per climb is the cost; outpace it with success rate.</td></tr>
-<tr><td><strong>Sprinter</strong></td><td>Half XP on success means you LEVEL slowly. Lean into fail-XP routes (Iron Lung's territory!) or pile into Type-D high-risk routes for net XP.</td></tr>
-<tr><td><strong>Iron Lung</strong></td><td>Buy<strong>Mental Anchor</strong>ASAP — it cancels your only downside (extra fail endurance) and your Relentless passive turns failures into XP.</td></tr>
-<tr><td><strong>Free Solo</strong></td><td>You MUST train aggressively before climbing. Until your effective stats clear the easiest route's requirements, you cannot do anything productive.</td></tr>
-<tr><td><strong>Route Reader</strong></td><td>Stack rest-bonus cards (Beta Reading Book + Pre-Climb Stretching). Resting becomes incredibly powerful: +22 endurance, +3 all stats next climb.</td></tr></tbody>
-</table>
+<h2 id="tables">TABLES</h2>
+<h3 id="climbers-at-a-glance">Climbers at a glance</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Climber</th><th>Str</th><th>Tech</th><th>Focus</th><th>Flex</th><th>Endurance</th><th>Complexity</th></tr></thead>
+<tbody><tr><td><strong>Iron Lung</strong></td><td>16</td><td>17</td><td>19</td><td>14</td><td>120</td><td>Low</td></tr>
+<tr><td><strong>Technician</strong></td><td>12</td><td>26</td><td>18</td><td>14</td><td>100</td><td>Low</td></tr>
+<tr><td><strong>Sprinter</strong></td><td>22</td><td>14</td><td>12</td><td>16</td><td>85</td><td>Medium</td></tr>
+<tr><td><strong>Route Reader</strong></td><td>15</td><td>19</td><td>22</td><td>14</td><td>110</td><td>Medium</td></tr>
+<tr><td><strong>Free Solo</strong></td><td>11</td><td>23</td><td>20</td><td>16</td><td>100</td><td>High</td></tr></tbody>
+</table></div>
+<h3 id="growth-per-level">Growth per level</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Climber</th><th>Str</th><th>Tech</th><th>Focus</th><th>Flex</th><th>Endurance</th></tr></thead>
+<tbody><tr><td><strong>Iron Lung</strong></td><td>+2.5</td><td>+2.5</td><td>+3</td><td>+2</td><td>+8</td></tr>
+<tr><td><strong>Technician</strong></td><td>+1.5</td><td>+4.5</td><td>+2.5</td><td>+2</td><td>+5</td></tr>
+<tr><td><strong>Sprinter</strong></td><td>+4</td><td>+2</td><td>+1.5</td><td>+2.5</td><td>+3</td></tr>
+<tr><td><strong>Route Reader</strong></td><td>+2</td><td>+3.5</td><td>+4</td><td>+1.5</td><td>+7</td></tr>
+<tr><td><strong>Free Solo</strong></td><td>+1.5</td><td>+4</td><td>+3</td><td>+2.5</td><td>+6</td></tr></tbody>
+</table></div>
+<p>Your stat at any Level = starting stat + growth × (Level − 1), rounded to the nearest whole number.</p>
+<h3 id="milestone-tiers">Milestone tiers</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Tier</th><th>Bouldering</th><th>Top Rope</th><th>Lead</th></tr></thead>
+<tbody><tr><td><strong>Beginner</strong></td><td>V0–V2</td><td>5.6–5.8</td><td>5.8</td></tr>
+<tr><td><strong>Intermediate</strong></td><td>V3–V7</td><td>5.9–5.11c</td><td>5.9–5.11c</td></tr>
+<tr><td><strong>Expert</strong></td><td>V8–V12</td><td>5.12a–5.13c</td><td>5.12a–5.14a</td></tr></tbody>
+</table></div>
+<p>A few routes have no Milestone badge (for example, grades 5.10c, 5.11d, 5.12c, 5.13b, and 5.13d). They are never drawn as Milestones.</p>
+<h3 id="resting-exactly">Resting, exactly</h3>
+<p>Resting gives back Endurance equal to your maximum, but your Endurance can't go higher than <strong>maximum + rest bonus</strong>.</p>
 <hr>
 <h2 id="quick-reference">QUICK REFERENCE</h2>
-<h3 id="turn-priority">Turn priority</h3>
-<ul><li>Player with most time remaining acts next.</li><li>A round ends when every player is at 0 time.</li></ul>
-<h3 id="round-end-events-in-order">Round-end events (in order)</h3>
-<ol><li>Token rotates; one area's routes are cleared and refreshed.</li><li>All players return to the Lobby (belayer stations freed).</li><li>Time units reset (+1 if Approach Shoes owned).</li><li>Once-per-round flags reset.</li><li>Endurance carries over.</li><li>Training bonuses persist.</li></ol>
-<h3 id="climbing-area-access">Climbing area access</h3>
-<table>
-<thead><tr><th>Area</th><th>Requires</th></tr></thead>
-<tbody><tr><td>Bouldering</td><td>Nothing</td></tr>
-<tr><td>Top Rope</td><td>Nothing (but needs a free belayer station)</td></tr>
-<tr><td>Lead Climbing</td><td>Belay Device + Locking Carabiner + Lead Rope (OR Free Solo)</td></tr></tbody>
-</table>
-<h3 id="costs-at-a-glance">Costs at a glance</h3>
-<table>
-<thead><tr><th>Action</th><th>Time</th><th>Endurance</th></tr></thead>
-<tbody><tr><td>Climb</td><td>2–8</td><td>12–100</td></tr>
-<tr><td>Train</td><td>2</td><td>8–15</td></tr>
-<tr><td>Rest</td><td>1</td><td>0 (gain endurance)</td></tr>
-<tr><td>Buy gear</td><td>1</td><td>0</td></tr></tbody>
-</table>
-<h3 id="game-ends-when">Game ends when</h3>
-<ul><li>A player completes 3 milestones (there is no round limit).</li></ul>
+<p><strong>Goal:</strong> First to send all 3 Milestones wins.</p>
+<p><strong>Who acts:</strong> Most Time left acts next. Tied? Whoever just acted continues; otherwise seat order.</p>
+<p><strong>Actions</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Action</th><th>Time</th><th>Notes</th></tr></thead>
+<tbody><tr><td>Climb</td><td>Card</td><td>Once per route per round</td></tr>
+<tr><td>Milestone</td><td>Card</td><td>No limit</td></tr>
+<tr><td>Train</td><td>2</td><td>+5 to one stat, forever</td></tr>
+<tr><td>Rest</td><td>1</td><td>Refill Endurance</td></tr>
+<tr><td>Buy Gear</td><td>1</td><td>Pay XP from current Level</td></tr>
+<tr><td>Call It a Day</td><td>All</td><td>Done for the round</td></tr></tbody>
+</table></div>
+<p><strong>A climb:</strong> Choose → Pay &amp; move → Roll (green −, red +) → Compare (meet or beat all 4) → Score XP.</p>
+<p><strong>Access:</strong> Bouldering — anyone. Top Rope — a free belayer station. Lead — 3 access cards (Free Solo exempt) and an empty wall.</p>
+<p><strong>End of round:</strong> Setter resets a wall → everyone to the Lobby → Time back to 10 → clear "Tried" markers. Endurance does <strong>not</strong> refill.</p>
 <hr>
-<h2 id="designers-notes">DESIGNER'S NOTES</h2>
-<p>All-In Ascent captures the progression, strategy, and risk-reward of real rock climbing. The dice introduce uncertainty (just like real climbing!), while character abilities and gear give you ways to manage that uncertainty. The route-tagging system rewards specialization — gear that helps on Crimp routes is genuinely strong on Crimp routes, and weakness on Dynamic routes — so the strategic question becomes "what's the GYM going to throw at me, and what can I prepare for?"</p>
-<p>The game celebrates progression. From V0 to V12, every successful send feels rewarding.</p>
-<p><strong>Climb on!</strong></p>
+<h2 id="designers-note">DESIGNER'S NOTE</h2>
+<p>Climbing is mostly falling. Real climbers spend months on a single route, learning a little more each time they peel off the wall. <strong>All-In Ascent</strong> is built around that feeling: every fall earns XP, every session on the boards makes you stronger, and the route that seemed impossible in round one becomes the one you send in round twelve.</p>
+<p>The dice are the wall having a good or bad day. Your climber, your training, and your gear are how you stack the odds.</p>
+<p><strong>Climb on.</strong></p>
 <hr>
-<p><em>Game design: Alpine Indoors Development Team</em> <em>Engine version: 0.6.0 (RuleModifications — open Top Rope with N−1 belayer stations of 2 routes each; Lead drops the Harness and is capped at 1 climber; Harness removed; round-end returns all players to the Lobby)</em> <em>This rulebook reflects the rules as encoded in <code>engine/data.js</code> and <code>engine/engine.js</code>. If a mechanic appears here that disagrees with the engine, the engine is authoritative — please file a rulebook update.</em></p>
+<p><em>Rules version 0.7.0. The digital game (<a href="game.js">game.js</a>) is the authority on any rule. If something here disagrees with it, please file a rulebook update.</em></p>
   </main>
 </div>
 </body>
