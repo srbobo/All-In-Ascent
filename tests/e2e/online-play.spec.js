@@ -41,7 +41,10 @@ test('online client plays a game against the GameRoom and bots', async ({ page }
   await page.goto('/index.html?online=1&host=localhost:1999&room=e2e-room&user=alice&password=pw');
   await expect(page.locator('#onlineLobby')).toContainText('Pick your character');
   await page.locator('.ol-char-card', { hasText: 'The Iron Lung' }).click();
+  // Easy CPUs (the heuristic bot) keep the run fast; Hard runs rollout search.
+  await page.selectOption('.ol-bot-difficulty', 'easy');
   await page.locator('button', { hasText: 'Add Bot' }).click();
+  await page.selectOption('.ol-bot-difficulty', 'easy');
   await page.locator('button', { hasText: 'Add Bot' }).click();
   await page.locator('#ol-controls button', { hasText: 'Start Game' }).click();
   await expect(page.locator('#gameBoard')).toBeVisible();

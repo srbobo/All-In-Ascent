@@ -24,6 +24,39 @@
 //   `node engine/build-data.js` (run by the test/playtest scripts; standalone
 //   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
 //
+// 0.8.1 (2026-10-10): One engine for local and online play.
+//   - Power Spotting's success heal stops at max endurance but never lowers
+//     endurance: a successful climb used to cap any surplus from rest-bonus
+//     gear back down to max, even without Power Spotting (applySuccessHeal).
+//   - climb_resolved now reports gearEffects (every gear effect that changed
+//     the climb), failPenalty, and the real enduranceCost (it ignored Body
+//     Tension Belt); dice_rolled reports discardedDice.
+//   - Local hot-seat play runs this engine (engine/engine.browser.js, built by
+//     engine/build-browser.js, replacing helpers.browser.js) instead of
+//     game.js's own copy of the rules, so local and online play can no longer
+//     drift apart. findLegalAction, illegalActionReason ({code, message, ...})
+//     and explainIllegalAction back the UIs' click handling and the reasons
+//     shown on unavailable cards.
+//   Patch — only games where a Power Spotting / rest-bonus climber sends
+//   while above max endurance change.
+// 0.8.0 (2026-10-09): CPU-audit rules fixes (docs/CPU_PLAYTEST_AUDIT.md).
+//   - Dice gear makes the climber's choice the way a climber would. Sequence
+//     Memorization and Crimp Sequence Decoder used to act on the HIGHEST die,
+//     even a helpful buff die, so they could make a climb harder. Now
+//     resolveClimbDice picks each target to maximise the outcome against the
+//     climb's effective stats: Memorization only on a nerf die, Mountain
+//     Mentor on the nerf die that matters (was: the first one), Power Tap Belt
+//     swaps by outcome, and the Decoder re-rolls only when that raises
+//     P(send) — it is a "may", never forced. Gear choices never touch the
+//     phantom 2nd die on 0–1-die routes.
+//   - The climber with the most Time opens each round (ties → seat order).
+//     Seat 1 always opened before, even when another climber had 11 Time
+//     from Approach Shoes.
+//   - computeClimbStats: the one read-only source for a climb's stats (Beta
+//     Boost + stat shift included), shared by the climb handler and the new
+//     engine/observe.js, so probability previews cannot drift from real climbs.
+//   Minor bump — invalidates v0.7.x baselines for games with dice gear or
+//   Approach Shoes. RNG streams are unchanged for games with neither.
 // 0.7.0 (2026-10-09): Rulebook-revision rules fixes.
 //   - Solo games get 1 Top Rope belayer station (the "Auto-Belay"):
 //     belayerCount = max(1, N − 1). Previously a solo game had 0 stations and
@@ -41,20 +74,8 @@
 //     helps: Crimp re-rolls the die furthest on the wrong side of average
 //     (3.5), Memorization sets the highest nerf die to 1. Both used to take
 //     the highest die, which threw away good buff dice. The dice gear (Power
-//     Tap Belt too) now scores choices by the dice's net effect after
-//     Mountain Mentor, so it never improves a die that is cancelled anyway.
-//   - Mountain Mentor cancels the highest nerf die (was: the first one).
-//   - Power Spotting's success heal stops at max endurance but never lowers
-//     endurance: a successful climb used to cap any surplus from rest-bonus
-//     gear back down to max, even without Power Spotting (applySuccessHeal).
-//   - climb_resolved now reports gearEffects (every gear effect that changed
-//     the climb), failPenalty, and the real enduranceCost (it ignored Body
-//     Tension Belt); dice_rolled reports discardedDice.
-//   - Local hot-seat play runs this engine (engine/engine.browser.js, built by
-//     engine/build-browser.js) instead of game.js's own copy of the rules, so
-//     local and online play can no longer drift apart. findLegalAction,
-//     illegalActionReason ({code, message, ...}) and explainIllegalAction back
-//     the UIs' click handling and the reasons shown on unavailable cards.
+//     Tap Belt too) now skips dice that apply nothing, including the nerf die
+//     Mountain Mentor is about to negate.
 //   - Route Reader Versatility stat shift is now in the engine: a climb action
 //     may carry shift {from, to, amount ≤ 10}, once per round, regular routes
 //     only. getLegalActions adds one suggested-shift variant per climb when it
@@ -119,5 +140,5 @@
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-export const ENGINE_VERSION = { major: 0, minor: 7, patch: 0 };
+export const ENGINE_VERSION = { major: 0, minor: 8, patch: 1 };
 export const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;

@@ -1,0 +1,122 @@
+{
+  "technician": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1,
+      "enduranceWeight": 0.7,
+      "xpRate": 8,
+      "xpWeight": 0,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 13.36,
+      "tuned": 13.18
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 13.13,
+      "tuned": 12.947
+    },
+    "kept": true
+  },
+  "sprinter": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1,
+      "enduranceWeight": 1,
+      "xpRate": 8,
+      "xpWeight": 1,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 16.66,
+      "tuned": 16.66
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 15.887,
+      "tuned": 15.887
+    },
+    "kept": true
+  },
+  "ironLung": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1.25,
+      "enduranceWeight": 1,
+      "xpRate": 11.2,
+      "xpWeight": 0,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 13.31,
+      "tuned": 12.94
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 13.057,
+      "tuned": 12.54
+    },
+    "kept": true
+  },
+  "freeSolo": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1,
+      "enduranceWeight": 1,
+      "xpRate": 8,
+      "xpWeight": 1,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 11.2,
+      "tuned": 11.2
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 10.827,
+      "tuned": 10.827
+    },
+    "kept": true
+  },
+  "routeReader": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1,
+      "enduranceWeight": 1,
+      "xpRate": 8,
+      "xpWeight": 1,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 10.25,
+      "tuned": 10.25
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 10.007,
+      "tuned": 10.007
+    },
+    "kept": true
+  }
+}

@@ -107,6 +107,13 @@ const climbEvents = (events) => ({
   two.players[1].character.location = TRAINING_AREAS[0].name;
   const busy = illegalActionReason(two, { type: 'train', areaName: TRAINING_AREAS[0].name });
   check('stationInUse names the occupant', busy.code === 'stationInUse' && busy.occupants[0] === 2, JSON.stringify(busy));
+
+  // Rules variant: one training per round.
+  const limited = createGame({ seed: 4, characterKeys: ['ironLung'], rules: { trainPerRound: 1 } }).state;
+  const station = { type: 'train', areaName: TRAINING_AREAS[0].name };
+  const { state: trained } = applyAction(limited, findLegalAction(getLegalActions(limited), station));
+  const again = illegalActionReason(trained, { type: 'train', areaName: TRAINING_AREAS[1].name });
+  check('variant per-round training limit is explained', again?.code === 'trainingLimit' && again.limit === 1, JSON.stringify(again));
 }
 
 // =============================================================================
@@ -124,10 +131,13 @@ const climbEvents = (events) => ({
   ];
   let checked = 0;
   let disagreement = '';
-  for (let g = 0; g < 12 && !disagreement; g++) {
+  // Standard rules, plus balance-experiment variants (state.rules) that change
+  // training costs and add training limits.
+  const VARIANTS = [null, { trainTime: 3, trainBonus: 4, trainEnduranceMult: 1.5, trainCapBase: 10, trainCapPerLevel: 5, trainPerRound: 1 }];
+  for (let g = 0; g < 16 && !disagreement; g++) {
     const rng = createRng(500 + g);
     const keys = rng.shuffle(['technician', 'sprinter', 'ironLung', 'routeReader', 'freeSolo']).slice(0, 1 + (g % 4));
-    let { state } = createGame({ seed: 900 + g, characterKeys: keys });
+    let { state } = createGame({ seed: 900 + g, characterKeys: keys, rules: VARIANTS[g % 2] });
     for (let i = 0; i < 250 && !state.gameEnded && !disagreement; i++) {
       const legal = getLegalActions(state);
       for (const wanted of candidates(state)) {
@@ -145,7 +155,8 @@ const climbEvents = (events) => ({
       ({ state } = applyAction(state, moves.length ? moves[Math.floor(rng.next() * moves.length)] : legal[0]));
     }
   }
-  check(`explainIllegalAction gives a reason exactly when getLegalActions refuses (${checked} checks)`, !disagreement, disagreement);
+  check(`explainIllegalAction gives a reason exactly when getLegalActions refuses, incl. rules variants (${checked} checks)`,
+    !disagreement, disagreement);
 }
 
 // =============================================================================

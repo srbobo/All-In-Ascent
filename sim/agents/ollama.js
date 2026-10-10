@@ -1484,3 +1484,9 @@ async function fetchWithTimeout(url, options, timeoutMs, externalSignal) {
     if (externalSignal && extListener) externalSignal.removeEventListener('abort', extListener);
   }
 }
+
+// Exported for the AlphaZero-style distillation pipeline
+// (sim/generate-training-data.js): training pairs must use byte-identical
+// prompts to what the tournament harness sends, or the fine-tune trains on
+// a different distribution than it is evaluated on.
+export { buildSystemPrompt, buildUserPrompt, extractRecentHistory };

@@ -250,11 +250,25 @@
       const filled = OnlineMode.seats.filter(s => s !== null).length;
       const allHaveChar = OnlineMode.seats.filter(s => s !== null).every(s => s.characterKey);
       const canStart = filled >= 2 && allHaveChar;
+      // CPU difficulty: Easy = heuristic (legacy), Medium/Hard = rollout
+      // search (simulates every legal action to pick its move — the strong
+      // CPU). The chosen level rides along on the add_bot message.
+      const diffSel = document.createElement('select');
+      diffSel.className = 'ol-bot-difficulty';
+      diffSel.title = 'CPU difficulty';
+      [['easy', 'Easy CPU'], ['medium', 'Medium CPU'], ['hard', 'Hard CPU']].forEach(([v, label]) => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = label;
+        diffSel.appendChild(opt);
+      });
+      diffSel.value = 'hard';
+      ctlHost.appendChild(diffSel);
       const addBot = document.createElement('button');
       addBot.type = 'button';
       addBot.className = 'ol-btn ol-btn-secondary';
       addBot.textContent = 'Add Bot';
-      addBot.onclick = () => send({ type: 'add_bot' });
+      addBot.onclick = () => send({ type: 'add_bot', difficulty: diffSel.value });
       ctlHost.appendChild(addBot);
       const startBtn = document.createElement('button');
       startBtn.type = 'button';

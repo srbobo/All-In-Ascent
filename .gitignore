@@ -15,3 +15,11 @@ results/
 # Playwright end-to-end test output (npm run test:e2e).
 test-results/
 playwright-report/
+
+# Archived LLM learning program (dead — see training/README.md): generated
+# datasets, LoRA adapter weights and the Python venv. Large and regenerable.
+training-data/
+training/adapters/
+training/data/
+training/pilot-split/
+training/.venv/

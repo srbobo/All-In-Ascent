@@ -8,7 +8,7 @@
 //   - Climbing Coach +1 on buff dice only
 //   - Power Tap Belt: roll N+1, keep N
 //   - Crimp Sequence Decoder / Sequence Memorization pick the die that helps
-//   - Mountain Mentor cancels the highest nerf die
+//   - Mountain Mentor (stat-blind fallback; v0.8 stats-aware choice is in test-rules-v08.js)
 //   - Route Reader stat shift in the engine
 
 import { createGame, belayerCountFor, regularRoutePool } from './state.js';
@@ -247,7 +247,7 @@ check('belayerCountFor(4) = 3', belayerCountFor(4) === 3);
 }
 
 // =============================================================================
-// MOUNTAIN MENTOR — CANCEL THE HIGHEST NERF DIE
+// MOUNTAIN MENTOR — STAT-BLIND FALLBACK (the engine picks with stats: test-rules-v08.js)
 // =============================================================================
 {
   const mentor = charBase('ironLung', ['Mountain Mentor']);
@@ -255,7 +255,7 @@ check('belayerCountFor(4) = 3', belayerCountFor(4) === 3);
   const reqs = (char, effects, dice) => applyDiceToRequirements(char, flatRoute, effects, dice).requirements;
 
   const a = reqs(mentor, nerfs, [2, 5]);
-  check('Mentor: cancels the higher nerf die', a.strength === 22 && a.focus === 20, JSON.stringify(a));
+  check('Mentor: without a chosen die, cancels the first nerf die', a.strength === 20 && a.focus === 25, JSON.stringify(a));
 
   const b = reqs(mentor, nerfs, [4, 4]);
   check('Mentor: cancels the first nerf die on a tie', b.strength === 20 && b.focus === 24, JSON.stringify(b));
@@ -272,8 +272,8 @@ check('belayerCountFor(4) = 3', belayerCountFor(4) === 3);
   check('Mentor: Technician keeps buff dice (nerf dice already ignored)',
     e.technique === 13 && e.strength === 15, JSON.stringify(e));
 
-  const { appliedModifiers } = applyDiceToRequirements(mentor, flatRoute, nerfs, [2, 5]);
-  check('Mentor: appliedModifiers shows the cancelled die as modifier 0',
+  const { appliedModifiers } = applyDiceToRequirements(mentor, flatRoute, nerfs, [2, 5], { mentorIndex: 1 });
+  check('Mentor: the chosen die (mentorIndex) shows as modifier 0',
     appliedModifiers[0].modifier === 1 && appliedModifiers[1].modifier === 0, JSON.stringify(appliedModifiers));
 }
 

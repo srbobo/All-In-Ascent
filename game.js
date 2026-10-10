@@ -1,11 +1,15 @@
-// All In Ascent — browser game bundle.
+// All In Ascent — browser game: game data + UI.
 //
 // This file is the SINGLE SOURCE OF TRUTH for game data. The GAME DATA section
 // below is extracted into engine/data.js by `node engine/build-data.js` (run
 // automatically by the test/playtest npm scripts) so the Node engine, sim
 // harness, and analysis tools read the same values without hand-syncing.
+//
+// It holds NO game rules: local and online play both run the engine in
+// engine/ (loaded in the browser as engine/engine.browser.js). See the RULES
+// ENGINE BRIDGE section below and CLAUDE.md.
 // Rules version is kept in step with the Node engine (engine/version.js).
-const GAME_VERSION = '0.7.0';
+const GAME_VERSION = '0.8.1';
 if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
 
 // ===== GAME DATA =====

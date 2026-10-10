@@ -54,6 +54,7 @@ const nodeGlobals = {
   fetch: 'readonly',
   URL: 'readonly',
   URLSearchParams: 'readonly',
+  Response: 'readonly', // PartyKit onRequest (Workers + Node 18+ global)
   AbortController: 'readonly',
   structuredClone: 'readonly',
   TextEncoder: 'readonly',

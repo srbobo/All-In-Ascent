@@ -244,6 +244,22 @@ export function computeEffectiveStats(char, route, area, attemptedRoutesForPlaye
   };
 }
 
+// Effective stats for one specific climb, exactly as the climb handler will
+// use them: computeEffectiveStats, plus Route Reader's Beta Boost (+3 all, if
+// active) and an optional stat shift. Read-only — it does NOT consume the
+// Beta Boost or the once-per-round shift; the climb handler does that.
+export function computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift = null) {
+  let stats = computeEffectiveStats(char, route, area, attemptedRoutesForPlayer);
+  if (char.betaBoostActive) {
+    stats = {
+      strength: stats.strength + 3, technique: stats.technique + 3,
+      focus: stats.focus + 3, flexibility: stats.flexibility + 3,
+    };
+  }
+  if (shift) stats = applyStatShiftToStats(stats, shift);
+  return stats;
+}
+
 // =============================================================================
 // COST MODIFIERS (character passives)
 // =============================================================================
@@ -340,142 +356,322 @@ function effectiveDieModifier(char, effect) {
   return effect.modifier;
 }
 
-// Does this character own Mountain Mentor (negateOneNerfDie)?
-function hasMountainMentor(char) {
-  return !!char && (char.equipment || []).some(name => {
-    const g = GEAR_SHOP.find(x => x.name === name);
-    return g && g.effectKind === 'negateOneNerfDie';
-  });
-}
-
-// Index of the nerf die Mountain Mentor cancels: the highest-rolled die whose
-// effective modifier is +1 (the first such die on a tie), or -1 if none.
-function mountainMentorDieIndex(char, effectRollArray, rolls) {
-  let idx = -1;
-  for (let i = 0; i < effectRollArray.length; i++) {
-    if (effectiveDieModifier(char, effectRollArray[i]) !== 1) continue;
-    if (idx === -1 || rolls[i] > rolls[idx]) idx = i;
-  }
-  return idx;
-}
-
-// Net amount the dice add to this climb's requirements (nerf dice add, buff
-// dice subtract) after character overrides and, if owned, Mountain Mentor.
-// Lower is better for the climber. The die-choosing gear minimises this.
-function diceRequirementTotal(char, effectRollArray, rolls, mentor) {
-  const mentorIdx = mentor ? mountainMentorDieIndex(char, effectRollArray, rolls) : -1;
-  let total = 0;
-  for (let i = 0; i < effectRollArray.length; i++) {
-    if (i !== mentorIdx) total += effectiveDieModifier(char, effectRollArray[i]) * rolls[i];
-  }
-  return total;
-}
-
 // Roll the dice for a climb. `numDice` is max(2, effects.length) — even on a
 // Type-C "Pure Skill" route (empty rollEffect) we roll 2 dice that get
-// ignored, matching game.js behavior. Die i is applied to effectRollArray[i].
+// ignored, matching game.js behavior. Die i is applied to effectRollArray[i];
+// dice past the end of effectRollArray are never chosen by any gear effect.
 //
-// Gear effects on dice (applied AFTER the initial roll, in this order). The
-// "die of your choice" cards pick for the player: the die whose change most
-// lowers the dice's net effect on the requirements (diceRequirementTotal — a
-// buff die wants a high number, a nerf die a low one), first die on a tie.
-// That total already leaves out dice that apply nothing: dice negated by Free
-// Solo / Technician, dice past the route's effects, and the highest nerf die,
-// which Mountain Mentor cancels.
-//   - Crimp Sequence Decoder (rerollOnTag, Pinch/Crimp): re-roll one die,
-//     scoring a re-roll as a fresh roll's average (3.5). No re-roll when no die
-//     is expected to improve.
+// Gear effects on dice, in rulebook order ("roll, then re-rolls and extra
+// dice, then 'treat a die as' effects, then +1 effects"):
+//   - Crimp Sequence Decoder (rerollOnTag, Pinch/Crimp): MAY re-roll one die
+//     of the climber's choice.
 //   - Power Tap Belt (extraDieDiscardOne, Dynamic): roll ONE extra die, then
-//     discard any one die — so an N-die climb rolls N+1 and keeps N. The extra
-//     die is swapped in for whichever die it improves the most, or is itself
-//     discarded if it improves nothing.
+//     discard any one die — an N-die climb rolls N+1 and keeps N.
 //   - Sequence Memorization (treatOneDieAsValue=1, every climb): treat one die
-//     as 1 — in practice the highest nerf die still in play. Never lowers a
-//     buff die; no change when no die would improve.
+//     as 1, climber's choice.
 //   - Climbing Coach (milestoneBuffDiceBonus, milestone climbs only): every
 //     BUFF die (modifier -1) is +1, max 6. Nerf dice are untouched.
+//   - Mountain Mentor (negateOneNerfDie): ignore one nerf die, climber's
+//     choice — resolved in applyDiceToRequirements via `mentorIndex`.
+//
+// Every "climber's choice" is made for the player:
+//   - Without `stats` (stat-blind): the die whose change most lowers its
+//     requirement (a buff die wants a high number, a nerf die a low one) —
+//     the Decoder re-rolls the die furthest on the wrong side of average
+//     (3.5), Memorization takes the highest nerf die. Dice that apply nothing
+//     are never picked: dice negated by Free Solo / Technician, dice past the
+//     route's effects, and the nerf die Mountain Mentor negates (the first).
+//   - v0.8.0, with the climb's effective `stats`: each choice maximises the
+//     outcome instead (send first, then the deciding margin, then total
+//     margin), Memorization and Mentor chosen together; the Decoder re-rolls
+//     only when that raises P(send). The engine always passes stats.
 //
 // `trace` (optional array): each gear effect that fires pushes
 // { gear, effectKind, die, from, to } (die = index into the returned rolls;
 // Power Tap Belt also records `extra`, with die -1 when the extra die was the
 // one discarded). Read-only bookkeeping for UIs; it never changes the rolls.
-export function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilestone = false, trace = null) {
+//
+// Returns the final dice array. Use resolveClimbDice when you also need the
+// Mountain Mentor choice (pass it to applyDiceToRequirements as mentorIndex).
+export function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilestone = false, trace = null, stats = null) {
+  return resolveClimbDice(() => rng.rollDie(6), effectRollArray, char, route, isMilestone, stats, trace).dice;
+}
+
+// Shared dice procedure. `drawDie()` supplies each d6 (the engine passes the
+// game RNG; climbSendProbability passes scripted values to enumerate every
+// outcome exactly). Returns { dice, mentorIndex } where mentorIndex is the
+// nerf die Mountain Mentor ignores (null if none / not owned).
+export function resolveClimbDice(drawDie, effectRollArray, char = null, route = null, isMilestone = false, stats = null, trace = null) {
   const numDice = Math.max(2, effectRollArray.length);
-  const ownedGear = (char && char.equipment ? char.equipment : [])
+  const rolls = [];
+  for (let i = 0; i < numDice; i++) rolls.push(drawDie());
+  return finishClimbDice(rolls, drawDie, effectRollArray, char, route, isMilestone, stats, trace);
+}
+
+// Everything after the initial roll. Split out so the probability enumerator
+// can supply the initial roll itself and only script the follow-up dice.
+function finishClimbDice(rolls, drawDie, effectRollArray, char, route, isMilestone, stats, trace = null) {
+  const ctx = makeDiceContext(effectRollArray, char, route, isMilestone, stats);
+  const note = (gear, extra) => trace && trace.push({ gear: gear.name, effectKind: gear.effectKind, ...extra });
+
+  if (ctx.reroll) {
+    const target = chooseRerollTarget(ctx, rolls);
+    if (target !== null) {
+      const from = rolls[target];
+      rolls[target] = drawDie();
+      note(ctx.reroll, { die: target, from, to: rolls[target] });
+    }
+  }
+  if (ctx.extraDie) {
+    const extra = drawDie();
+    const replace = chooseExtraDieSwap(ctx, rolls, extra);
+    note(ctx.extraDie, { die: replace === null ? -1 : replace, extra, from: replace === null ? extra : rolls[replace], to: extra });
+    if (replace !== null) rolls[replace] = extra;
+  }
+  const { dice, mentorIndex, memoIndex } = chooseFinalDice(ctx, rolls);
+  if (trace) {
+    if (memoIndex !== null) note(ctx.memo, { die: memoIndex, from: rolls[memoIndex], to: ctx.memoValue });
+    if (ctx.coach) {
+      for (let i = 0; i < ctx.n; i++) {
+        if (ctx.effects[i].modifier === -1) note(ctx.coach, { die: i, from: rolls[i], to: dice[i] });
+      }
+    }
+  }
+  return { dice, mentorIndex };
+}
+
+function makeDiceContext(effects, char, route, isMilestone, stats) {
+  const owned = (char && char.equipment ? char.equipment : [])
     .map(name => GEAR_SHOP.find(g => g.name === name))
     .filter(Boolean);
-  const onTag = (gear) => route && route.tag && gear.tagFilter === route.tag;
+  const onTag = (gear) => !!(route && route.tag && gear.tagFilter === route.tag);
+  const find = (kind, tagged) => owned.find(g => g.effectKind === kind && (!tagged || onTag(g)));
+  const memo = find('treatOneDieAsValue', false);
+  const coach = isMilestone ? find('milestoneBuffDiceBonus', false) : null;
+  const n = effects.length;
+  const mods = effects.map(e => effectiveDieModifier(char, e));
+  const mentor = !!find('negateOneNerfDie', false);
+  // Dice whose value can change the outcome for this character.
+  const live = mods.map((m, i) => (m !== 0 ? i : -1)).filter(i => i >= 0);
+  // Stat-blind Mountain Mentor target: the first live nerf die. The other
+  // stat-blind choices leave it alone (it counts for nothing).
+  const mentorDefault = mentor ? (live.find(i => mods[i] === 1) ?? null) : null;
+  return {
+    char, route, effects, stats, n, mods, live, mentor, mentorDefault,
+    // Dice a stat-blind choice may pick: live, and not the one Mentor negates.
+    pickable: stats ? live : live.filter(i => i !== mentorDefault),
+    reroll: find('rerollOnTag', true) || null,
+    extraDie: find('extraDieDiscardOne', true) || null,
+    memo: memo || null,
+    memoValue: memo ? (memo.value || 1) : null,
+    coach: coach || null,
+    coachBonus: coach ? (coach.value || 1) : 0,
+  };
+}
 
-  const rolls = [];
-  for (let i = 0; i < numDice; i++) rolls.push(rng.rollDie(6));
+// Score a final dice configuration: [send, deciding margin, total margin].
+// The deciding margin is the margin on the stat that settles the climb (the
+// worst stat, or the 3rd-best for a Route Reader). Higher is better.
+function scoreDice(ctx, dice, mentorIndex) {
+  const { requirements } = applyDiceToRequirements(ctx.char, ctx.route, ctx.effects, dice, { mentorIndex });
+  return scoreRequirements(ctx.char, ctx.stats, requirements);
+}
 
-  const mentor = hasMountainMentor(char);
-  // Index of the die whose change to `to` most lowers diceRequirementTotal,
-  // or -1 if no change helps.
-  const bestDieToChange = (to) => {
-    const before = diceRequirementTotal(char, effectRollArray, rolls, mentor);
-    let bestIdx = -1;
+function scoreRequirements(char, stats, requirements) {
+  const margins = STAT_KEYS.map(k => stats[k] - requirements[k]).sort((a, b) => b - a);
+  const needed = char.key === 'routeReader' ? 3 : 4;
+  const deciding = margins[needed - 1];
+  return [deciding >= 0 ? 1 : 0, deciding, margins[0] + margins[1] + margins[2] + margins[3]];
+}
+
+function better(a, b) {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+}
+
+// Apply Sequence Memorization, Climbing Coach and Mountain Mentor, choosing
+// the Memorization and Mentor targets. Returns the best final dice.
+function chooseFinalDice(ctx, rolls) {
+  const memoOptions = [null];
+  if (ctx.memoValue !== null) {
+    // Treating a die as 1 only helps on a nerf die showing more than 1.
+    for (const i of ctx.pickable) if (ctx.mods[i] === 1 && rolls[i] > ctx.memoValue) memoOptions.push(i);
+  }
+  let best = null;
+  for (const memoIdx of memoOptions) {
+    const dice = rolls.slice();
+    if (memoIdx !== null) dice[memoIdx] = ctx.memoValue;
+    if (ctx.coachBonus) {
+      for (let i = 0; i < ctx.n; i++) if (ctx.effects[i].modifier === -1) dice[i] = Math.min(6, dice[i] + ctx.coachBonus);
+    }
+    // With stats, Mentor may take any live nerf die; stat-blind, the first.
+    const mentorOptions = !ctx.mentor ? [] : ctx.stats ? ctx.live.filter(i => ctx.mods[i] === 1)
+      : (ctx.mentorDefault === null ? [] : [ctx.mentorDefault]);
+    if (!mentorOptions.length) mentorOptions.push(null);
+    for (const mentorIndex of mentorOptions) {
+      const cand = { dice, mentorIndex, memoIndex: memoIdx };
+      if (!ctx.stats) {
+        // Stat-blind: Memorization on the highest pickable nerf die (first on
+        // ties). Never makes a die worse.
+        cand.score = [memoIdx === null ? 0 : rolls[memoIdx]];
+      } else {
+        cand.score = scoreDice(ctx, dice, mentorIndex);
+      }
+      if (!best || better(cand.score, best.score)) best = cand;
+    }
+  }
+  return best;
+}
+
+// Outcome of the dice from here on (Memorization/Coach/Mentor chosen well).
+function downstreamScore(ctx, rolls) {
+  const fin = chooseFinalDice(ctx, rolls);
+  return ctx.stats ? fin.score : null;
+}
+
+// Crimp Sequence Decoder: which die (if any) to re-roll. With stats, pick the
+// die whose re-roll gives the highest P(send) — re-rolling only when that
+// beats keeping the current dice. Without stats, re-roll the die that is
+// furthest on the wrong side of average (3.5), if any.
+function chooseRerollTarget(ctx, rolls) {
+  if (!ctx.stats) {
+    let target = null;
+    let worst = 0;
+    for (const i of ctx.pickable) {
+      const harm = ctx.mods[i] === 1 ? rolls[i] - 3.5 : 3.5 - rolls[i];
+      if (harm > worst) { worst = harm; target = i; }
+    }
+    return target;
+  }
+  const keep = downstreamScore(ctx, rolls);
+  let target = null;
+  let bestP = keep[0];
+  let bestMargin = keep[1];
+  for (const i of ctx.live) {
+    let p = 0;
+    let margin = 0;
+    for (let v = 1; v <= 6; v++) {
+      const next = rolls.slice();
+      next[i] = v;
+      const s = downstreamScore(ctx, next);
+      p += s[0] / 6;
+      margin += s[1] / 6;
+    }
+    if (p > bestP + 1e-12 || (Math.abs(p - bestP) <= 1e-12 && target !== null && margin > bestMargin)) {
+      bestP = p; bestMargin = margin; target = i;
+    }
+  }
+  return target;
+}
+
+// Power Tap Belt: which die (if any) the extra die replaces. Discarding the
+// extra die itself is always an option.
+function chooseExtraDieSwap(ctx, rolls, extra) {
+  if (!ctx.stats) {
+    let bestIdx = null;
     let bestGain = 0;
-    for (let i = 0; i < rolls.length; i++) {
-      const trial = rolls.slice();
-      trial[i] = to;
-      const gain = before - diceRequirementTotal(char, effectRollArray, trial, mentor);
+    for (const i of ctx.pickable) {
+      // Buff die: a higher die subtracts more. Nerf die: a lower die adds less.
+      const gain = ctx.mods[i] === -1 ? extra - rolls[i] : rolls[i] - extra;
       if (gain > bestGain) { bestGain = gain; bestIdx = i; }
     }
     return bestIdx;
-  };
+  }
+  let bestIdx = null;
+  let best = downstreamScore(ctx, rolls);
+  for (const i of ctx.live) {
+    const next = rolls.slice();
+    next[i] = extra;
+    const s = downstreamScore(ctx, next);
+    if (better(s, best)) { best = s; bestIdx = i; }
+  }
+  return bestIdx;
+}
 
-  // Crimp Sequence Decoder: on tagged climbs, re-roll the die a fresh roll
-  // (average 3.5) is most likely to improve.
-  for (const gear of ownedGear) {
-    if (gear.effectKind === 'rerollOnTag' && onTag(gear)) {
-      const idx = bestDieToChange(3.5);
-      if (idx === -1) continue;
-      const from = rolls[idx];
-      rolls[idx] = rng.rollDie(6);
-      if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: idx, from, to: rolls[idx] });
+const STAT_KEYS = ['strength', 'technique', 'focus', 'flexibility'];
+
+// =============================================================================
+// EXACT SEND PROBABILITY
+// =============================================================================
+
+// Exact probability that a climb sends, given the climber's current state.
+// Enumerates every die outcome through the SAME procedure the climb handler
+// runs (finishClimbDice + applyDiceToRequirements + the 3-of-4 / 4-of-4 rule),
+// including re-rolls and extra dice, so it cannot disagree with real climbs.
+// A climb rolls at most 4 live dice plus 1 follow-up die: ≤ 7,776 outcomes.
+//
+// Does not check legality (access, Time, Endurance, stations, Free Solo's
+// gate) — callers decide whether the climb may be started.
+//
+// Returns { pSend, expectedMargin, stats }. expectedMargin is the mean
+// deciding margin (stat − requirement on the stat that settles the climb):
+// useful to rank options when pSend is 0 or 1.
+export function climbSendProbability(char, route, area, attemptedRoutesForPlayer = {}, { isMilestone = false, shift = null } = {}) {
+  const stats = computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift);
+  // Memoised: the result depends only on the character, its gear, the climb's
+  // stats and the route — and bots ask about the same climbs every turn.
+  const memoKey = `${char.key}|${char.equipment.join(',')}|${stats.strength},${stats.technique},${stats.focus},${stats.flexibility}|` +
+    `${isMilestone ? 1 : 0}|${route.strength},${route.technique},${route.focus},${route.flexibility}|${route.tag || ''}|` +
+    `${(route.rollEffect || []).map(e => `${e.stat}${e.modifier}`).join(',')}`;
+  const hit = SEND_MEMO.get(memoKey);
+  if (hit) return { ...hit, stats };
+  const result = exactSendProbability(char, route, isMilestone, stats);
+  if (SEND_MEMO.size > 50000) SEND_MEMO.clear();
+  SEND_MEMO.set(memoKey, result);
+  return { ...result, stats };
+}
+
+const SEND_MEMO = new Map();
+
+function exactSendProbability(char, route, isMilestone, stats) {
+  const effects = buildEffectRollArray(char, route);
+  const live = effects.map((e, i) => (effectiveDieModifier(char, e) !== 0 ? i : -1)).filter(i => i >= 0);
+  const base = new Array(Math.max(2, effects.length)).fill(1);
+  const combos = 6 ** live.length;
+  let pSend = 0;
+  let expectedMargin = 0;
+  for (let code = 0; code < combos; code++) {
+    const rolls = base.slice();
+    let c = code;
+    for (const i of live) { rolls[i] = (c % 6) + 1; c = Math.floor(c / 6); }
+    enumerateFollowUpDraws(
+      (draw) => {
+        const res = finishClimbDice(rolls.slice(), draw, effects, char, route, isMilestone, stats);
+        const { requirements } = applyDiceToRequirements(char, route, effects, res.dice, { mentorIndex: res.mentorIndex });
+        return scoreRequirements(char, stats, requirements);
+      },
+      (score, weight) => {
+        pSend += (score[0] * weight) / combos;
+        expectedMargin += (score[1] * weight) / combos;
+      },
+    );
+  }
+  // Snap away float residue from summing sixths (6 × 1/6 → 0.9999…).
+  const snap = (x) => Math.round(x * 1e12) / 1e12;
+  return { pSend: snap(pSend), expectedMargin: snap(expectedMargin) };
+}
+
+// Run `run(draw)` once per possible sequence of follow-up d6 draws, calling
+// emit(result, probability) for each. Sequences are discovered lazily: a run
+// that asks for one more die than its scripted prefix is retried with that
+// die fixed to each of 1..6.
+const NEED_DIE = Symbol('need-die');
+function enumerateFollowUpDraws(run, emit) {
+  const stack = [[]];
+  while (stack.length) {
+    const prefix = stack.pop();
+    let k = 0;
+    const draw = () => {
+      if (k < prefix.length) return prefix[k++];
+      throw NEED_DIE;
+    };
+    try {
+      emit(run(draw), 6 ** -prefix.length);
+    } catch (e) {
+      if (e !== NEED_DIE) throw e;
+      for (let v = 1; v <= 6; v++) stack.push([...prefix, v]);
     }
   }
-
-  // Power Tap Belt: roll an extra die, keep the best N (discard one).
-  for (const gear of ownedGear) {
-    if (gear.effectKind === 'extraDieDiscardOne' && onTag(gear)) {
-      const extra = rng.rollDie(6);
-      const bestIdx = bestDieToChange(extra);
-      if (trace) {
-        trace.push({ gear: gear.name, effectKind: gear.effectKind, die: bestIdx, extra,
-          from: bestIdx === -1 ? extra : rolls[bestIdx], to: extra });
-      }
-      if (bestIdx !== -1) rolls[bestIdx] = extra;
-    }
-  }
-
-  // Sequence Memorization: every climb, treat the die that gains most as `value` (1).
-  for (const gear of ownedGear) {
-    if (gear.effectKind === 'treatOneDieAsValue') {
-      const target = gear.value || 1;
-      const idx = bestDieToChange(target);
-      if (idx === -1) continue;
-      if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: idx, from: rolls[idx], to: target });
-      rolls[idx] = target;
-    }
-  }
-
-  // Climbing Coach: on milestone climbs, every buff die +1 (max 6).
-  if (isMilestone) {
-    for (const gear of ownedGear) {
-      if (gear.effectKind === 'milestoneBuffDiceBonus') {
-        const bonus = gear.value || 1;
-        for (let i = 0; i < effectRollArray.length; i++) {
-          if (effectRollArray[i].modifier !== -1) continue;
-          const from = rolls[i];
-          rolls[i] = Math.min(6, rolls[i] + bonus);
-          if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: i, from, to: rolls[i] });
-        }
-      }
-    }
-  }
-  return rolls;
 }
 
 // Apply dice rolls and character overrides to produce final per-stat
@@ -487,13 +683,13 @@ export function rollClimbDice(rng, effectRollArray, char = null, route = null, i
 //
 // Engine v0.3.0 gear effect (negateOneNerfDie / Mountain Mentor):
 //   On every climb, the player may treat ONE nerf die (modifier +1) as 0.
-//   We cancel the highest-rolled nerf die (the first one on a tie), counting
-//   only nerf dice the character overrides haven't already negated.
+//   `opts.mentorIndex` names that die (resolveClimbDice picks it); when it is
+//   omitted, the first live nerf die is ignored (the stat-blind rule).
 //
 // Returns { requirements, appliedModifiers }
 //   appliedModifiers = array of {die, stat, modifier, deltaApplied, source}
 //   for telemetry. modifier is the POST-override value actually applied.
-export function applyDiceToRequirements(char, route, effectRollArray, diceRolls) {
+export function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts = {}) {
   const requirements = {
     strength: route.strength,
     technique: route.technique,
@@ -502,19 +698,26 @@ export function applyDiceToRequirements(char, route, effectRollArray, diceRolls)
   };
   const appliedModifiers = [];
 
-  // Mountain Mentor: cancel the highest nerf die (one per climb).
-  const mentorIdx = hasMountainMentor(char)
-    ? mountainMentorDieIndex(char, effectRollArray, effectRollArray.map((_, i) => diceRolls[i] ?? 0))
-    : -1;
+  const hasMentor = (char.equipment || []).some(name => {
+    const g = GEAR_SHOP.find(x => x.name === name);
+    return g && g.effectKind === 'negateOneNerfDie';
+  });
+  let mentorIndex = null;
+  if (hasMentor) {
+    if (opts.mentorIndex !== undefined) {
+      mentorIndex = opts.mentorIndex;
+    } else {
+      const first = effectRollArray.findIndex(e => effectiveDieModifier(char, e) === 1);
+      mentorIndex = first === -1 ? null : first;
+    }
+  }
 
   for (let i = 0; i < effectRollArray.length; i++) {
     const effect = effectRollArray[i];
     const die = diceRolls[i] ?? 0;
-    let effectiveMod = effect.modifier;
-
-    if (char.key === 'freeSolo') effectiveMod = 0;
-    if (char.key === 'technician' && effectiveMod === 1) effectiveMod = 0;
-    if (i === mentorIdx) effectiveMod = 0;
+    let effectiveMod = effectiveDieModifier(char, effect);
+    // Mountain Mentor — the chosen nerf die counts as 0.
+    if (effectiveMod === 1 && i === mentorIndex) effectiveMod = 0;
 
     // stat may be outside the four stat fields only as paranoia; ignore
     // silently if so (matches game.js permissiveness).
@@ -682,6 +885,45 @@ export function getTrainingBonusBoost(char) {
     if (gear && gear.effectKind === 'trainingBonusBoost') boost += (gear.value || 0);
   }
   return boost;
+}
+
+// =============================================================================
+// RULES VARIANTS (training) — for balance experiments
+// =============================================================================
+//
+// A game may carry `state.rules`, an object of overrides used by the balance
+// harness to A/B-test rule changes without editing code. Absent or empty, the
+// game plays the standard rules exactly. Training fields:
+//   trainTime            Time per session            (standard: the station's, 2)
+//   trainBonus           stat gained per session     (standard: the station's, 5)
+//   trainEnduranceMult   × station Endurance cost    (standard: 1)
+//   trainCapBase,        cap on the TRAINING bonus per stat: base + perLevel ×
+//   trainCapPerLevel     (Level − 1). Omit trainCapBase for no cap.
+//   trainPerRound        max sessions per climber per round (standard: no limit)
+
+// Time, Endurance and stat gain of one session at `area` for `char`.
+export function trainingSpec(rules, area, char) {
+  const r = rules || {};
+  return {
+    time: r.trainTime ?? area.time,
+    endurance: Math.round(area.endurance * (r.trainEnduranceMult ?? 1)),
+    gain: (r.trainBonus ?? area.bonus) + getTrainingBonusBoost(char),
+  };
+}
+
+// Max training bonus per stat at the climber's Level (Infinity = no cap).
+export function trainingCap(rules, char) {
+  const r = rules || {};
+  if (r.trainCapBase === undefined || r.trainCapBase === null) return Infinity;
+  return r.trainCapBase + (r.trainCapPerLevel ?? 0) * (char.level - 1);
+}
+
+// May `char` train `stat` once more under the variant's cap / per-round limit?
+// (Time, Endurance and station occupancy are checked by the caller.)
+export function trainingAllowed(rules, char, stat, gain) {
+  const r = rules || {};
+  if (r.trainPerRound !== undefined && (char.trainedThisRound || 0) >= r.trainPerRound) return false;
+  return char.trainingBonuses[stat] + gain <= trainingCap(rules, char);
 }
 
 // =============================================================================
