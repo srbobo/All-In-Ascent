@@ -66,7 +66,9 @@ export function drawTopRopeStations(rng, belayerCount, pool = ROUTES.topRope) {
 
 // ---------- Public API ----------
 
-export function createGame({ seed, characterKeys }) {
+// `rules` (optional): balance-experiment overrides, stored on the state as
+// state.rules — see trainingSpec in helpers.js. Omit for the standard rules.
+export function createGame({ seed, characterKeys, rules = null }) {
   // Validate inputs up front — these are the pipeline's guarantees,
   // so a bad input is a programming bug, not runtime noise.
   if (!Array.isArray(characterKeys) || characterKeys.length < 1 || characterKeys.length > 4) {
@@ -134,6 +136,7 @@ export function createGame({ seed, characterKeys }) {
     // and is no longer tied to this count.
     belayerCount,
     attemptedRoutes,
+    ...(rules ? { rules: { ...rules } } : {}),
     gameEnded: false,
     winner: null,
     pendingLevelUp: null,

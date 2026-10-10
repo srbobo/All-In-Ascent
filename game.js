@@ -1594,8 +1594,10 @@ function resolveLocalClimb(char, route, stats, isMilestone) {
  const effectRollArray = Engine.buildEffectRollArray(char, route);
  const rng = { rollDie: (sides = 6) => Math.floor(Math.random() * sides) + 1 };
  const diceTrace = [];
- const dice = Engine.rollClimbDice(rng, effectRollArray, char, route, isMilestone, diceTrace);
- const { requirements, appliedModifiers } = Engine.applyDiceToRequirements(char, route, effectRollArray, dice);
+ // Gear "your choice" dice picks are made against this climb's stats, the same
+ // way the engine resolves climbs (resolveClimbShared in engine/engine.js).
+ const { dice, mentorIndex } = Engine.resolveClimbDice(() => rng.rollDie(6), effectRollArray, char, route, isMilestone, stats, diceTrace);
+ const { requirements, appliedModifiers } = Engine.applyDiceToRequirements(char, route, effectRollArray, dice, { mentorIndex });
  const { success } = Engine.resolveClimbOutcome(char, stats, requirements);
  const xpGained = Engine.computeClimbXp(char, route, success);
  char.xp += xpGained;

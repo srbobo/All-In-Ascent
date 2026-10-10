@@ -38,16 +38,16 @@ import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';
 import { ACCESS_CARDS, drawTopRopeStations, regularRoutePool } from './state.js';
 import {
-  checkAreaAccess, canEnterSection, computeEffectiveStats,
+  checkAreaAccess, canEnterSection,
   canClimbTopRopeRoute, pickFreeBelayerStation,
   getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost,
   getGearPurchaseTimeCost, getEffectiveGearCost,
-  getSpendableXp, buildEffectRollArray, rollClimbDice,
+  getSpendableXp, buildEffectRollArray, resolveClimbDice, computeClimbStats,
   applyDiceToRequirements, resolveClimbOutcome, computeClimbXp,
-  getFailureEnduranceExtra, getSuccessEnduranceHeal, getTrainingBonusBoost,
-  freeSoloCanAttempt, applyBetaBoostIfActive,
+  getFailureEnduranceExtra, getSuccessEnduranceHeal,
+  freeSoloCanAttempt, trainingSpec, trainingAllowed,
   computeRestRecovery, applyLevelUpIfNeeded,
-  bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, applyStatShiftToStats,
+  bestRouteReaderShift, canUseStatShift, isWellFormedStatShift,
 } from './helpers.js';
 
 // =============================================================================
@@ -70,8 +70,10 @@ export function getLegalActions(state) {
 
   // Training: one per station, capacity 1 per round, costs time + endurance.
   for (const area of TRAINING_AREAS) {
-    if (char.timeRemaining < area.time) continue;
-    if (char.currentEndurance < area.endurance) continue;
+    const spec = trainingSpec(state.rules, area, char);
+    if (char.timeRemaining < spec.time) continue;
+    if (char.currentEndurance < spec.endurance) continue;
+    if (!trainingAllowed(state.rules, char, area.stat, spec.gain)) continue;
     const cap = canEnterSection(area.name, player.playerNum, state);
     if (!cap.canEnter) continue;
     actions.push({ type: 'train', areaName: area.name });
@@ -294,6 +296,9 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     char.belayerStation = null;
   }
 
+  // Snapshot this round's attempted-route marks before marking this climb.
+  const attemptedBefore = { ...(s.attemptedRoutes[player.playerNum] || {}) };
+
   // 2. Mark the route as attempted this round (only for regular climbs —
   // milestones have no per-round attempt cap per game.js).
   if (!isMilestone) {
@@ -311,12 +316,15 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   const baseEnduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance);
   char.currentEndurance -= baseEnduranceCost;
 
-  // 5. Effective stats (base + training + gear + per-route gear).
-  const baseStats = computeEffectiveStats(char, route, area, s.attemptedRoutes[player.playerNum]);
-
-  // 6. Consume Route Reader Beta Boost if active. Single emit captures the fact.
-  const { stats: boostedStats, consumed: betaConsumed } = applyBetaBoostIfActive(char, baseStats);
-  if (betaConsumed) {
+  // 5-6. Effective stats for this climb: base + training + gear + per-route
+  //      gear, then Route Reader's Beta Boost (+3) and stat shift. Computed by
+  //      the same read-only helper climbSendProbability uses, so previews and
+  //      real climbs can't drift apart. Consuming the flags happens below.
+  //      (Route attempted-marks don't feed gear bonuses in v0.7+ data, but use
+  //      the pre-climb marks so a preview and the climb see identical input.)
+  const effectiveStats = computeClimbStats(char, route, area, attemptedBefore, shift);
+  if (char.betaBoostActive) {
+    char.betaBoostActive = false;
     emitter.emit('ability_activated', {
       playerNum: player.playerNum,
       character: char.key,
@@ -326,9 +334,7 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   }
 
   // 6b. Route Reader stat shift (validated above): this climb only, once per round.
-  let effectiveStats = boostedStats;
   if (shift) {
-    effectiveStats = applyStatShiftToStats(boostedStats, shift);
     char.abilityUsed = true;
     emitter.emit('ability_activated', {
       playerNum: player.playerNum,
@@ -340,9 +346,10 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
 
   // 7. Build and roll dice (Sprinter gets +1 nerf die; v0.3.0 gear may
   //    re-roll, add an extra die, replace dice, or shift dice on milestones).
+  //    Gear choices ("your choice") are made against effectiveStats.
   const effectArray = buildEffectRollArray(char, route);
-  const dice = rollClimbDice(rng, effectArray, char, route, isMilestone);
-  const { requirements, appliedModifiers } = applyDiceToRequirements(char, route, effectArray, dice);
+  const { dice, mentorIndex } = resolveClimbDice(() => rng.rollDie(6), effectArray, char, route, isMilestone, effectiveStats);
+  const { requirements, appliedModifiers } = applyDiceToRequirements(char, route, effectArray, dice, { mentorIndex });
 
   emitter.emit('dice_rolled', {
     playerNum: player.playerNum,
@@ -441,12 +448,15 @@ function handleTrain(s, rng, action, emitter) {
   const timeBefore = char.timeRemaining;
   const eBefore = char.currentEndurance;
 
+  // Old Climbing Journal (gear) boosts every session by +N; a rules variant
+  // (state.rules) may change the Time, Endurance or bonus.
+  const spec = trainingSpec(s.rules, area, char);
   char.location = area.name;
-  char.timeRemaining -= area.time;
-  char.currentEndurance -= area.endurance;
-  // Old Climbing Journal (gear) boosts every training session by +N.
-  const trainingBonus = area.bonus + getTrainingBonusBoost(char);
+  char.timeRemaining -= spec.time;
+  char.currentEndurance -= spec.endurance;
+  const trainingBonus = spec.gain;
   char.trainingBonuses[area.stat] += trainingBonus;
+  char.trainedThisRound = (char.trainedThisRound || 0) + 1;
 
   emitter.emit('train_action', {
     playerNum: player.playerNum,
@@ -455,8 +465,8 @@ function handleTrain(s, rng, action, emitter) {
     bonus: trainingBonus,
     totalTrainingBonusAfter: { ...char.trainingBonuses },
     resourcesDelta: {
-      time: { before: timeBefore, after: char.timeRemaining, delta: -area.time },
-      endurance: { before: eBefore, after: char.currentEndurance, delta: -area.endurance },
+      time: { before: timeBefore, after: char.timeRemaining, delta: -spec.time },
+      endurance: { before: eBefore, after: char.currentEndurance, delta: -spec.endurance },
     },
   });
 }
@@ -710,6 +720,7 @@ function endRound(s, rng, emitter) {
     const approachBonus = c.equipment.includes('Approach Shoes') ? 1 : 0;
     c.timeRemaining = 10 + approachBonus;
     c.abilityUsed = false;
+    c.trainedThisRound = 0;
     c.location = 'lobby';
     c.belayerStation = null;
   }
@@ -723,17 +734,26 @@ function endRound(s, rng, emitter) {
   // — no time-based unlock ramp.
 
   s.round = newRound;
-  s.currentPlayerIndex = 0;
+  // The climber with the most Time opens the round (ties → seat order), the
+  // same rule as every other turn. v0.7.0 always started seat 1, even when
+  // someone else had 11 Time from Approach Shoes.
+  s.currentPlayerIndex = firstToActIndex(s.players);
 
   emitter.emit('round_end', { round: endedRound, routesCleared: cleared, nextRound: newRound });
   emitter.emit('round_start', { round: newRound, routeClearingPosition: s.routeClearingPosition });
 
   // Kick off the first turn of the new round.
-  const first = s.players[0];
+  const first = s.players[s.currentPlayerIndex];
   emitter.emit('turn_start', {
     round: newRound,
     playerNum: first.playerNum,
     timeRemaining: first.character.timeRemaining,
     endurance: first.character.currentEndurance,
   });
+}
+
+// Index of the player who acts first: most Time remaining, ties to seat order.
+export function firstToActIndex(players) {
+  const maxTime = Math.max(...players.map(p => p.character.timeRemaining));
+  return players.findIndex(p => p.character.timeRemaining === maxTime);
 }
