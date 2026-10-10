@@ -437,6 +437,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: var(--lh-snug); 
 .aia-cost .aia-icon { width: 1.15em; height: 1.15em; }
 .aia-cost--time .aia-icon      { color: var(--cobalt-text); }
 .aia-cost--endurance .aia-icon { color: var(--marigold-text); }
+/* cost changed by the climber's passives or gear: printed with a marker */
+.aia-cost.is-adjusted b { text-decoration: underline dotted 0.12em; text-underline-offset: 0.18em; }
+.aia-cost.is-adjusted b::after { content: "*"; font-size: 0.7em; vertical-align: super; }
 .aia-cost--xp { margin-left: auto; }
 .aia-cost--xp .aia-icon        { color: var(--cobalt-text); }
 .aia-cost__fail { font-family: var(--font-mono); font-size: var(--t-meta); color: var(--ink-muted); font-weight: 700; }

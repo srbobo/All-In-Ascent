@@ -18,6 +18,8 @@
      status   short text badge ("Attempted", "Owned", "Your station"...)
      tone     'muted' | 'locked' | 'done' — visual state hooks
      setCode  footer set code override
+     costs    { time, endurance } as this climber pays them (route cards);
+              an adjusted cost is marked and its base is read out
 
    Requires design/card-art.js (window.AIAArt).
    ========================================================================== */
@@ -140,6 +142,8 @@
     const ms = o.milestone ? MILESTONES[o.milestone] : null;
     const frame = ms ? 'marigold' : meta.color;
     const moves = (r.moveFeatures || []).join(' · ');
+    // Costs as this climber would pay them (passives + gear); defaults to the printed card.
+    const cost = { time: o.costs?.time ?? r.time, endurance: o.costs?.endurance ?? r.endurance };
     const chips = [r.routeType, r.tag].filter(Boolean);
     const node = el(`
       <article class="aia-card aia-card--route ${ms ? 'aia-card--milestone' : ''} ${stateClasses(o)}" data-area="${area}" style="${frameVars(frame)} --circuit: var(--${circ.key}); --circuit-on: var(--on-${circ.key});" aria-labelledby="${id}-name">
@@ -161,8 +165,8 @@
           ${reqsMarkup(r, o.stats, { verb: 'required' })}
           ${diceMarkup(r.rollEffect)}
           <div class="aia-costs">
-            <span class="aia-cost aia-cost--time" title="Time cost">${icon('time')}<b>${r.time}</b><span class="sr-only"> time</span></span>
-            <span class="aia-cost aia-cost--endurance" title="Endurance cost">${icon('endurance')}<b>${r.endurance}</b><span class="sr-only"> endurance</span></span>
+            <span class="aia-cost aia-cost--time${cost.time !== r.time ? ' is-adjusted' : ''}" title="Time cost${cost.time !== r.time ? ` (base ${r.time})` : ''}">${icon('time')}<b>${cost.time}</b><span class="sr-only"> time${cost.time !== r.time ? `, base ${r.time}` : ''}</span></span>
+            <span class="aia-cost aia-cost--endurance${cost.endurance !== r.endurance ? ' is-adjusted' : ''}" title="Endurance cost${cost.endurance !== r.endurance ? ` (base ${r.endurance})` : ''}">${icon('endurance')}<b>${cost.endurance}</b><span class="sr-only"> endurance${cost.endurance !== r.endurance ? `, base ${r.endurance}` : ''}</span></span>
             <span class="aia-cost aia-cost--xp" title="XP on send / on fall">${icon('xp')}<b>${r.xpSuccess}</b><span class="aia-cost__fail" aria-hidden="true">/${r.xpFail}</span><span class="sr-only"> XP on a send, ${r.xpFail} XP on a fall</span></span>
           </div>
           ${o.extra || ''}
