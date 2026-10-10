@@ -32,11 +32,11 @@
 //     not a gameplay condition).
 
 import {
-  ROUTES, GEAR_SHOP, TRAINING_AREAS,
+  GEAR_SHOP, TRAINING_AREAS,
 } from './data.js';
 import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';
-import { ACCESS_CARDS, drawTopRopeStations } from './state.js';
+import { ACCESS_CARDS, drawTopRopeStations, regularRoutePool } from './state.js';
 import {
   checkAreaAccess, canEnterSection, computeEffectiveStats,
   canClimbTopRopeRoute, pickFreeBelayerStation,
@@ -47,6 +47,7 @@ import {
   getFailureEnduranceExtra, getSuccessEnduranceHeal, getTrainingBonusBoost,
   freeSoloCanAttempt, applyBetaBoostIfActive,
   computeRestRecovery, applyLevelUpIfNeeded,
+  bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, applyStatShiftToStats,
 } from './helpers.js';
 
 // =============================================================================
@@ -101,6 +102,13 @@ export function getLegalActions(state) {
       // Free Solo "Life or Die" — must meet all base requirements.
       if (!freeSoloCanAttempt(char, route)) continue;
       actions.push({ type: 'climb', area, routeName: route.name });
+      // Route Reader "Versatility": also offer this climb with the most useful
+      // once-per-round stat shift, when one helps. (applyAction accepts any
+      // valid shift on a legal climb; this variant is the menu's suggestion.)
+      if (canUseStatShift(char, false)) {
+        const shift = bestRouteReaderShift(char, route, area, state.attemptedRoutes[player.playerNum]);
+        if (shift) actions.push({ type: 'climb', area, routeName: route.name, shift });
+      }
     }
   }
 
@@ -226,6 +234,9 @@ function pickPublicActionFields(action) {
   for (const k of ['area', 'routeName', 'areaName', 'difficulty', 'gearName']) {
     if (action[k] !== undefined) out[k] = action[k];
   }
+  if (isWellFormedStatShift(action.shift)) {
+    out.shift = { from: action.shift.from, to: action.shift.to, amount: action.shift.amount };
+  }
   return out;
 }
 
@@ -258,9 +269,17 @@ export function isTerminal(state) {
 // CLIMB — shared implementation used by both regular climbs and milestone
 // attempts. `isMilestone` flips the post-success milestone-completion
 // branch on.
-function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficulty) {
+function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficulty, shift = null) {
   const player = s.players[s.currentPlayerIndex];
   const char = player.character;
+
+  // Validate a Route Reader stat shift before anything is paid.
+  if (shift) {
+    if (!isWellFormedStatShift(shift)) throw new Error(`climb: malformed stat shift ${JSON.stringify(shift)}`);
+    if (!canUseStatShift(char, isMilestone)) {
+      throw new Error('climb: stat shift is only for a Route Reader, once per round, on a regular route');
+    }
+  }
 
   // 1. Move the player into the section. For Top Rope, occupy the belayer
   //    station this climb belongs to (route.belayer for a regular climb; a
@@ -296,13 +315,26 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   const baseStats = computeEffectiveStats(char, route, area, s.attemptedRoutes[player.playerNum]);
 
   // 6. Consume Route Reader Beta Boost if active. Single emit captures the fact.
-  const { stats: effectiveStats, consumed: betaConsumed } = applyBetaBoostIfActive(char, baseStats);
+  const { stats: boostedStats, consumed: betaConsumed } = applyBetaBoostIfActive(char, baseStats);
   if (betaConsumed) {
     emitter.emit('ability_activated', {
       playerNum: player.playerNum,
       character: char.key,
       ability: 'Beta Boost',
       effect: '+3 all stats for this climb',
+    });
+  }
+
+  // 6b. Route Reader stat shift (validated above): this climb only, once per round.
+  let effectiveStats = boostedStats;
+  if (shift) {
+    effectiveStats = applyStatShiftToStats(boostedStats, shift);
+    char.abilityUsed = true;
+    emitter.emit('ability_activated', {
+      playerNum: player.playerNum,
+      character: char.key,
+      ability: 'Versatility',
+      effect: `moved ${shift.amount} ${shift.from} → ${shift.to} for this climb`,
     });
   }
 
@@ -389,14 +421,15 @@ function handleClimb(s, rng, action, emitter) {
   const { area, routeName } = action;
   const route = (s.availableRoutes[area] || []).find(r => r.name === routeName);
   if (!route) throw new Error(`climb: no route "${routeName}" available in ${area}`);
-  resolveClimbShared(s, rng, emitter, route, area, /*isMilestone*/ false, null);
+  resolveClimbShared(s, rng, emitter, route, area, /*isMilestone*/ false, null, action.shift || null);
 }
 
 function handleMilestone(s, rng, action, emitter) {
   const { difficulty } = action;
   const m = s.milestoneRoutes[difficulty];
   if (!m) throw new Error(`milestone: no milestone at tier "${difficulty}"`);
-  resolveClimbShared(s, rng, emitter, m.route, m.area, /*isMilestone*/ true, difficulty);
+  // Passing action.shift lets resolveClimbShared reject it: no shifts on milestones.
+  resolveClimbShared(s, rng, emitter, m.route, m.area, /*isMilestone*/ true, difficulty, action.shift || null);
 }
 
 function handleTrain(s, rng, action, emitter) {
@@ -656,14 +689,14 @@ function endRound(s, rng, emitter) {
   //   2 → refresh bouldering,    advance to 0
   let cleared;
   if (s.routeClearingPosition === 0) {
-    s.availableRoutes.leadClimbing = rng.pickN(ROUTES.leadClimbing, 5);
+    s.availableRoutes.leadClimbing = rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing'), 5);
     cleared = 'leadClimbing';
   } else if (s.routeClearingPosition === 1) {
     // Refresh all belayer stations together (2×belayerCount routes).
-    s.availableRoutes.topRope = drawTopRopeStations(rng, s.belayerCount);
+    s.availableRoutes.topRope = drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope'));
     cleared = 'topRope';
   } else {
-    s.availableRoutes.bouldering = rng.pickN(ROUTES.bouldering, 5);
+    s.availableRoutes.bouldering = rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering'), 5);
     cleared = 'bouldering';
   }
   s.routeClearingPosition = (s.routeClearingPosition + 1) % 3;

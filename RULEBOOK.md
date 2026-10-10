@@ -1,502 +1,649 @@
 # ALL-IN ASCENT
-## Alpine Indoors Rock Climbing Board Game
+## Try. Fall. Get Stronger. Send.
 
-### Official Rulebook — Engine v0.4.0
+*A climbing game of grit, gear, and good beta for 1–4 players, set at Alpine Indoors.*
 
 ---
 
 ## TABLE OF CONTENTS
-1. [Game Overview](#game-overview)
-2. [Game Components](#game-components)
-3. [Setup](#setup)
-4. [Objective](#objective)
-5. [Characters](#characters)
-6. [Understanding Your Character](#understanding-your-character)
-7. [How to Play](#how-to-play)
-8. [Actions You Can Take](#actions-you-can-take)
-9. [Climbing Routes](#climbing-routes)
-10. [Route Specialty Tags](#route-specialty-tags)
-11. [The Dice System](#the-dice-system)
-12. [Training](#training)
-13. [The Gear Shop](#the-gear-shop)
-14. [Resting](#resting)
-15. [Leveling Up](#leveling-up)
-16. [Route Clearing System](#route-clearing-system)
-17. [Special Rules](#special-rules)
-18. [Winning the Game](#winning-the-game)
-19. [Strategy Tips](#strategy-tips)
-20. [Quick Reference](#quick-reference)
+
+**Learn to Play**
+1. [Welcome to Alpine Indoors](#welcome-to-alpine-indoors)
+2. [How to Win](#how-to-win)
+3. [What's in the Box](#whats-in-the-box)
+4. [Words to Know](#words-to-know)
+5. [The Golden Rules](#the-golden-rules)
+6. [Setup](#setup)
+7. [Meet the Climbers](#meet-the-climbers)
+8. [How a Round Works](#how-a-round-works)
+9. [Your Actions](#your-actions)
+10. [Climbing a Route](#climbing-a-route)
+11. [Your First Round](#your-first-round)
+12. [The Gym](#the-gym)
+13. [XP and Leveling Up](#xp-and-leveling-up)
+14. [The Gear Shop](#the-gear-shop)
+15. [End of the Round](#end-of-the-round)
+16. [Ringing the Bell](#ringing-the-bell)
+
+**Reference**
+
+17. [Coach's Corner](#coachs-corner)
+18. [Clarifications and FAQ](#clarifications-and-faq)
+19. [Gear Card Reference](#gear-card-reference)
+20. [Tables](#tables)
+21. [Quick Reference](#quick-reference)
 
 ---
 
-## GAME OVERVIEW
+## WELCOME TO ALPINE INDOORS
 
-Welcome to**All-In Ascent**, where you step into the climbing shoes of an aspiring rock climber at Alpine Indoors climbing gym! Over multiple rounds, you'll attempt challenging routes, train your body, purchase essential gear, and level up your character from beginner to elite climber.
+> **Lore:** The old freight warehouse on the edge of town smells like rubber, chalk, and burnt coffee. Its walls are covered in a riot of color: coral crimps, teal slopers, violet volumes as big as armchairs. This is **Alpine Indoors**, and tonight the chalkboard by the front desk lists three new **Milestone** routes. One easy. One hard. One that nobody has sent.
+>
+> Every night after closing, the **Setter** strips one wall bare and bolts up something new. Every morning, the regulars are back — training on the boards, swapping beta, falling off, chalking up, and trying again.
+>
+> At the top of the tallest wall hangs a brass bell. The first climber to send all three Milestones gets to ring it.
 
-**Players:**1–4
-**Win condition:**First player to complete all 3 Milestone Routes
-**Complexity:**Medium
+In **All-In Ascent**, you are one of those regulars. You will climb routes to earn experience, train your body on the boards, buy gear that bends the rules, and rest when your forearms give out. Every climb costs **Time** and **Endurance**. Every climb — even a fall — teaches you something.
+
+Some days you send. Most days you fall. The climber who learns fastest wins.
 
 ---
 
-## GAME COMPONENTS
+## HOW TO WIN
 
--**5 unique characters**, each with one special ability
--**72 route cards**across three climbing areas:
- -**Bouldering**(26 routes, V0–V12)
- -**Top Rope**(23 routes, 5.6–5.13c)
- -**Lead Climbing**(23 routes, 5.8–5.14a)
-- Each route may carry one**specialty tag**: Pinch/Crimp, Toe/Heel Hook, Roof/Sloper, Dynamic, or untagged
--**4 core stats**: Strength, Technique, Focus, Flexibility
--**Endurance system**— separate stamina pool that drains with effort
--**4 training equipment cards**— one per stat
--**17 gear cards**in the shop (3 access cards + 14 permanent-passive cards)
--**2 six-sided dice**(more on some climbs — see Dice System)
--**3 Milestone Route cards**drawn at game start: one Beginner, one Intermediate, one Expert
--**Route Clearing Token**(rotates 0 → 1 → 2 → 0)
--**Top Rope belayer stations**— N − 1 stations for N players (e.g. 2 in a 3-player game), fixed for the whole game; each station holds 2 routes and admits one climber
--**XP and Level trackers**per player
+> **Golden Rule:** **The first climber to send all 3 Milestone routes wins immediately.**
+
+There is no round limit. Milestones are shared: everyone races up the same three routes, but each climber must send them for themselves.
+
+---
+
+## WHAT'S IN THE BOX
+
+| Component | Count | What it's for |
+|---|---|---|
+| Climber boards | 5 | Your character: starting stats, growth, and ability |
+| Climber standees | 5 | Shows where you are standing in the gym |
+| Gym board | 1 | The Lobby, three climbing walls, Training Area, Rest Area, Gear Shop, Milestone board, and Setter's track |
+| Route cards | 72 | 26 Bouldering · 23 Top Rope · 23 Lead |
+| Gear cards | 17 | 3 Lead access cards + 14 permanent upgrades |
+| Training station tiles | 4 | Campus Board, MoonBoard, Grip Board, Balance & Core |
+| Setter's token | 1 | Shows which wall gets reset at the end of the round |
+| Six-sided dice | 5 | 3 green **Beta dice** and 2 red **Crux dice** |
+| Player tracker sheets | 4 | Track Time, Endurance, XP, Level, and training bonuses |
+| Milestone markers | 12 | 3 per player, to mark your sends |
+| "Tried" markers | 20 | Mark routes you have already attempted this round |
+
+---
+
+## WORDS TO KNOW
+
+These words appear in **bold** throughout the rules. Each one means exactly one thing.
+
+| Term | Meaning |
+|---|---|
+| **Climber** | You, the character you play. |
+| **Send** | Succeed on a climb. |
+| **Fall** | Fail a climb. You still earn some XP. |
+| **Time** | Your action budget. You get **10 Time** every round. |
+| **Endurance** | Your stamina. Climbing and training spend it. Resting refills it. |
+| **XP** | Experience. Earned from every climb. Spent on gear. Raises your **Level**. |
+| **Stats** | Your four abilities: **Strength**, **Technique**, **Focus**, **Flexibility**. |
+| **Requirement** | The four numbers on a route card. Meet or beat all four to send. |
+| **Beta die** (green) | A helpful die. **Subtract** it from a requirement. |
+| **Crux die** (red) | A harmful die. **Add** it to a requirement. |
+| **Milestone** | One of the three shared routes you must send to win. |
+| **Tag** | A specialty icon on a route (Crimp, Dynamic, Hook, or Roof). Some gear cares about tags. |
+| **Station** | A spot that holds only **one** climber at a time. |
+| **Lobby** | Where every climber starts each round. |
+
+---
+
+## THE GOLDEN RULES
+
+When in doubt, come back here.
+
+1. **The card beats the rulebook.** If a climber board or gear card contradicts these rules, the card wins.
+2. **Can't pay, can't play.** You need enough **Time** and **Endurance** to *start* an action.
+3. **Pay first, then roll.** You pay a climb's costs whether you send or fall.
+4. **Meet or beat.** A stat *equal* to its requirement passes.
+5. **You stand where you last acted.** Your standee stays at your last action's spot until you do something somewhere else.
 
 ---
 
 ## SETUP
 
-1. Choose the number of players (1–4).
-2. Each player picks a character (no duplicates allowed).
-3.**Three Milestone Routes are randomly drawn**from the route deck, with two constraints:
- - One**Beginner**route (V0–V2 / 5.6–5.8 / Lead 5.8–5.9)
- - One**Intermediate**route (V3–V7 / 5.9–5.11c / Lead 5.10a–5.11c)
- - One**Expert**route (V8–V12 / 5.12a–5.13c / Lead 5.12a–5.14a)
- - **All three milestones must come from DIFFERENT climbing areas** (one Bouldering, one Top Rope, one Lead — in any combination). Sort the route deck by tier, then draw cards in order: Beginner first, then Intermediate from a different area, then Expert from the third remaining area. If a drawn card matches an already-taken area, set it aside and draw again; reshuffle set-asides back at the end.
-4. Deal**5 random routes**into Bouldering and Lead Climbing. Set up the Top Rope area as**N − 1 belayer stations**(N = player count), dealing**2 random routes to each station**.
-5. Deal**3 random non-access gear cards**into the gear shop. The 3 access cards (Belay Device, Locking Carabiner, Lead Rope) are always available for purchase.
-6. Place the**Route Clearing Token**at Position 0.
-7. Set up the**N − 1 Top Rope belayer stations**(none in a 1-player game).
-8. Each player begins with:
- - Level 1
- - 0 XP
- - 10 Time Units
- - Character-specific starting stats and endurance
- - No equipment
- - 0/3 Milestones complete
+<!-- figure:gym-map -->
+
+1. **Lay out the gym.** Place the gym board in the middle of the table. Place the 4 training station tiles on the Training Area.
+2. **Choose climbers.** Each player takes a climber board and matching standee. Place every standee in the **Lobby**. First game? Try the **Iron Lung** or the **Technician** — see [Meet the Climbers](#meet-the-climbers).
+3. **Draw the Milestones.** Every route card that can be a Milestone shows a **Milestone badge**: Beginner, Intermediate, or Expert. Draw three Milestones, each from a **different wall**:
+   - Draw 1 random **Beginner** route from any wall.
+   - Draw 1 random **Intermediate** route from a different wall.
+   - Draw 1 random **Expert** route from the last remaining wall.
+   - Place them face up on the Milestone board. They stay out of the route decks for the whole game.
+4. **Deal the walls.** Shuffle each wall's deck separately.
+   - **Bouldering:** deal 5 routes face up.
+   - **Lead:** deal 5 routes face up.
+   - **Top Rope:** create **belayer stations** — one fewer than the number of players. Deal **2 routes** to each station. *(3 players = 2 stations = 4 Top Rope routes.)*
+5. **Stock the Gear Shop.** Place the 3 Lead access cards (Belay Device, Locking Carabiner, Lead Rope) face up — they are always for sale. Shuffle the other 14 gear cards and deal **3** face up as the market.
+6. **Set the Setter.** Place the Setter's token on **Lead** on the reset track.
+7. **Prepare your tracker.** Each player starts at:
+   - **Level 1** and **0 XP**
+   - **10 Time**
+   - **Endurance** at your climber's starting maximum
+   - **0** training bonuses, no gear, no Milestones
+
+> **Solo game:** Play with **1 belayer station** (the **Auto-Belay**). Everything else is the same. Try to ring the bell in as few rounds as you can.
 
 ---
 
-## OBJECTIVE
+## MEET THE CLIMBERS
 
-**Be the FIRST player to successfully complete all 3 Milestone Routes — and WIN.**
+Every climber plays by the same rules — then breaks exactly one of them. Each climber board shows:
 
-There is no round limit. The game runs until a player completes all three milestones — pace your investments for the long game.
+- **Starting stats** and starting **Endurance**.
+- **Growth** — how much each stat rises every time you level up.
+- **Ability** — what makes this climber special. A **+** is an edge. A **–** is the price.
+- **Complexity** — how hard the climber is to play *well*. It is not how strong they are.
 
----
+> **First game?** Pick the **Iron Lung** and the **Technician**. Their abilities are always on, and there's nothing to remember mid-climb. Try the **Free Solo** once you know the routes.
 
-## CHARACTERS
+### The Iron Lung
+<!-- climber:ironLung -->
 
-There are**5 playable characters**. Each has a unique stat profile, a unique passive ability, and a different optimal strategy.
+> *"Fall seven times. Chalk up eight."*
 
-### The Technician (Precision Specialist)
-A movement artist who reads sequences perfectly and wastes no energy on inefficient beta.
--**Starting stats:**Str 12 / Tech 26 / Focus 18 / Flex 14
--**Starting endurance:**100
--**Growth per level:**+1.5 Str / +4.5 Tech / +2.5 Focus / +2 Flex / +5 endurance
--**Passive — Perfect Beta:**All nerf dice on every climb are negated (treated as 0). All stat requirements are reduced by 5. Climbs cost +1 extra time.
+The first one in and the last one out. The Iron Lung is not the strongest climber at Alpine Indoors, or the smartest. They simply never stop trying — and every fall makes them better.
 
-### The Sprinter (Speed Climber)
-Climbs explosively with dynamic movements. Burns bright but fast.
--**Starting stats:**Str 22 / Tech 14 / Focus 12 / Flex 16
--**Starting endurance:**85
--**Growth per level:**+4 Str / +2 Tech / +1.5 Focus / +2.5 Flex / +3 endurance
--**Passive — Flash Speed:**Time cost of every climb is reduced by 2 (minimum 1), but successful climbs grant only 50% of normal XP. Rolls one extra d6 nerf die applied to Focus on every climb.
+**Ability — Relentless**
+- **+** When you **fall**, earn **50% more XP**.
+- **–** When you **fall**, lose **5 extra Endurance**.
 
-### The Iron Lung (Endurance Athlete)
-Tackles challenges head-on with determination.
--**Starting stats:**Str 16 / Tech 17 / Focus 19 / Flex 14
--**Starting endurance:**120
--**Growth per level:**+2.5 Str / +2.5 Tech / +3 Focus / +2 Flex / +8 endurance
--**Passive — Relentless:**On a failed climb, earn 50% more XP than the base fail XP. Lose an extra 5 endurance on every failure.
+**Plays like:** a grinder. Throw yourself at routes slightly above your level, fall forward, and level up faster than anyone.
+**Watch out for:** the extra Endurance loss. Rest often, or buy **Mental Anchor** to cancel it.
 
-### The Free Solo (Risk Taker)
-Dares the impossible — but only when the stats are bulletproof.
--**Starting stats:**Str 11 / Tech 23 / Focus 20 / Flex 16
--**Starting endurance:**100
--**Growth per level:**+1.5 Str / +4 Tech / +3 Focus / +2.5 Flex / +6 endurance
--**Passive — Life or Die:**Can attempt Lead routes WITHOUT owning the access cards (Belay Device, Locking Carabiner, Lead Rope). (Top Rope is open to everyone now.) All dice roll effects are negated (no luck swing).**Can ONLY attempt climbs where your effective stats — base + training + permanent gear bonuses — already meet every requirement.**
+### The Technician
+<!-- climber:technician -->
 
-### The Route Reader (Problem Solver)
-Studies routes meticulously before attempting. Knowledge is power.
--**Starting stats:**Str 15 / Tech 19 / Focus 22 / Flex 14
--**Starting endurance:**110
--**Growth per level:**+2 Str / +3.5 Tech / +4 Focus / +1.5 Flex / +7 endurance
--**Passive — Versatility:**When you Rest, you gain a**Beta Boost**(+3 to all stats on your next climb). On any climb,**only 3 of your 4 stats need to meet the requirement**to succeed. Once per round you may**redistribute up to 10 stat points**between any two attributes (lasts until end of round).
+> *"Every hold has a right answer."*
 
----
+The Technician climbs like a chess player — slow, silent, and three moves ahead. They waste nothing. But all that care takes time.
 
-## UNDERSTANDING YOUR CHARACTER
+**Ability — Perfect Beta**
+- **+** Ignore every red **Crux die**.
+- **+** Every requirement is **5 lower** for you.
+- **–** Every climb costs **1 extra Time**.
 
-### The Four Core Stats
--**Strength**— Power moves, overhang routes, pulling
--**Technique**— Footwork, body positioning, slab climbing, precision
--**Focus**— Mental control, lead climbing, complex sequences
--**Flexibility**— Reach, high steps, body positioning
+**Plays like:** a sharpshooter. Fewer climbs, but almost all of them sends. Routes that look brutal on paper are often within reach.
+**Watch out for:** low Strength. Strength-heavy overhangs are your weak spot.
 
-### Endurance
-A separate pool from XP/level. Every climb, train, and rest action moves your endurance.
--**Current Endurance:**how much you have right now
--**Max Endurance:**the cap (grows when you level up; gear may also raise it)
+### The Sprinter
+<!-- climber:sprinter -->
 
-### Time Units
-Each round, every player has**10 Time Units**(+1 if you own Approach Shoes). When you run out of time, your turn ends; the round continues with other players.
+> *"Why hang around?"*
 
-| Action | Time cost |
-|---|---|
-| Climb (typical) | 2–8 |
-| Climb (with Sprinter passive) | 1–6 |
-| Train | 2 |
-| Rest | 1 |
-| Buy gear | 1 (free with Approach Shoes?**No**— Approach Shoes adds extra time at round start, not at shop) |
+The Sprinter is all fast-twitch muscle. They flash routes before anyone else finishes chalking up — and occasionally fly off the wall in a blur of limbs.
 
->**Note:**there is no per-round purchase limit on gear. You can buy as many items as you can afford if you have time.
+**Ability — Flash Speed**
+- **+** Every climb costs **2 less Time** (minimum 1).
+- **–** A **send** earns only **half XP**.
+- **–** Roll **1 extra red Crux die** on **Focus** on every climb.
 
----
+**Plays like:** volume. Fit twice as many climbs into a round as anyone else, and use the extra attempts to cover the half XP.
+**Watch out for:** Focus. Your extra Crux die makes Focus-heavy routes risky, and Focus grows slowly for you.
 
-## HOW TO PLAY
+### The Route Reader
+<!-- climber:routeReader -->
 
-The game proceeds in**rounds**. Within a round:
+> *"I've already climbed it. In my head."*
 
-1.**Player turns advance by time-remaining priority.**The player with the most time remaining acts next. Ties resolve by player order. When a player has 0 time left, they're skipped.
-2.**A round ends**when every player has 0 time remaining (or has explicitly chosen End Turn).
-3.**At round end:**
- - The Route Clearing Token rotates: 0 → 1 → 2 → 0
- - All routes in the cleared area are replaced with new random routes (when Top Rope clears, every belayer station refreshes together)
- -**All players return to the Lobby**, freeing every belayer station
- - Each player's time units reset to 10 (+1 if they own Approach Shoes)
- -**Endurance carries over**between rounds (no automatic refill)
- -**Training bonuses PERSIST across rounds**(they accumulate over the whole game)
- - Once-per-round abilities (e.g. Route Reader's stat redistribute) reset
- - Belayer count is**fixed at N − 1**all game — there is no round-based unlock.
+The Route Reader spends more time sitting on the mats, staring at the wall, than climbing it. Then they get up and float.
 
-The game ends as soon as any one player completes their 3rd milestone. There is no round limit.
+**Ability — Versatility**
+- **+** You **send** if **3 of your 4 stats** meet their requirements.
+- **+** When you **Rest**, gain a **Beta Boost**: **+3 to all stats** on your next climb.
+- **+** **Once per round**, before a regular (non-Milestone) climb, you may move **up to 10 points** from one stat to another **for that climb only**.
+
+**Plays like:** a problem solver. Ignore your worst stat, rest before big attempts, and reshape yourself to fit the route.
+**Watch out for:** overthinking. Your edges are flexible, not big. Use them every round.
+
+### The Free Solo
+<!-- climber:freeSolo -->
+
+> *"No rope. No doubt."*
+
+Nobody has ever seen the Free Solo fall. That is because the Free Solo never gets on a route they are not certain of.
+
+**Ability — Life or Die**
+- **+** Climb **Lead** routes **without** the Lead access cards.
+- **+** Ignore **all** dice, green and red. You **never fall**.
+- **–** You may only attempt a route if your stats — **base + training + permanent gear** — already meet **every** requirement.
+
+**Plays like:** a planner. Train hard, then collect guaranteed sends. Every climb is a sure thing — if you're allowed to start it.
+**Watch out for:** a slow start. Until training catches you up, very few routes are open to you. You still need a free belayer station for Top Rope.
 
 ---
 
-## ACTIONS YOU CAN TAKE
+## HOW A ROUND WORKS
 
-On your turn you may take any of these actions, repeatedly, in any order, as long as you have the resources:
+The game is played in **rounds**. There are no fixed turns. Instead, you spend **Time**, and **the climber with the most Time left always acts next**.
 
--**Climb a route**— see [Climbing Routes](#climbing-routes)
--**Attempt a Milestone**— same mechanic as climb, but on the milestone routes (no per-round attempt limit)
--**Train**— see [Training](#training)
--**Buy gear**— see [The Gear Shop](#the-gear-shop)
--**Rest**— see [Resting](#resting)
--**End your turn**— voluntarily forfeit any remaining time units this round
+<!-- figure:round-flow -->
 
----
+1. Every climber starts the round with **10 Time** (11 with Approach Shoes).
+2. The climber with the **most Time left** takes **one action** and pays its Time cost.
+3. Check again: whoever now has the most Time acts next.
+   - **Tied?** If you just acted and are tied for most, you keep going. Otherwise, the tied climber earliest in seat order goes.
+4. A climber with **0 Time** is done for the round.
+5. When **every** climber is at 0 Time, the round ends. See [End of the Round](#end-of-the-round).
 
-## CLIMBING ROUTES
+> **Example:** Three climbers start with 10 Time. Ana (seat 1) climbs a route for 4 Time and drops to 6. Ben and Cal are tied at 10, so Ben (seat 2) goes next and trains for 2 Time, dropping to 8. Cal still has 10 and rests for 1, dropping to 9. Cal still has the most Time, so Cal acts again.
 
-### Bouldering (V0–V12)
-Short, powerful problems without ropes.
--**No equipment required**to attempt. Always accessible to all players.
-- 5 routes available at any time, drawn from the bouldering deck (26 cards total)
-- Time cost: 2–6. Endurance cost: 12–100. XP rewards: 25–100 success / 8–95 fail
-
-### Top Rope (5.6–5.13c)
-Roped climbing with a belay from above.
--**No equipment required**— Top Rope is open to all players.
--**Belayer stations:**the area is split into**N − 1 belayer stations**(N = player count), each holding**2 routes**and admitting**one climber at a time**. You join a belayer by attempting one of its two routes; you may switch to another station's routes only if that station is free. A station another player occupies**blocks both of its routes**for you until the routes clear (or that player returns to the Lobby at round end).
-- 2 routes per station (so 2 × (N − 1) visible total; 23 in deck)
-- Time cost: 3–7. Endurance cost: 15–100. XP rewards: 30–100 success / 10–88 fail
-
-### Lead Climbing (5.8–5.14a)
-The highest-stakes discipline — clip the rope as you ascend.
--**Required equipment:**Belay Device + Locking Carabiner + Lead Rope
--**Single belayer:**only**one climber at a time**may be in Lead Climbing.
-- 5 routes available at a time (23 in deck)
-- Time cost: 4–8. Endurance cost: 25–100. XP rewards: 40–100 success / 15–98 fail
-
-### Free Solo Exception
-The Free Solo character bypasses the Lead access-card requirement — they can attempt Lead routes from turn 1 without owning Belay Device, Locking Carabiner, or Lead Rope. (Top Rope needs no gear from anyone.) The trade-off is severe: see the character description above.
+> **Remember:** Big actions don't skip the line — they just push you to the back of it. A 7-Time climb means everyone else catches up before you act again.
 
 ---
 
-## ROUTE SPECIALTY TAGS
+## YOUR ACTIONS
 
-Every route is**either tagged or untagged**. The four specialty tags are:
+On your turn, take **one** action. You may take the same action as often as you like, as long as you can pay for it.
 
-| Tag | Theme | Routes in deck |
-|---|---|---|
-|**Pinch/Crimp**| Finger-intensive holds | 16 (22%) |
-|**Dynamic**| Explosive, dyno, jump moves | 14 (19%) |
-|**Toe/Heel Hook**| Footwork-driven, slab-style | 9 (13%) |
-|**Roof/Sloper**| Body tension, gymnastic | 8 (11%) |
-|**(untagged)**| Pure stat checks, varied | 25 (35%) |
+| Action | Time | Endurance | Where your standee goes |
+|---|---|---|---|
+| **Climb** a route | On the card (2–8) | On the card | That wall (or belayer station) |
+| **Attempt a Milestone** | On the card | On the card | That Milestone's wall |
+| **Train** | 2 | 8–15 | That training station |
+| **Rest** | 1 | Refill | Rest Area |
+| **Buy Gear** | 1 | — | Gear Shop |
+| **Call It a Day** | All remaining | — | Stays put |
 
-Tags do nothing on their own. They're a hook for**gear cards**— four specialty gear cards each target one tag and grant a specific advantage on tagged routes only. See [The Gear Shop](#the-gear-shop) for details.
+### Climb
+Attempt a face-up route on any wall you can access. See [Climbing a Route](#climbing-a-route).
+- You may attempt each regular route **only once per round**. Place a "Tried" marker on it.
 
->**Strategic note:**when the milestone routes are revealed at game start, check their tags. If two milestones share a tag, the matching specialty card becomes especially valuable.
+### Attempt a Milestone
+Exactly like a climb, but on one of the three Milestone routes.
+- **No once-per-round limit.** Try a Milestone as often as you can pay for it.
+- You still need access to its wall and a free spot (see [The Gym](#the-gym)).
+
+### Train
+Move to a training station and permanently raise one stat by **+5**.
+
+| Station | Stat | Time | Endurance |
+|---|---|---|---|
+| **Campus Board** | Strength | 2 | 15 |
+| **Continuous MoonBoard** | Technique | 2 | 12 |
+| **Grip Board** | Focus | 2 | 10 |
+| **Balance & Core** | Flexibility | 2 | 8 |
+
+- Training bonuses **last the whole game** and stack. Train Strength three times: +15 Strength.
+- Each training station is a **Station**: it holds one climber. While someone stands there, no one else can use it.
+
+### Rest
+Move to the Rest Area and spend **1 Time**. Refill your Endurance to your maximum.
+- Some gear adds a **rest bonus** that lets you rest *above* your maximum.
+- Any number of climbers may rest at once.
+
+### Buy Gear
+Move to the Gear Shop, spend **1 Time**, and pay the card's cost in **XP**. See [The Gear Shop](#the-gear-shop).
+
+### Call It a Day
+Set your Time to 0. You are done for this round.
 
 ---
 
-## THE DICE SYSTEM
+## CLIMBING A ROUTE
 
-### How a climb works
+This is the heart of the game. Every climb follows the same five steps.
 
-1.**Pay costs first**— the time and endurance cost are deducted whether you succeed or fail.
-2.**Look up the route's `rollEffect`**— a list of dice modifiers, e.g. `[{stat: 'technique', modifier: -1}, {stat: 'strength', modifier: +1}]`.
-3.**Roll dice**— number of dice = max(2, number of effects in `rollEffect`). The Sprinter rolls one ADDITIONAL die targeting Focus with a +1 (nerf) modifier on every climb.
-4.**Apply each die to its stat:**
- - Modifier**−1**(buff, green):**subtract**the die value from the stat requirement (easier!)
- - Modifier**+1**(nerf, red):**add**the die value to the stat requirement (harder!)
- - Modifier**0**: no change
-5.**Compute your effective stats:**
- `effective = base stat + training bonus + permanent gear bonus + per-route gear bonus`
-6.**Apply character-ability adjustments**(Route Reader's Beta Boost, Technician's −5 blanket, etc.).
-7.**Compare:**does each effective stat meet or exceed each modified requirement?
- -**Success**if all 4 stats pass (3 of 4 for Route Reader)
- -**Failure**otherwise
-8.**Earn XP**— success XP if you cleared, fail XP if you didn't. Iron Lung adds +50% to fail XP. Sprinter halves success XP.
+<!-- figure:route-card -->
 
-### Character-specific dice rules
--**Technician:**Every nerf die (+1 modifier) is treated as a 0. Every requirement is reduced by 5 (floored at 0).
--**Sprinter:**Adds an extra Focus-nerf die.
--**Free Solo:**Every dice modifier is treated as 0. Effectively no luck swing — but Free Solo can only attempt climbs where they already pass on stats alone.
--**Route Reader:**Only 3 of 4 stats need to pass.
+### Step 1 — Choose
+Pick a face-up route you are allowed to try:
+- You have **access** to its wall (Lead needs the access cards — see [The Gym](#the-gym)).
+- There is **room** for you (Top Rope stations and Lead hold one climber).
+- You haven't **tried** it this round (Milestones are exempt).
+- You can **pay** its Time and Endurance.
 
-### One-attempt-per-round rule (regular routes only)
-You can only attempt each specific regular route once per round. After a success or failure, that route is "marked attempted" and you must wait until next round to retry — or the route may be cleared by then.**Milestone routes are NOT subject to this rule**— you may retry them as many times as you like.
+### Step 2 — Pay and Move
+Pay the route's **Time** and **Endurance**. Move your standee to that wall. Mark the route "Tried."
+
+### Step 3 — Roll
+Roll **one die for each dice icon** on the route card.
+- **Green Beta die:** **subtract** the number from that stat's requirement. *The route just got easier.*
+- **Red Crux die:** **add** the number to that stat's requirement. *The route just got harder.*
+
+No dice icons? Don't roll. It's a pure test of skill.
+
+<!-- figure:dice -->
+
+### Step 4 — Compare
+Add up each of your stats: **base stat + training bonus + gear bonus.** Compare each one to its requirement.
+- **All four meet or beat** their requirement: you **send**!
+- **Any one is short:** you **fall**.
+
+### Step 5 — Score
+- **Send:** gain the route's **Send XP** (the bigger number).
+- **Fall:** gain the route's **Fall XP** (the smaller number).
+- If it was a **Milestone** and you sent it, place one of your Milestone markers on it.
+
+> **Example:** The Sprinter (Strength 22, Technique 14, Focus 12, Flexibility 16) tries **Power Pulley**, a V0 boulder.
+> *Requirements:* Strength 22 · Technique 14 · Focus 10 · Flexibility 12. *Dice:* a green die on Strength and a green die on Technique — plus the Sprinter's extra red die on Focus.
+> **Pay:** 2 Time − 2 (Flash Speed) = **1 Time** (the minimum), and **14 Endurance**.
+> **Roll:** green 4 (Strength), green 2 (Technique), red 5 (Focus).
+> **New requirements:** Strength 22 − 4 = **18**. Technique 14 − 2 = **12**. Focus 10 + 5 = **15**. Flexibility **12**.
+> **Compare:** Strength 22 ✓ · Technique 14 ✓ · Focus 12 ✗ · Flexibility 16 ✓. **Fall!**
+> **Score:** Fall XP is 10, halved by Flash Speed: **5 XP**. A red 2 or lower would have been a send worth 14 XP.
+
+> **Remember:** Your stats are the sum of three things: your **base stat** (from your level), your **training bonus**, and your **gear bonus**. Add them up before you compare.
+
+> **Off the Wall:** Climbers call the hardest move on a route the **crux**, and advice on how to climb it **beta**. Asking for beta is polite. Giving beta nobody asked for is how gym feuds start.
 
 ---
 
-## TRAINING
+## YOUR FIRST ROUND
 
-The training area has 4 stations. Training grants**permanent bonuses**to a stat that**accumulate over the entire game**(not just one round).
+Here is a full round for two new climbers, **Ivy** (Iron Lung) and **Theo** (Technician). The Bouldering wall shows **Beginner's Fortune**, **Open Door**, and **Power Pulley**, among others. Follow along to see the rules working together.
 
-| Station | Boosts | Time | Endurance | Bonus |
+| # | Who | Time left | Action | Why |
 |---|---|---|---|---|
-| Campus Board | Strength | 2 | 15 | +5 |
-| Continuous MoonBoard | Technique | 2 | 12 | +5 |
-| Grip Board | Focus | 2 | 10 | +5 |
-| Balance and Core | Flexibility | 2 | 8 | +5 |
+| 1 | Ivy | 10 → 8 | Climbs **Beginner's Fortune** (15/15/15/10). **Send**, +25 XP. | Ivy's stats already beat every requirement. A free send. |
+| 2 | Theo | 10 → 7 | Climbs **Beginner's Fortune** too. **Send**, +25 XP. | Bouldering has unlimited room. Perfect Beta drops it to 10/10/10/5, but costs Theo 1 extra Time. |
+| 3 | Ivy | 8 → 6 | Trains at the **Campus Board**. Strength 16 → 21. | Open Door needs 18 Strength. Train the gap. |
+| 4 | Theo | 7 → 5 | Trains at the **Grip Board**. Focus +5. | Theo wanted Strength too, but Ivy is still standing at the Campus Board. It's blocked. |
+| 5 | Ivy | 6 → 4 | Climbs **Open Door** (18/14/12/14, no dice). **Send**, +25 XP. | Strength 21 now clears 18. Ivy leaves the Campus Board. |
+| 6 | Theo | 5 → 3 | Trains at the **Campus Board**. Strength 12 → 17. | Ivy left, so the station is free. |
+| 7 | Ivy | 4 → 2 | Climbs **Power Pulley** (22 Strength, green die on Strength). **Send**, +28 XP. | Any green roll drops Strength to 21 or less. Ivy can't miss. |
+| 8 | Theo | 3 → 0 | Climbs **Open Door**. **Send**, +25 XP. | Perfect Beta makes it 13/9/7/9, and Strength 17 now clears it. Theo is done. |
+| 9 | Ivy | 2 → 1 | **Rests.** Endurance 67 → 120. | Endurance doesn't refill between rounds. Rest before the round ends. |
+| 10 | Ivy | 1 → 0 | **Calls it a day.** | Nothing else costs just 1 Time. |
 
--**Capacity:**one player per station per round. If another player took a station this round, you can't use it until next round.
--**Stacking:**training bonuses accumulate game-wide. Train Strength three times → +15 permanent strength training bonus.
--**Per-round persistence:**unlike older versions of this game, training bonuses do**NOT**reset at round end. They stay until game end.
--**Affected by gear:**Old Climbing Journal upgrades every training session from +5 to +6.
+**End of round:** The Setter resets the Lead wall, both standees return to the Lobby, and Time resets to 10. Ivy has **78 XP** and full Endurance. Theo has **50 XP** and 51 Endurance — Theo's first action next round should probably be a rest.
+
+---
+
+## THE GYM
+
+Alpine Indoors has three climbing walls. Each has its own deck, its own feel, and its own rules for getting on.
+
+| Wall | Grades | Face-up routes | Access | Room |
+|---|---|---|---|---|
+| **Bouldering** | V0–V12 | 5 | Anyone | Unlimited |
+| **Top Rope** | 5.6–5.13c | 2 per belayer station | Anyone | 1 climber per station |
+| **Lead** | 5.8–5.14a | 5 | Lead access cards | 1 climber |
+
+### Bouldering — the Cave
+Short, powerful problems over thick mats. No rope, no partner, no waiting. **Anyone** can boulder, and there's always room.
+
+### Top Rope — the Belay Line
+Roped climbs with a partner holding the rope from below. Top Rope is split into **belayer stations** — one fewer than the number of players. Each station holds **2 routes** and **one climber**.
+- To climb a Top Rope route, its station must be **free** (or already yours).
+- If another climber stands at a station, **both** of its routes are blocked for you.
+- A Top Rope **Milestone** may be attempted at **any free station**. You stand at that station afterward.
+
+### Lead — the Big Wall
+The tallest wall, where you clip the rope as you climb. Lead needs all **three access cards**: **Belay Device**, **Locking Carabiner**, and **Lead Rope**. (The Free Solo ignores this.) Only **one** climber can be on Lead at a time.
+
+> **Off the Wall:** On top rope, the rope runs through an anchor *above* you, so a fall is a gentle sit. On lead, you clip the rope in as you climb, so a fall can drop you several meters before the rope catches. That's why Lead needs the most gear — and the most nerve.
+
+> **Off the Wall:** Boulders are graded **V0** (easiest) to **V17**. Rope climbs use the Yosemite Decimal System, from **5.0** up to **5.15**. The letters split each number into four steps: 5.11a is easier than 5.11d.
+
+### Route Tags
+Most routes carry one **tag**. Tags do nothing by themselves — they only matter for gear that names them.
+
+| Tag | Style | Routes |
+|---|---|---|
+| **Pinch/Crimp** | Tiny, finger-ripping holds | 16 |
+| **Dynamic** | Jumps, lunges, and dynos | 14 |
+| **Toe/Heel Hook** | Clever footwork | 9 |
+| **Roof/Sloper** | Steep ceilings and round holds | 8 |
+| *(no tag)* | A straight test of stats | 25 |
+
+> **Coach's tip:** Check your Milestones' tags at setup. If two share a tag, the matching gear card is worth a lot.
+
+---
+
+## XP AND LEVELING UP
+
+You earn **XP** from every climb. XP does two jobs: it **raises your Level**, and it's the **money** you spend on gear.
+
+### Leveling Up
+When your XP reaches the next threshold, you level up immediately:
+- Your stats rise by your climber's **Growth** numbers (round to the nearest whole number).
+- Your maximum Endurance rises by your Endurance growth.
+- Training bonuses and gear stay.
+
+| Level | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Total XP** | 100 | 250 | 450 | 700 | 1,000 | 1,350 | 1,750 | 2,200 | 2,700 | 3,250 | 3,850 | 4,500 | 5,200 | 6,000 |
+
+Level 15 is the maximum.
+
+### Spending XP — Use It or Lose It
+You may only spend XP you've earned **since your current Level began**.
+- Spending XP moves you **backward** on the XP track — but never below the start of your current Level. You never lose a Level.
+- When you level up, any XP left over from the old Level is **locked in**. It counts toward your Level, but you can't spend it anymore.
+
+> **Example:** The Iron Lung is Level 2 (which starts at 100 XP) and has 230 XP. They can spend up to **130 XP**. They buy Mental Anchor for 130 and drop back to 100 XP — still Level 2, but now 150 XP away from Level 3 again.
+
+> **Remember:** Every XP you spend is XP you must earn again to level up. Buy gear when it will pay you back.
 
 ---
 
 ## THE GEAR SHOP
 
-The shop contains**17 cards total**: 3 access cards (always available) and 14 permanent-passive cards (3 visible at any time, refreshed when bought).
+Gear cards are **permanent**. Once you own one, it works for the rest of the game. There are no charges and nothing to discard.
 
-You spend XP from your**current level**to buy gear. This is the XP you've earned since your last level-up — it does NOT carry over when you level up.
+**To buy:** Move to the Gear Shop, spend **1 Time**, and pay the cost in spendable **XP**. You may buy as many cards per round as you can afford.
 
-### Access cards (always visible, gate Lead Climbing)
+- **Lead access cards** (3) are always for sale and must be bought in order: **Belay Device → Locking Carabiner → Lead Rope**.
+- **The market** shows 3 other cards. When you buy one, refill the empty slot from the gear deck.
+- There is only **one copy** of each card. Once someone owns it, no one else can buy it.
+
+Gear comes in three families:
+- **Access** — unlocks Lead climbing.
+- **Specialty** — powerful, but only on routes with a matching **tag**.
+- **Boost & Fix** — always on. More Time, faster recovery, better training, kinder dice.
+
+See the [Gear Card Reference](#gear-card-reference) for every card.
+
+---
+
+## END OF THE ROUND
+
+When every climber has 0 Time, the round ends. Do these steps in order:
+
+1. **The Setter resets a wall.** Discard every face-up route on the wall the Setter's token points to and deal fresh ones. (For Top Rope, redeal every belayer station.) Then move the token to the next wall: **Lead → Top Rope → Bouldering → Lead…**
+2. **Back to the Lobby.** Return every standee to the Lobby. All stations are free again.
+3. **Reset Time** to 10 (11 with Approach Shoes).
+4. **Clear** all "Tried" markers and reset once-per-round abilities.
+
+**What carries over:** Endurance (it does **not** refill on its own), XP, Level, training bonuses, gear, and Milestones.
+
+> **Remember:** Watch the Setter's token. A route you're saving for next round might not survive the night.
+
+---
+
+## RINGING THE BELL
+
+The moment a climber sends their **third Milestone**, the game ends and that climber wins. Ring the bell!
+
+- Milestones can be sent in **any order**.
+- Each climber's Milestones are their own. Sending one doesn't take it from anyone else.
+
+---
+
+## COACH'S CORNER
+
+**General tips**
+1. **Read your Milestones first.** Their walls tell you whether you need Lead access cards. Their tags tell you which specialty gear to watch for.
+2. **If a Milestone is on Lead, start saving early.** The three access cards cost 250 XP together.
+3. **Train your biggest gap, not your lowest stat.** Compare your stats to your Milestone requirements. Fix whatever is furthest behind.
+4. **Levels beat gear.** A level-up raises every stat, forever. Don't spend XP so freely that you never level.
+5. **Watch the belay line.** In a crowded game, Top Rope stations and the Lead wall can get blocked. Plan a backup climb.
+
+**Climber tips**
+
+| Climber | Coach says… |
+|---|---|
+| **Iron Lung** | Buy **Mental Anchor** early — it erases your only drawback. Then fall up the grades. |
+| **Technician** | Try routes that look too hard. Crux dice can't touch you, and −5 everywhere adds up. |
+| **Sprinter** | Climb a lot. Half XP on sends means you need volume. Avoid routes with heavy Focus requirements. |
+| **Route Reader** | Rest before Milestone attempts for the +3 Beta Boost. Stack rest-bonus gear. Use your stat shift every round. |
+| **Free Solo** | Train first, climb later. Every point of training opens new routes, and every route you start is a guaranteed send. |
+
+---
+
+## CLARIFICATIONS AND FAQ
+
+> **Commonly Forgotten Rules**
+> 1. Endurance does **not** refill at the end of the round. Rest.
+> 2. You need enough Endurance to *start* a climb or training session.
+> 3. Everyone returns to the **Lobby** at the end of every round.
+> 4. A station (training, belayer, or Lead) is blocked while someone **stands** there.
+> 5. Each regular route: once per round. Milestones: no limit.
+> 6. Spending XP sets back your progress toward the next Level.
+> 7. Leftover XP is locked in when you level up.
+
+**Can my Endurance go below 0?** No. It stops at 0. But you can't *start* a climb or training session without enough Endurance to pay for it.
+
+**Can I rest when my Endurance is already full?** Yes. It costs 1 Time. For the Route Reader, it still grants the Beta Boost.
+
+**Does the Iron Lung's extra Endurance loss stop me from climbing?** No. You only need enough Endurance to pay the route's printed cost. The extra 5 is lost after the fall (down to 0).
+
+**Do requirements go below 0?** No. A requirement can't drop below 0.
+
+**The Technician ignores Crux dice. Does it still roll them?** Roll them if you like — they simply don't count. Beta dice still help.
+
+**Does the Free Solo need a belayer station for Top Rope?** Yes. Life or Die skips gear, not other climbers.
+
+**Do gear "on specific routes" bonuses count for the Free Solo's check?** No. Only base stats, training, and *permanent* gear bonuses count toward deciding whether the Free Solo may start a climb.
+
+**Can the Route Reader's stat shift be used on a Milestone?** No. It only works on regular routes.
+
+**Does the Beta Boost last more than one climb?** No. It applies to your very next climb (regular or Milestone), then ends.
+
+**I own gear that changes dice. In what order do they apply?** Roll, then apply re-rolls and extra dice, then "treat a die as" effects, then +1 effects. When a card says "your choice," you choose.
+
+**How does Power Tap Belt work with three dice?** Roll your three dice as usual, then roll one extra. You may swap the extra die in for any one of your dice. The die you don't use is discarded. You always end with the same number of dice the route shows.
+
+**Does Climbing Coach make red dice worse?** No. It only adds +1 to green Beta dice, so it always helps.
+
+**Can I attempt a Milestone that someone else already sent?** Yes. Milestones are never "taken."
+
+**What if the gear deck runs out?** Leave the empty market slot empty.
+
+---
+
+## GEAR CARD REFERENCE
+
+### Access cards — always for sale
 
 | Card | Cost | Effect |
 |---|---|---|
-| Belay Device | 70 | Part of the Lead system. −2 Strength on Lead routes |
-| Locking Carabiner | 60 | Part of the Lead system. +5 max endurance (requires Belay Device) |
-| Lead Rope | 120 | Unlocks Lead. −3 Strength on Lead routes (requires Belay Device + Locking Carabiner) |
+| **Belay Device** | 70 | First Lead card. +2 Strength on Lead routes. |
+| **Locking Carabiner** | 60 | Needs Belay Device. +5 maximum Endurance. |
+| **Lead Rope** | 120 | Needs both above. **Unlocks Lead.** +3 Strength on Lead routes. |
 
->**Free Solo**ignores all three — they can attempt Lead from turn 1 without buying any of these. (Top Rope needs no gear from anyone.)
-
-### Specialty cards (target tagged routes)
+### Specialty cards — only on matching tags
 
 | Card | Cost | Tag | Effect |
 |---|---|---|---|
-| Crimp Sequence Decoder | 130 | Pinch/Crimp | On Pinch/Crimp climbs, re-roll one die of your choice |
-| Trick Foot Manual | 110 | Toe/Heel Hook | Toe/Heel Hook climbs cost 1 less time (minimum 1) |
-| Body Tension Belt | 150 | Roof/Sloper | Roof/Sloper climbs cost half endurance (round up) |
-| Power Tap Belt | 120 | Dynamic | On Dynamic climbs, roll an extra die and use the best 2 |
+| **Crimp Sequence Decoder** | 130 | Pinch/Crimp | Re-roll one die of your choice. |
+| **Trick Foot Manual** | 110 | Toe/Heel Hook | These climbs cost 1 less Time (minimum 1). |
+| **Body Tension Belt** | 150 | Roof/Sloper | These climbs cost half Endurance (round up). |
+| **Power Tap Belt** | 120 | Dynamic | Roll 1 extra die, then discard any one die. |
 
-### Boost & Fix cards (permanent passive abilities)
+### Boost & Fix cards — always on
 
 | Card | Cost | Effect |
 |---|---|---|
-| Approach Shoes | 55 | +1 time at round start (every round) |
-| Beta Reading Book | 100 | When you Rest, restore +10 endurance |
-| Pre-Climb Stretching | 90 | When you Rest, restore +12 endurance |
-| Power Spotting | 90 | Successful climbs restore +5 endurance |
-| Confidence Building | 110 | Failed climbs grant +10 bonus XP |
-| Old Climbing Journal | 100 | Training sessions give +6 instead of +5 |
-| Mental Anchor | 130 | Failed climbs no longer cost extra endurance (cancels Iron Lung's −5 fail penalty) |
-| Sequence Memorization | 150 | On every climb, treat one die as a 1 (your choice after rolling) |
-| Climbing Coach | 180 | On milestone climbs, every die is +1 |
-| Mountain Mentor | 200 | On every climb, treat one nerf die as 0 |
+| **Approach Shoes** | 55 | +1 Time at the start of every round. |
+| **Pre-Climb Stretching** | 90 | Rest bonus +12. |
+| **Power Spotting** | 90 | After a send, regain 5 Endurance (up to your maximum). |
+| **Beta Reading Book** | 100 | Rest bonus +10. |
+| **Old Climbing Journal** | 100 | Training gives +6 instead of +5. |
+| **Confidence Building** | 110 | +10 XP whenever you fall. |
+| **Mental Anchor** | 130 | Falls never cost extra Endurance. |
+| **Sequence Memorization** | 150 | On every climb, after rolling, change one die to a 1. |
+| **Climbing Coach** | 180 | On Milestone climbs, add +1 to every green Beta die (maximum 6). |
+| **Mountain Mentor** | 200 | On every climb, ignore one red Crux die. |
 
->**Permanent means permanent.**Every card here applies for the rest of the game once bought. There are no consumables, no charges, no reset markers.
-
->**Stacking:**rest-bonus cards stack — owning both Beta Reading Book (+10) and Pre-Climb Stretching (+12) gives +22 rest endurance.
+Rest bonuses stack. Owning Pre-Climb Stretching and Beta Reading Book lets you rest up to 22 above your maximum.
 
 ---
 
-## RESTING
+## TABLES
 
-When endurance is low, visit the rest area.
+### Climbers at a glance
 
-1. Spend**1 time unit**.
-2. Restore endurance up to your**Max Endurance + Rest Bonus from gear**, where the heal amount equals your full Max Endurance.
-3. The Route Reader gains a**Beta Boost**(+3 to all stats on the next climb) immediately upon resting.
+| Climber | Str | Tech | Focus | Flex | Endurance | Complexity |
+|---|---|---|---|---|---|---|
+| **Iron Lung** | 16 | 17 | 19 | 14 | 120 | Low |
+| **Technician** | 12 | 26 | 18 | 14 | 100 | Low |
+| **Sprinter** | 22 | 14 | 12 | 16 | 85 | Medium |
+| **Route Reader** | 15 | 19 | 22 | 14 | 110 | Medium |
+| **Free Solo** | 11 | 23 | 20 | 16 | 100 | High |
 
-**Worked example**— Iron Lung at Max 120, current 30:
-- No gear: heal up to min(120 + 0, 30 + 120) =**120**(full restore)
-- With Beta Reading Book (+10 rest): heal up to min(120 + 10, 30 + 120) =**130**(above max!)
-- With Pre-Climb Stretching (+12 rest) AND Beta Reading Book (+10): heal up to min(120 + 22, 30 + 120) =**142**
+### Growth per level
 
----
+| Climber | Str | Tech | Focus | Flex | Endurance |
+|---|---|---|---|---|---|
+| **Iron Lung** | +2.5 | +2.5 | +3 | +2 | +8 |
+| **Technician** | +1.5 | +4.5 | +2.5 | +2 | +5 |
+| **Sprinter** | +4 | +2 | +1.5 | +2.5 | +3 |
+| **Route Reader** | +2 | +3.5 | +4 | +1.5 | +7 |
+| **Free Solo** | +1.5 | +4 | +3 | +2.5 | +6 |
 
-## LEVELING UP
+Your stat at any Level = starting stat + growth × (Level − 1), rounded to the nearest whole number.
 
-Earning XP raises your level, which automatically raises your stats and max endurance.
+### Milestone tiers
 
-| Level | Cumulative XP needed | XP for THIS level only |
-|---|---|---|
-| 1 → 2 | 100 | 100 |
-| 2 → 3 | 250 | 150 |
-| 3 → 4 | 450 | 200 |
-| 4 → 5 | 700 | 250 |
-| 5 → 6 | 1,000 | 300 |
-| 6 → 7 | 1,350 | 350 |
-| 7 → 8 | 1,750 | 400 |
-| 8 → 9 | 2,200 | 450 |
-| 9 → 10 | 2,700 | 500 |
-| 10 → 11 | 3,250 | 550 |
-| 11 → 12 | 3,850 | 600 |
-| 12 → 13 | 4,500 | 650 |
-| 13 → 14 | 5,200 | 700 |
-| 14 → 15 | 6,000 | 800 |
-|**Level 15**| — | (cap) |
+| Tier | Bouldering | Top Rope | Lead |
+|---|---|---|---|
+| **Beginner** | V0–V2 | 5.6–5.8 | 5.8 |
+| **Intermediate** | V3–V7 | 5.9–5.11c | 5.9–5.11c |
+| **Expert** | V8–V12 | 5.12a–5.13c | 5.12a–5.14a |
 
-When you level up:
-- All four stats increase by your character's growth rate (e.g. Technician +4.5 Tech)
-- Max endurance increases by your character's endurance growth rate
--**Spendable XP for gear continues to accumulate from total XP**— it does NOT reset to 0 at level-up. Whatever you had before the level-up, you keep.
+A few routes have no Milestone badge (for example, grades 5.10c, 5.11d, 5.12c, 5.13b, and 5.13d). They are never drawn as Milestones.
 
----
-
-## ROUTE CLEARING SYSTEM
-
-The gym is dynamic. Routes get cleared and reset throughout the game.
-
-The**Route Clearing Token**sits at one of three positions:
--**Position 0**→ next round-end clears Lead Climbing (then advances to position 1)
--**Position 1**→ next round-end clears Top Rope (then advances to position 2)
--**Position 2**→ next round-end clears Bouldering (then advances back to position 0)
-
-When Bouldering or Lead is cleared, its 5 visible routes are discarded and 5 new routes are drawn at random from that area's deck. When Top Rope is cleared, **all belayer stations refresh together** — every station's 2 routes are redrawn.
-
-**At every round end, all players return to the Lobby**, which frees all belayer stations for the next round.
-
-**Belayer count is fixed**at N − 1 (N = player count) for the whole game. There is no round-based belayer unlock.
-
----
-
-## SPECIAL RULES
-
-### Section capacity
-- Bouldering: unlimited
-- Top Rope: N − 1 belayer stations, **1 climber per station** (a station is blocked while another player holds it)
-- Lead Climbing: a single belayer — **1 climber at a time**
-- Training equipment: 1 player per station per round (exclusive)
-- Gear Shop: unlimited
-- Rest area: unlimited
-
-### One-attempt-per-round (regular routes)
-You may attempt each specific regular route only once per round. Milestone routes have no such limit — attempt them as often as you like.
-
-### Special abilities are PASSIVE
-Every character's special ability in this version is a**passive**that fires automatically. There are no "activate once per round" buttons. The only "active" character power is Route Reader's once-per-round stat redistribution (and the Beta Boost is also automatic when they rest).
-
-### Free Solo's strict guarantee
-Free Solo's "Life or Die" passive lets it bypass equipment**but**restricts it to climbs where its**effective stats — base plus training plus permanent gear bonuses — meet every requirement.**Per-route gear bonuses (e.g. Crimp Sequence Decoder's re-roll) do NOT count toward the guarantee. You can NEVER attempt a route where any stat is short, no matter how favorable the dice.
-
----
-
-## WINNING THE GAME
-
-**The first player to complete all 3 Milestone Routes wins immediately.**
-
-Milestone routes:
-- Are randomly drawn at game start: **one per difficulty tier AND one per climbing area** (Beginner / Intermediate / Expert, and Bouldering / Top Rope / Lead — every game guarantees mastery of all three areas)
-- Are visible to all players from turn 1
-- Use the same climb mechanics as regular routes
--**Have no per-round attempt limit**— retry as often as you can afford
-- Are tracked individually per player — your milestones complete for YOU only
-- Can be attempted in any order
-
-There is no round limit — the game continues until a player completes all three milestones.
-
-### Climbing area requirements still apply
-A milestone in the Top Rope deck needs no gear, but it still requires a **free belayer station** to attempt (you cannot top-rope without a belayer). A milestone in the Lead deck still requires the full Lead system (Belay Device + Locking Carabiner + Lead Rope, or the Free Solo passive) and the single Lead belayer slot.
-
----
-
-## STRATEGY TIPS
-
-### General
-1.**Read the milestone tags FIRST.**If two milestones share a tag, the matching specialty gear card is your highest-value purchase.
-2.**Buy the Lead access cards EARLY if a milestone is in Lead.**Top Rope is open to everyone, but Lead still requires Belay Device + Locking Carabiner + Lead Rope (Free Solo excepted). If your milestone is in Lead, that path is structurally mandatory. Also watch belayer contention: Top Rope stations and the single Lead slot can be blocked by opponents.
-3.**Train the stat with the LARGEST gap**to your milestone requirements — not the lowest absolute stat. The lowest stat may not be the bottleneck.
-4.**Level up matters more than spendable XP.**Level-ups grant permanent stat increases that compound.
-5.**Watch the Route Clearing Token.**A route you've been planning to attempt may disappear next round.
-
-### Per character
-
-| Character | Key tip |
-|---|---|
-|**Technician**| High Tech + nerf-die immunity → attempt routes that look brutal on paper. The +1 time per climb is the cost; outpace it with success rate. |
-|**Sprinter**| Half XP on success means you LEVEL slowly. Lean into fail-XP routes (Iron Lung's territory!) or pile into Type-D high-risk routes for net XP. |
-|**Iron Lung**| Buy**Mental Anchor**ASAP — it cancels your only downside (extra fail endurance) and your Relentless passive turns failures into XP. |
-|**Free Solo**| You MUST train aggressively before climbing. Until your effective stats clear the easiest route's requirements, you cannot do anything productive. |
-|**Route Reader**| Stack rest-bonus cards (Beta Reading Book + Pre-Climb Stretching). Resting becomes incredibly powerful: +22 endurance, +3 all stats next climb. |
+### Resting, exactly
+Resting gives back Endurance equal to your maximum, but your Endurance can't go higher than **maximum + rest bonus**.
 
 ---
 
 ## QUICK REFERENCE
 
-### Turn priority
-- Player with most time remaining acts next.
-- A round ends when every player is at 0 time.
+**Goal:** First to send all 3 Milestones wins.
 
-### Round-end events (in order)
-1. Token rotates; one area's routes are cleared and refreshed.
-2. All players return to the Lobby (belayer stations freed).
-3. Time units reset (+1 if Approach Shoes owned).
-4. Once-per-round flags reset.
-5. Endurance carries over.
-6. Training bonuses persist.
+**Who acts:** Most Time left acts next. Tied? Whoever just acted continues; otherwise seat order.
 
-### Climbing area access
-| Area | Requires |
-|---|---|
-| Bouldering | Nothing |
-| Top Rope | Nothing (but needs a free belayer station) |
-| Lead Climbing | Belay Device + Locking Carabiner + Lead Rope (OR Free Solo) |
+**Actions**
 
-### Costs at a glance
-| Action | Time | Endurance |
+| Action | Time | Notes |
 |---|---|---|
-| Climb | 2–8 | 12–100 |
-| Train | 2 | 8–15 |
-| Rest | 1 | 0 (gain endurance) |
-| Buy gear | 1 | 0 |
+| Climb | Card | Once per route per round |
+| Milestone | Card | No limit |
+| Train | 2 | +5 to one stat, forever |
+| Rest | 1 | Refill Endurance |
+| Buy Gear | 1 | Pay XP from current Level |
+| Call It a Day | All | Done for the round |
 
-### Game ends when
-- A player completes 3 milestones (there is no round limit).
+**A climb:** Choose → Pay & move → Roll (green −, red +) → Compare (meet or beat all 4) → Score XP.
 
----
+**Access:** Bouldering — anyone. Top Rope — a free belayer station. Lead — 3 access cards (Free Solo exempt) and an empty wall.
 
-## DESIGNER'S NOTES
-
-All-In Ascent captures the progression, strategy, and risk-reward of real rock climbing. The dice introduce uncertainty (just like real climbing!), while character abilities and gear give you ways to manage that uncertainty. The route-tagging system rewards specialization — gear that helps on Crimp routes is genuinely strong on Crimp routes, and weakness on Dynamic routes — so the strategic question becomes "what's the GYM going to throw at me, and what can I prepare for?"
-
-The game celebrates progression. From V0 to V12, every successful send feels rewarding.
-
-**Climb on!**
+**End of round:** Setter resets a wall → everyone to the Lobby → Time back to 10 → clear "Tried" markers. Endurance does **not** refill.
 
 ---
 
-*Game design: Alpine Indoors Development Team*
-*Engine version: 0.6.0 (RuleModifications — open Top Rope with N−1 belayer stations of 2 routes each; Lead drops the Harness and is capped at 1 climber; Harness removed; round-end returns all players to the Lobby)*
-*This rulebook reflects the rules as encoded in `engine/data.js` and `engine/engine.js`. If a mechanic appears here that disagrees with the engine, the engine is authoritative — please file a rulebook update.*
+## DESIGNER'S NOTE
+
+Climbing is mostly falling. Real climbers spend months on a single route, learning a little more each time they peel off the wall. **All-In Ascent** is built around that feeling: every fall earns XP, every session on the boards makes you stronger, and the route that seemed impossible in round one becomes the one you send in round twelve.
+
+The dice are the wall having a good or bad day. Your climber, your training, and your gear are how you stack the odds.
+
+**Climb on.**
+
+---
+
+*Rules version 0.7.0. The digital game ([game.js](game.js)) is the authority on any rule. If something here disagrees with it, please file a rulebook update.*

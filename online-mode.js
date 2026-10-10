@@ -336,10 +336,15 @@
       toast('No legal actions known yet — waiting on server state.', 4000);
       return;
     }
+    // A Route Reader stat shift rides alongside the base climb action: the
+    // menu only lists one suggested shift per route, but the player may pick
+    // any valid one, so we match the plain climb and send the shift
+    // separately for the server to validate.
+    const { shift, ...base } = match;
     const idx = OnlineMode.legalActions.findIndex(a => {
-      if (a.type !== match.type) return false;
-      // Every additional field on `match` must equal the same field on `a`.
-      for (const [k, v] of Object.entries(match)) {
+      if (a.type !== base.type || a.shift) return false;
+      // Every additional field on `base` must equal the same field on `a`.
+      for (const [k, v] of Object.entries(base)) {
         if (k === 'type') continue;
         if (a[k] !== v) return false;
       }
@@ -350,7 +355,7 @@
       toast(`Action not currently legal: ${detail}`, 4000);
       return;
     }
-    send({ type: 'action', actionIndex: idx });
+    send(shift ? { type: 'action', actionIndex: idx, shift } : { type: 'action', actionIndex: idx });
   }
   OnlineMode.sendAction = sendAction;
 

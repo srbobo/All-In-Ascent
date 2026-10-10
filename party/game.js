@@ -29,6 +29,7 @@
 import { createGame } from '../engine/state.js';
 import { getLegalActions, applyAction, isTerminal } from '../engine/engine.js';
 import { CHARACTERS } from '../engine/data.js';
+import { isWellFormedStatShift, canUseStatShift } from '../engine/helpers.js';
 import { createHeuristicAgent } from '../sim/agents/heuristic.js';
 
 const MAX_SEATS = 4;
@@ -183,7 +184,7 @@ export default class GameRoom {
 
       case 'action':
         if (this.phase !== 'in_progress' || !seat) return;
-        await this.handleAction(seat, msg.actionIndex);
+        await this.handleAction(seat, msg.actionIndex, msg.shift);
         break;
 
       case 'leave':
@@ -292,7 +293,7 @@ export default class GameRoom {
   // Action handling
   // ------------------------------------------------------------------
 
-  async handleAction(seat, actionIndex) {
+  async handleAction(seat, actionIndex, shift) {
     const seatIndex = this.seats.indexOf(seat);
     if (seatIndex !== this.state.currentPlayerIndex) {
       // Not their turn — silently ignore.
@@ -302,7 +303,16 @@ export default class GameRoom {
     if (typeof actionIndex !== 'number' || actionIndex < 0 || actionIndex >= legal.length) {
       return;
     }
-    this.advance(legal[actionIndex]);
+    let action = legal[actionIndex];
+    // Route Reader stat shift: attach a client-chosen shift to a legal regular
+    // climb. Anything malformed or not allowed right now is ignored.
+    if (shift !== undefined) {
+      const char = this.state.players[seatIndex].character;
+      const clean = shift && { from: shift.from, to: shift.to, amount: shift.amount };
+      if (action.type !== 'climb' || !isWellFormedStatShift(clean) || !canUseStatShift(char, false)) return;
+      action = { ...action, shift: clean };
+    }
+    this.advance(action);
     await this.maybePlayBot();
   }
 
