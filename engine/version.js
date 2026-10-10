@@ -37,6 +37,12 @@
 //   - Power Tap Belt: generic "roll 1 extra die, discard one" (N dice → roll
 //     N+1, keep N). Was "keep best 2", which dropped dice on 3-die routes.
 //     effectKind extraDieDiscardOne.
+//   - Crimp Sequence Decoder and Sequence Memorization pick the die that
+//     helps: Crimp re-rolls the die furthest on the wrong side of average
+//     (3.5), Memorization sets the highest nerf die to 1. Both used to take
+//     the highest die, which threw away good buff dice. The dice gear (Power
+//     Tap Belt too) now skips dice that apply nothing, including the nerf die
+//     Mountain Mentor is about to negate.
 //   - Route Reader Versatility stat shift is now in the engine: a climb action
 //     may carry shift {from, to, amount ≤ 10}, once per round, regular routes
 //     only. getLegalActions adds one suggested-shift variant per climb when it

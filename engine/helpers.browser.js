@@ -349,20 +349,41 @@ function effectiveDieModifier(char, effect) {
   return effect.modifier;
 }
 
+// Index of the nerf die Mountain Mentor will negate in applyDiceToRequirements
+// (the first die whose effective modifier is +1), or -1 if the card isn't owned
+// or there is no such die. Lets the dice gear leave that die alone.
+function mountainMentorDieIndex(char, effectRollArray, ownedGear) {
+  if (!ownedGear.some(g => g.effectKind === 'negateOneNerfDie')) return -1;
+  return effectRollArray.findIndex(e => effectiveDieModifier(char, e) === 1);
+}
+
+// How much changing a die from `from` to `to` lowers its stat requirement,
+// given the modifier it applies: a buff die (-1) wants a high number, a nerf
+// die (+1) a low one, a die that applies nothing (0) doesn't care.
+function dieChangeGain(mod, from, to) {
+  return mod * (from - to);
+}
+
 // Roll the dice for a climb. `numDice` is max(2, effects.length) — even on a
 // Type-C "Pure Skill" route (empty rollEffect) we roll 2 dice that get
 // ignored, matching game.js behavior. Die i is applied to effectRollArray[i].
 //
-// Gear effects on dice (applied AFTER the initial roll, in this order):
-//   - Crimp Sequence Decoder (rerollOnTag, Pinch/Crimp): re-roll one die. We
-//     re-roll the highest die (deterministic best-effort policy).
+// Gear effects on dice (applied AFTER the initial roll, in this order). The
+// "die of your choice" cards pick for the player: the die whose change most
+// lowers its requirement (a buff die wants a high number, a nerf die a low
+// one). Dice that apply nothing are never picked — dice negated by Free Solo /
+// Technician, dice past the route's effects, and the nerf die Mountain Mentor
+// is about to negate anyway.
+//   - Crimp Sequence Decoder (rerollOnTag, Pinch/Crimp): re-roll one die — the
+//     one furthest on the wrong side of a fresh roll's average (3.5). No
+//     re-roll when every die is already average or better.
 //   - Power Tap Belt (extraDieDiscardOne, Dynamic): roll ONE extra die, then
-//     discard any one die — so an N-die climb rolls N+1 and keeps N. In
-//     practice the extra die is swapped in for whichever die it improves the
-//     most (a buff die wants a high number, a nerf die a low one), or is
-//     itself discarded if it improves nothing.
+//     discard any one die — so an N-die climb rolls N+1 and keeps N. The extra
+//     die is swapped in for whichever die it improves the most, or is itself
+//     discarded if it improves nothing.
 //   - Sequence Memorization (treatOneDieAsValue=1, every climb): treat one die
-//     as 1. Applied as a final pass — replace the highest die with 1.
+//     as 1 — in practice the highest nerf die still in play. Never lowers a
+//     buff die; no change when no die would improve.
 //   - Climbing Coach (milestoneBuffDiceBonus, milestone climbs only): every
 //     BUFF die (modifier -1) is +1, max 6. Nerf dice are untouched.
 //
@@ -380,14 +401,29 @@ function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilest
   const rolls = [];
   for (let i = 0; i < numDice; i++) rolls.push(rng.rollDie(6));
 
-  // Crimp Sequence Decoder: re-roll one die on tagged climbs (re-roll the highest).
+  const mentorIdx = mountainMentorDieIndex(char, effectRollArray, ownedGear);
+  // Modifier die i will actually apply (0 for dice that count for nothing).
+  const dieMod = (i) => (i === mentorIdx ? 0 : effectiveDieModifier(char, effectRollArray[i]));
+  // Index of the die whose change to `to` gains the most, or -1 if no change helps.
+  const bestDieToChange = (to) => {
+    let bestIdx = -1;
+    let bestGain = 0;
+    for (let i = 0; i < rolls.length; i++) {
+      const gain = dieChangeGain(dieMod(i), rolls[i], to);
+      if (gain > bestGain) { bestGain = gain; bestIdx = i; }
+    }
+    return bestIdx;
+  };
+
+  // Crimp Sequence Decoder: on tagged climbs, re-roll the die a fresh roll
+  // (average 3.5) is most likely to improve.
   for (const gear of ownedGear) {
     if (gear.effectKind === 'rerollOnTag' && onTag(gear)) {
-      let maxIdx = 0;
-      for (let i = 1; i < rolls.length; i++) if (rolls[i] > rolls[maxIdx]) maxIdx = i;
-      const from = rolls[maxIdx];
-      rolls[maxIdx] = rng.rollDie(6);
-      if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: maxIdx, from, to: rolls[maxIdx] });
+      const idx = bestDieToChange(3.5);
+      if (idx === -1) continue;
+      const from = rolls[idx];
+      rolls[idx] = rng.rollDie(6);
+      if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: idx, from, to: rolls[idx] });
     }
   }
 
@@ -395,15 +431,7 @@ function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilest
   for (const gear of ownedGear) {
     if (gear.effectKind === 'extraDieDiscardOne' && onTag(gear)) {
       const extra = rng.rollDie(6);
-      let bestIdx = -1;
-      let bestGain = 0;
-      for (let i = 0; i < effectRollArray.length; i++) {
-        const mod = effectiveDieModifier(char, effectRollArray[i]);
-        // Buff die (mod -1): a higher die subtracts more. Nerf die (mod +1):
-        // a lower die adds less.
-        const gain = mod === -1 ? extra - rolls[i] : mod === 1 ? rolls[i] - extra : 0;
-        if (gain > bestGain) { bestGain = gain; bestIdx = i; }
-      }
+      const bestIdx = bestDieToChange(extra);
       if (trace) {
         trace.push({ gear: gear.name, effectKind: gear.effectKind, die: bestIdx, extra,
           from: bestIdx === -1 ? extra : rolls[bestIdx], to: extra });
@@ -412,16 +440,14 @@ function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilest
     }
   }
 
-  // Sequence Memorization: every climb, treat one die as 1 (replace highest die with 1)
+  // Sequence Memorization: every climb, treat the die that gains most as `value` (1).
   for (const gear of ownedGear) {
     if (gear.effectKind === 'treatOneDieAsValue') {
       const target = gear.value || 1;
-      let maxIdx = 0;
-      for (let i = 1; i < rolls.length; i++) if (rolls[i] > rolls[maxIdx]) maxIdx = i;
-      if (rolls[maxIdx] > target) {
-        if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: maxIdx, from: rolls[maxIdx], to: target });
-        rolls[maxIdx] = target;
-      }
+      const idx = bestDieToChange(target);
+      if (idx === -1) continue;
+      if (trace) trace.push({ gear: gear.name, effectKind: gear.effectKind, die: idx, from: rolls[idx], to: target });
+      rolls[idx] = target;
     }
   }
 

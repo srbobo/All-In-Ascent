@@ -7,12 +7,13 @@
 //   - Locking Carabiner max endurance survives level-up
 //   - Climbing Coach +1 on buff dice only
 //   - Power Tap Belt: roll N+1, keep N
+//   - Crimp Sequence Decoder / Sequence Memorization pick the die that helps
 //   - Route Reader stat shift in the engine
 
 import { createGame, belayerCountFor, regularRoutePool } from './state.js';
 import { getLegalActions, applyAction } from './engine.js';
 import {
-  rollClimbDice, applyLevelUpIfNeeded, getGearMaxEnduranceBonus,
+  rollClimbDice, applyDiceToRequirements, applyLevelUpIfNeeded, getGearMaxEnduranceBonus,
   bestRouteReaderShift, isWellFormedStatShift,
 } from './helpers.js';
 import { ROUTES } from './data.js';
@@ -161,6 +162,72 @@ check('belayerCountFor(4) = 3', belayerCountFor(4) === 3);
   const tech = charBase('technician', ['Power Tap Belt']);
   const f = rollClimbDice(queuedRng([2, 5, 6, 1]), effects, tech, dynamic);
   check('Power Tap: Technician never swaps into an ignored nerf die', f[1] === 5, JSON.stringify(f));
+
+  const nerfs = [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }];
+  const mentorBelt = charBase('ironLung', ['Power Tap Belt', 'Mountain Mentor']);
+  const g = rollClimbDice(queuedRng([6, 3, 1]), nerfs, mentorBelt, dynamic);
+  check('Power Tap: skips the nerf die Mountain Mentor negates', g[0] === 6 && g[1] === 1, JSON.stringify(g));
+}
+
+// =============================================================================
+// CRIMP SEQUENCE DECODER — RE-ROLL THE DIE MOST LIKELY TO IMPROVE
+// =============================================================================
+{
+  const effects = [{ stat: 'technique', modifier: -1 }, { stat: 'strength', modifier: 1 }];
+  const crimp = { tag: 'Pinch/Crimp' };
+  const decoder = charBase('ironLung', ['Crimp Sequence Decoder']);
+
+  const a = rollClimbDice(queuedRng([6, 5, 2]), effects, decoder, crimp);
+  check('Crimp: never re-rolls a high buff die', a[0] === 6 && a[1] === 2, JSON.stringify(a));
+
+  const b = rollClimbDice(queuedRng([1, 4, 5]), effects, decoder, crimp);
+  check('Crimp: re-rolls a low buff die over a slightly-high nerf die', b[0] === 5 && b[1] === 4, JSON.stringify(b));
+
+  // Throws if a third die were drawn: no die is worse than average, so no re-roll.
+  const c = rollClimbDice(queuedRng([5, 2]), effects, decoder, crimp);
+  check('Crimp: no re-roll when every die is average or better', c[0] === 5 && c[1] === 2, JSON.stringify(c));
+
+  const d = rollClimbDice(queuedRng([1, 6]), effects, decoder, { tag: 'Dynamic' });
+  check('Crimp: no re-roll off-tag', d[0] === 1 && d[1] === 6, JSON.stringify(d));
+
+  const tech = charBase('technician', ['Crimp Sequence Decoder']);
+  const e = rollClimbDice(queuedRng([3, 6, 5]), effects, tech, crimp);
+  check('Crimp: Technician never re-rolls an ignored nerf die', e[0] === 5 && e[1] === 6, JSON.stringify(e));
+
+  const trace = [];
+  rollClimbDice(queuedRng([1, 4, 5]), effects, decoder, crimp, false, trace);
+  check('Crimp: trace names the re-rolled die',
+    trace.length === 1 && trace[0].die === 0 && trace[0].from === 1 && trace[0].to === 5, JSON.stringify(trace));
+}
+
+// =============================================================================
+// SEQUENCE MEMORIZATION — TREAT THE WORST NERF DIE AS 1
+// =============================================================================
+{
+  const memo = charBase('ironLung', ['Sequence Memorization']);
+  const mixed = [
+    { stat: 'technique', modifier: -1 }, { stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 },
+  ];
+  const a = rollClimbDice(queuedRng([6, 4, 5]), mixed, memo, { tag: null });
+  check('Memorization: sets the highest nerf die to 1, not a high buff die',
+    a[0] === 6 && a[1] === 4 && a[2] === 1, JSON.stringify(a));
+
+  const buffs = [{ stat: 'technique', modifier: -1 }, { stat: 'focus', modifier: -1 }];
+  const b = rollClimbDice(queuedRng([5, 6]), buffs, memo, { tag: null });
+  check('Memorization: never lowers a buff die', b[0] === 5 && b[1] === 6, JSON.stringify(b));
+
+  const solo = charBase('freeSolo', ['Sequence Memorization']);
+  const c = rollClimbDice(queuedRng([6, 6, 6]), mixed, solo, { tag: null });
+  check('Memorization: no change when Free Solo ignores every die', c.every(d => d === 6), JSON.stringify(c));
+
+  const nerfs = [{ stat: 'strength', modifier: 1 }, { stat: 'focus', modifier: 1 }];
+  const route = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
+  const mentor = charBase('ironLung', ['Sequence Memorization', 'Mountain Mentor']);
+  const d = rollClimbDice(queuedRng([6, 4]), nerfs, mentor, { tag: null });
+  check('Memorization + Mountain Mentor: leaves the die Mentor negates', d[0] === 6 && d[1] === 1, JSON.stringify(d));
+  const { requirements } = applyDiceToRequirements(mentor, route, nerfs, d);
+  check('Memorization + Mountain Mentor: both nerf dice neutralised',
+    requirements.strength === 20 && requirements.focus === 21, JSON.stringify(requirements));
 }
 
 // =============================================================================
