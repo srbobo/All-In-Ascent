@@ -45,6 +45,12 @@ export async function playGame({ chars, seed, agents, maxRounds = 200, params = 
   const msRound = chars.map(() => ({}));
   const actionCounts = chars.map(() => ({}));
   const timeSpent = chars.map(() => ({})); // Time per action type, per seat
+  // Per-seat play detail for strategy analysis (analysis/strategy-diversity.mjs).
+  const detail = chars.map(() => ({
+    wallClimbs: { bouldering: 0, topRope: 0, leadClimbing: 0 }, sends: 0, falls: 0,
+    milestoneOrder: [], gearOrder: [], trainStats: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
+    abilities: {}, gritClaimed: 0, decisions: 0, closeCalls: 0, nearTypes: {},
+  }));
   let decisions = 0;
   const t0 = performance.now();
   let term = isTerminal(state);
@@ -58,7 +64,30 @@ export async function playGame({ chars, seed, agents, maxRounds = 200, params = 
     actionCounts[seat][action.type] = (actionCounts[seat][action.type] || 0) + 1;
     const before = state.players[seat].character.timeRemaining;
     const roundBefore = state.round;
-    ({ state } = applyAction(state, action));
+    let events;
+    ({ state, events } = applyAction(state, action));
+    const d = detail[seat];
+    d.decisions++;
+    if (pick && pick.decision) {
+      // A close call: a different productive action came within 1 Time.
+      if (pick.decision.nearTypes.some(t => t === 'climb' || t === 'train' || t === 'milestone' || t === 'buyGear')) d.closeCalls++;
+      for (const t of pick.decision.nearTypes) d.nearTypes[t] = (d.nearTypes[t] || 0) + 1;
+    }
+    for (const e of events) {
+      const p = e.payload || {};
+      if (e.type === 'climb_resolved') {
+        if (!p.isMilestone) d.wallClimbs[p.area]++;
+        if (p.success) d.sends++; else d.falls++;
+        if (p.isMilestone && p.success) d.milestoneOrder.push(p.difficulty);
+        if (p.gritGained) d.gritClaimed += p.gritGained;
+      } else if (e.type === 'ability_activated') {
+        d.abilities[p.ability] = (d.abilities[p.ability] || 0) + 1;
+      } else if (e.type === 'gear_purchased') {
+        d.gearOrder.push(p.gearName);
+      } else if (e.type === 'train_action') {
+        d.trainStats[p.stat]++;
+      }
+    }
     const after = state.players[seat].character.timeRemaining;
     const spent = state.round !== roundBefore || state.gameEnded ? before - (state.gameEnded ? after : 0) : before - after;
     timeSpent[seat][action.type] = (timeSpent[seat][action.type] || 0) + spent;
@@ -81,6 +110,7 @@ export async function playGame({ chars, seed, agents, maxRounds = 200, params = 
     expertRoute: state.milestoneRoutes.expert.route.name,
     actions: actionCounts,
     timeSpent,
+    detail,
     levels: state.players.map(p => p.character.level),
     gear: state.players.map(p => [...p.character.equipment]),
     stalls: bots.map(b => b.stalls || 0),

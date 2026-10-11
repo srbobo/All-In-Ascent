@@ -32,6 +32,7 @@ import {
   applyLevelUpIfNeeded, buildEffectRollArray, calculateGearBonuses, checkAreaAccess,
   computeRestRecovery, getEffectiveClimbEnduranceCost, getEffectiveClimbTimeCost,
   getFailureEnduranceExtra, getSpendableXp, trainingCap, trainingSpec,
+  usesGrit, gearPrice, abilityParam, passRule,
 } from '../../engine/helpers.js';
 
 export const STATS = ['strength', 'technique', 'focus', 'flexibility'];
@@ -51,6 +52,11 @@ export const DEFAULT_PARAMS = {
   minXpTime: 3,        // Time to earn ANY XP (one climb), however little is needed
   gearWeight: 1,       // multiplier on the value of saving XP for market gear
   levelsAhead: 4,      // how many level-ups ahead the level credit looks
+  gritTime: 2,        // Grit economy: Time to earn one Grit by climbing
+  partnerFactor: 0.6,  // Grit cost per session with Training Partner (≈ one free a round)
+  capWeight: 1,        // multiplier on the Time to raise a training cap by levelling
+  neverIdle: true,     // never idle (empty Rest / Call It a Day) while anything else is legal:
+                       // cuts Grit-economy games ~45 → ~25 rounds, standard ones slightly too
 };
 
 // =============================================================================
@@ -134,19 +140,24 @@ export function milestoneModel(char, tier, m) {
     ? { strength: 0, technique: 0, focus: 0, flexibility: 0 }
     : calculateGearBonuses(char, route, m.area, {});
   const isRR = char.key === 'routeReader';
+  // A Route Reader plans to Rest first, so its attempt carries the Beta Boost.
+  const boost = isRR ? (abilityParam(char, 'betaBoost') ?? 3) : 0;
+  const rule = passRule(isRR ? { ...char, betaBoostActive: true } : char, true);
+  const adj = char.key === 'technician' ? abilityParam(char, 'reqReduction') : 0;
   return {
     tier,
     req: STATS.map(k => route[k]),
-    adj: char.key === 'technician' ? 5 : 0,
-    bonus: STATS.map(k => routeBonus[k] + (isRR ? 3 : 0)), // RR plans to Rest (Beta Boost) first
+    adj,
+    bonus: STATS.map(k => routeBonus[k] + boost),
     dists,
-    needed: isRR ? 3 : 4,
-    time: getEffectiveClimbTimeCost(char, route.time, route) + (isRR ? 1 : 0),
+    needed: rule.needed,
+    nearMiss: rule.nearMiss,
+    time: getEffectiveClimbTimeCost(char, route.time, route, true) + (isRR ? 1 : 0),
     endurance: getEffectiveClimbEnduranceCost(char, route, route.endurance),
     failExtra: getFailureEnduranceExtra(char),
     // Expected requirement per stat (dice at their mean) — the deficit
     // surrogate that steers training while P(send) is still flat at 0.
-    expReq: STATS.map((k, s) => route[k] - (char.key === 'technician' ? 5 : 0) + meanOf(dists[s])),
+    expReq: STATS.map((k, s) => route[k] - adj + meanOf(dists[s])),
   };
 }
 
@@ -175,7 +186,9 @@ export function planPSend(m, x) {
   const q3 = passProb(m, 3, x[3] + m.bonus[3]);
   const all = q0 * q1 * q2 * q3;
   if (m.needed === 4) return all;
-  return all + (1 - q0) * q1 * q2 * q3 + q0 * (1 - q1) * q2 * q3 + q0 * q1 * (1 - q2) * q3 + q0 * q1 * q2 * (1 - q3);
+  // 3 of 4: one stat may fail — by at most nearMiss, when a variant sets one.
+  const near = (s, q) => (Number.isFinite(m.nearMiss) ? passProb(m, s, x[s] + m.bonus[s] + m.nearMiss) : 1) - q;
+  return all + near(0, q0) * q1 * q2 * q3 + q0 * near(1, q1) * q2 * q3 + q0 * q1 * near(2, q2) * q3 + q0 * q1 * q2 * near(3, q3);
 }
 
 function deficit(m, x) {
@@ -194,6 +207,17 @@ function deficit(m, x) {
 // Returns { time, endurance } (endurance = the plan's total Endurance use).
 function planCost(models, x0, train, R, params) {
   const { specs, bonus0, cap, perRound } = train;
+  // Grit economy: sessions use Grit on hand first; each one after that
+  // also costs the climbing Time to earn its Grit.
+  const gritCost = train.gritCost || 0;
+  let gritHave = train.gritHave || 0;
+  let gritTime = 0;
+  let capTime = 0;
+  const gritExtra = () => (gritHave >= gritCost ? 0 : (gritCost - gritHave) * params.gritTime);
+  // Training cap: a session past the cap needs the level-ups that raise it,
+  // priced at train.beyondCapTime each. (Stopping the plan AT the cap made a
+  // higher cap look costlier than a lower one, so the bot avoided levelling.)
+  const beyond = (s) => (tb[s] + specs[s].gain > cap ? train.beyondCapTime : 0);
   // With a per-round session limit, a session also costs its share of the
   // rounds the limit forces you to wait through.
   const effTime = specs.map(t => (perRound ? Math.max(t.time, 10 / perRound) : t.time));
@@ -222,10 +246,10 @@ function planCost(models, x0, train, R, params) {
     let defGain = 0;
     const def0 = models.reduce((a, m) => a + deficit(m, x), 0);
     for (let s = 0; s < 4; s++) {
-      if (tb[s] + specs[s].gain > cap) continue; // capped at this Level
+      if (beyond(s) === Infinity) continue; // cap can never be raised
       x[s] += specs[s].gain;
       const next = attempts(x);
-      const g = cur.cost - next.cost - trainCost[s];
+      const g = cur.cost - next.cost - trainCost[s] - gritExtra() - beyond(s);
       if (g > bestGain) { bestGain = g; best = s; bestNext = next; }
       const dg = def0 - models.reduce((a, m) => a + deficit(m, x), 0);
       if (dg > defGain) { defGain = dg; defBest = s; }
@@ -241,14 +265,17 @@ function planCost(models, x0, train, R, params) {
       bestNext = attempts(x);
       x[best] -= specs[best].gain;
     }
+    capTime += beyond(best);
     x[best] += specs[best].gain;
     tb[best] += specs[best].gain;
+    gritTime += gritExtra();
+    gritHave = Math.max(0, gritHave - gritCost);
     trainTime += effTime[best];
     trainEnd += specs[best].endurance;
     cur = bestNext;
   }
   return {
-    time: params.trainWeight * trainTime + cur.time,
+    time: params.trainWeight * trainTime + gritTime + capTime + cur.time,
     endurance: trainEnd + cur.end,
   };
 }
@@ -274,18 +301,42 @@ function gameCtx(game) {
 function coreEstimate(char, game, params, cache) {
   const { milestoneRoutes, rules } = game;
   const pending = TIERS.filter(t => !char.milestonesCompleted[t]);
-  if (!pending.length) return { plan: 0, access: 0, endurance: 0, earmarked: 0, R: 1 };
+  if (!pending.length) return { plan: 0, access: 0, endurance: 0, earmarked: 0, gritReserved: 0, R: 1 };
   const x = permanentStats(char);
   const train = {
     specs: TRAINING_AREAS_BY_STAT.map(t => trainingSpec(rules, t, char)),
     bonus0: STATS.map(k => char.trainingBonuses[k]),
     cap: trainingCap(rules, char),
     perRound: rules && rules.trainPerRound ? rules.trainPerRound : null,
+    beyondCapTime: 0,
   };
+  if (Number.isFinite(train.cap)) {
+    // Each level raises the cap by trainCapPerLevel in every stat; a session
+    // past the cap costs the Time to earn that share of a level's XP.
+    const perLevel = rules.trainCapPerLevel || 0;
+    const row = XP_TABLE.find(r => r.level === char.level);
+    const next = XP_TABLE.find(r => r.level === char.level + 1);
+    train.beyondCapTime = perLevel > 0 && row && next
+      ? params.capWeight * ((next.cumulative - row.cumulative) / params.xpRate) / Math.max(1, perLevel / train.specs[0].gain)
+      : Infinity;
+  }
+  // Lead access shortfall (Free Solo needs none). In the Grit economy the
+  // cards cost Grit, so Grit they need aren't available for training.
+  const Grit = usesGrit(rules);
+  const { access, earmarked, gritReserved } = needsLeadAccess(char, pending, milestoneRoutes)
+    ? (Grit ? accessEstimateGrit(char, rules, params) : accessEstimate(char, params))
+    : { access: 0, earmarked: 0, gritReserved: 0 };
+  if (Grit) {
+    const partner = char.equipment.some(n => GEAR_SHOP.find(g => g.name === n)?.effectKind === 'freeTrainingSession');
+    const freeTraining = !!(rules.characters && rules.characters[char.key] && rules.characters[char.key].freeTraining);
+    train.gritCost = freeTraining ? 0 : (rules.grit.trainCost ?? 1) * (partner ? params.partnerFactor : 1);
+    train.gritHave = Math.min(80, Math.max(0, (char.grit || 0) - gritReserved));
+  }
   const rest = computeRestRecovery({ ...char, currentEndurance: 0 });
   const R = Math.max(1, rest.newEndurance + rest.restBonusApplied / 2);
   const key = `${char.key}|${x.join(',')}|${train.bonus0.join(',')}|${train.cap}|` +
-    `${JSON.stringify(train.specs)}|${train.perRound}|${R}|${char.equipment.join(',')}|${pending.join(',')}`;
+    `${JSON.stringify(train.specs)}|${train.perRound}|${train.gritCost}|${train.gritHave}|${train.beyondCapTime}|${R}|` +
+    `${char.equipment.join(',')}|${pending.join(',')}`;
   let plan = cache && cache.get(key);
   if (!plan) {
     const models = pending.map(t => milestoneModel(char, t, milestoneRoutes[t]));
@@ -295,14 +346,20 @@ function coreEstimate(char, game, params, cache) {
       cache.set(key, plan);
     }
   }
-  // Lead access shortfall (Free Solo needs none).
-  const { access, earmarked } = needsLeadAccess(char, pending, milestoneRoutes)
-    ? accessEstimate(char, params)
-    : { access: 0, earmarked: 0 };
   // Endurance already in the tank covers part of the plan's need.
   const credit = Math.min(char.currentEndurance, plan.endurance);
   const endurance = -params.enduranceWeight * credit / R;
-  return { plan: plan.time + params.enduranceWeight * plan.endurance / R, access, endurance, earmarked, R };
+  return { plan: plan.time + params.enduranceWeight * plan.endurance / R, access, endurance, earmarked, gritReserved, R };
+}
+
+// Lead access in the Grit economy: cards cost Grit, earned at gritTime
+// each. No level-up cliff and nothing earmarked from XP (XP is never spent).
+function accessEstimateGrit(char, rules, params) {
+  const missing = ACCESS.filter(n => !char.equipment.includes(n)).map(n => GEAR_SHOP.find(g => g.name === n));
+  const need = missing.reduce((a, g) => a + gearPrice(rules, char, g), 0);
+  const short = Math.max(0, need - (char.grit || 0));
+  const earnTime = short > 0 ? Math.max(params.minXpTime, short * params.gritTime) : 0;
+  return { access: missing.length + earnTime, earmarked: 0, gritReserved: Math.min(need, char.grit || 0) };
 }
 
 function needsLeadAccess(char, pending, milestoneRoutes) {
@@ -399,7 +456,8 @@ export function explainTimeToFinish(char, gameIn, params = DEFAULT_PARAMS, cache
   // what makes XP worth saving for market gear; without it the bot only ever
   // valued XP for levels and Lead access.
   if (game.market && params.gearWeight > 0) {
-    const free = getSpendableXp(char) - core.earmarked;
+    const gritMode = usesGrit(game.rules);
+    const free = gritMode ? (char.grit || 0) - core.gritReserved : getSpendableXp(char) - core.earmarked;
     const next = XP_TABLE.find(r => r.level === char.level + 1);
     const room = next ? next.cumulative - char.xp : Infinity;
     let best = 0;
@@ -414,9 +472,15 @@ export function explainTimeToFinish(char, gameIn, params = DEFAULT_PARAMS, cache
       // XP still to earn before the purchase. If earning it would level the
       // climber up first (wiping saved XP), the whole cost comes after that
       // level-up — the same cliff accessEstimate prices for Lead access.
-      const shortfall = Math.max(0, g.cost - free);
-      const toEarn = shortfall === 0 ? 0 : (shortfall < room ? shortfall : room + g.cost);
-      const buyTime = 1 + (toEarn > 0 ? Math.max(params.minXpTime, toEarn / params.xpRate) : 0);
+      let buyTime;
+      if (gritMode) {
+        const short = Math.max(0, gearPrice(game.rules, char, g) - free);
+        buyTime = 1 + (short > 0 ? Math.max(params.minXpTime, short * params.gritTime) : 0);
+      } else {
+        const shortfall = Math.max(0, g.cost - free);
+        const toEarn = shortfall === 0 ? 0 : (shortfall < room ? shortfall : room + g.cost);
+        buyTime = 1 + (toEarn > 0 ? Math.max(params.minXpTime, toEarn / params.xpRate) : 0);
+      }
       best = Math.max(best, value - buyTime);
     }
     parts.gearCredit = params.gearWeight * best;

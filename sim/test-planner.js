@@ -33,13 +33,19 @@ const zero = () => ({ strength: 0, technique: 0, focus: 0, flexibility: 0 });
 {
   const rng = createRng(17);
   const gearSets = [[], ['Climbing Coach'], ['Belay Device', 'Locking Carabiner', 'Lead Rope']];
+  // Ability tuning (character balance experiments) must stay exact too.
+  const TUNES = {
+    routeReader: [null, { nearMiss: 5 }, { milestonePasses: 4 }, { betaBoost: 2, nearMiss: 3 }],
+    technician: [null, { reqReduction: 7, extraTime: 0 }],
+    sprinter: [null, { focusCrux: false }],
+  };
   let cases = 0;
   let worst = 0;
   let worstCase = '';
   for (const key of CHARS) {
     for (const area of ['bouldering', 'topRope', 'leadClimbing']) {
       for (const route of ROUTES[area]) {
-        for (const gear of gearSets) {
+        for (const gear of gearSets) for (const tune of (TUNES[key] || [null])) {
           for (let k = 0; k < 3; k++) {
             // Stats scattered around the requirements.
             const stats = Object.fromEntries(STATS.map(s => [s, route[s] + Math.floor(rng.next() * 25) - 12]));
@@ -49,6 +55,7 @@ const zero = () => ({ strength: 0, technique: 0, focus: 0, flexibility: 0 });
               // The model plans a Route Reader's attempts after a Rest (Beta Boost).
               betaBoostActive: key === 'routeReader', abilityUsed: false,
               milestonesCompleted: { beginner: false, intermediate: false, expert: false },
+              ...(tune ? { abilityParams: tune } : {}),
             };
             const m = { area, route };
             const exact = climbSendProbability(char, route, area, {}, { isMilestone: true }).pSend;

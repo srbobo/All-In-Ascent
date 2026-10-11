@@ -23,7 +23,7 @@
 import { readFileSync } from 'node:fs';
 import { applyAction, getLegalActions } from '../../engine/engine.js';
 import { observe } from '../../engine/observe.js';
-import { applyLevelUpIfNeeded } from '../../engine/helpers.js';
+import { applyLevelUpIfNeeded, claimClimbGrit, usesGrit } from '../../engine/helpers.js';
 import { createRng } from '../../engine/rng.js';
 import { DEFAULT_PARAMS, timeToFinish } from './planner-model.js';
 
@@ -38,11 +38,12 @@ export function loadTunedWeights() {
   return tunedWeights;
 }
 
-// Stall guard. timeToFinish is an estimate, and a one-step lookahead over an
+// Idle guard. timeToFinish is an estimate, and a one-step lookahead over an
 // estimate can find spots where every useful action looks slightly worse than
-// idling — and then idles forever. If the estimate has not improved over
-// STALL_ROUNDS rounds, idling is forbidden for the round (when anything else
-// is legal), which walks the bot out of the trap.
+// idling — and then idles forever. By default (params.neverIdle) idling is
+// never chosen while anything else is legal; with neverIdle off, it is
+// forbidden once the estimate has not improved over STALL_ROUNDS rounds.
+// `stalls` counts rounds where that no-progress condition held.
 const STALL_ROUNDS = 2;
 
 export function createPlannerAgent({ params = null, tuned = false, epsilon = 0, seed = 1 } = {}) {
@@ -59,10 +60,12 @@ export function createPlannerAgent({ params = null, tuned = false, epsilon = 0, 
         lastRound = state.round;
         const me = state.players[state.currentPlayerIndex].character;
         const ctx = { milestoneRoutes: state.milestoneRoutes, rules: state.rules || null, market: state.availableGear.map(g => g.name) };
-        history.push(estimate(me, ctx, resolveParams(me, params, tuned), cache));
+        const p0 = resolveParams(me, params, tuned);
+        history.push(estimate(me, ctx, p0, cache));
         const then = history[history.length - 1 - STALL_ROUNDS];
-        forbidIdle = then !== undefined && history[history.length - 1] > then - 0.01;
-        if (forbidIdle) this.stalls++;
+        const stalled = then !== undefined && history[history.length - 1] > then - 0.01;
+        if (stalled) this.stalls++;
+        forbidIdle = p0.neverIdle || stalled;
       }
       return choosePlannerAction(state, legalActions || getLegalActions(state), {
         params, tuned, epsilon, rng, cache, forbidIdle,
@@ -98,6 +101,7 @@ export function choosePlannerAction(state, legalActions, {
   const ttf = (char, g = here) => timeToFinish(char, g, p, cache);
 
   const hasNonIdle = obs.actions.some(a => a.type !== 'endTurn' && a.type !== 'rest');
+  const scored = []; // every option considered, for the decision-tension report
   let best = null;
   for (const a of obs.actions) {
     const action = legalActions[a.i];
@@ -107,8 +111,8 @@ export function choosePlannerAction(state, legalActions, {
       case 'climb':
       case 'milestone': {
         spent = a.time;
-        const send = climbOutcome(me, a, true);
-        const fall = climbOutcome(me, a, false);
+        const send = climbOutcome(state, me, a, true);
+        const fall = climbOutcome(state, me, a, false);
         future = (a.pSend > 0 ? a.pSend * ttf(send) : 0) + (a.pSend < 1 ? (1 - a.pSend) * ttf(fall) : 0);
         break;
       }
@@ -129,20 +133,32 @@ export function choosePlannerAction(state, legalActions, {
     const idle = a.type === 'endTurn' ||
       (a.type === 'rest' && a.enduranceAfter <= me.currentEndurance && !(a.grantsBetaBoost && !me.betaBoostActive));
     if (forbidIdle && idle && hasNonIdle) continue;
+    scored.push({ cost, type: a.type });
     if (!best || cost < best.cost - 1e-6 || (cost < best.cost + 1e-6 && best.idle && !idle)) {
       best = { cost, a, idle };
     }
   }
+  // How close the call was: the gap to the runner-up, and which other kinds of
+  // action came within 1 Time of the best (analysis/strategy-diversity.mjs).
+  const others = scored.filter(o => o !== scored.find(x => x.cost === best.cost && x.type === best.a.type));
+  const gap = others.length ? Math.min(...others.map(o => o.cost)) - best.cost : Infinity;
+  const nearTypes = [...new Set(others.filter(o => o.cost - best.cost <= 1).map(o => o.type))].filter(t => t !== best.a.type);
   return {
     actionIndex: best.a.i,
     rationale: `planner: ${describe(best.a)} → est. ${best.cost.toFixed(1)} Time to finish`,
+    decision: { gap, nearTypes, options: scored.length },
   };
 }
 
-// The climber after a climb resolves one way or the other.
-function climbOutcome(me, a, sent) {
+// The climber after a climb resolves one way or the other. Grit rewards are
+// applied with the engine's own claimClimbGrit, on a copy of the card.
+function climbOutcome(state, me, a, sent) {
   const c = structuredClone(me);
   c.xp += sent ? a.xp.send : a.xp.fall;
+  if (usesGrit(state.rules)) {
+    const card = a.type === 'milestone' ? {} : { ...state.availableRoutes[a.wall].find(r => r.name === a.route) };
+    claimClimbGrit(state.rules, c, card, { isMilestone: a.type === 'milestone', success: sent, tier: a.tier });
+  }
   c.currentEndurance -= a.endurance;
   if (sent) c.currentEndurance = Math.min(c.maxEndurance, c.currentEndurance + a.sendHeal);
   else c.currentEndurance -= a.fallExtraEndurance;
