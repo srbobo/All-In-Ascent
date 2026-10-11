@@ -8,6 +8,7 @@ import { test, expect } from '@playwright/test';
 import { createGame } from '../../engine/state.js';
 import { illegalActionReason } from '../../engine/engine.js';
 import { ROUTES, GEAR_SHOP } from '../../engine/data.js';
+import { ENGINE_VERSION_STRING } from '../../engine/version.js';
 import {
   seedPageRandom, collectPageErrors, collectDialogs, startLocalGame, playRandomly, replayInEngine, asJson, cardAction,
 } from './support.js';
@@ -49,6 +50,19 @@ test('opens from file:// (no server) and plays through the engine', async ({ pag
   expect(asJson(replayInEngine(browserState))).toEqual(browserState);
   expect(errors).toEqual([]);
 });
+
+for (const [where, url] of [['served', '/index.html'], ['from file://', indexFileUrl]]) {
+  test(`footer shows the rules engine version (${where})`, async ({ page }) => {
+    const errors = collectPageErrors(page);
+    await page.goto(url);
+    const footer = page.locator('footer.site-footer');
+    await expect(footer).toBeVisible();
+    // The version comes from the engine bundle, so it always matches engine/version.js.
+    await expect(page.getByTestId('engine-version')).toHaveText(`v${ENGINE_VERSION_STRING}`);
+    await expect(footer).toContainText(`Rules engine v${ENGINE_VERSION_STRING}`);
+    expect(errors).toEqual([]);
+  });
+}
 
 test('gear effects from the engine show in the climb result', async ({ page }) => {
   const errors = collectPageErrors(page);

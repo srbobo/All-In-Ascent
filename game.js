@@ -12,6 +12,14 @@
 const GAME_VERSION = '1.0.0';
 if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
 
+// Footer: show the rules engine's version, read from the engine bundle
+// (engine/engine.browser.js loads after this file, so wait for the DOM).
+function renderEngineVersion() {
+ const el = document.getElementById('engineVersion');
+ if (el && window.AscentEngine) el.textContent = `v${window.AscentEngine.ENGINE_VERSION_STRING}`;
+}
+if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', renderEngineVersion);
+
 // ===== GAME DATA =====
 
 const CHARACTERS = {

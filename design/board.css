@@ -29,6 +29,23 @@ body::before {
 }
 
 /* ---------- Site header -------------------------------------------------- */
+/* Footer: the rules engine's version (filled in by game.js from the engine). */
+.site-footer {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-6) var(--gutter) var(--sp-5);
+}
+.site-footer__version {
+  margin: 0;
+  padding: var(--sp-1) var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border-radius: 999px;
+}
+
 .site-header {
   display: grid;
   grid-template-columns: 1fr auto;
