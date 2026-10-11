@@ -16,6 +16,7 @@ import * as engineModule from './engine.js';
 import * as stateModule from './state.js';
 import * as helpersModule from './helpers.js';
 import * as statsModule from './stats.js';
+import * as recordModule from './match-record.js';
 import { createRng } from './rng.js';
 import { CHARACTERS, ROUTES, GEAR_SHOP } from './data.js';
 
@@ -85,9 +86,13 @@ for (let g = 0; g < 24; g++) {
   if (firstDiff) break;
   // The post-game summary local play shows is the one online play shows.
   if (!summaryDiff && !same(statsModule.summarizeGame(a), browser.summarizeGame(b))) summaryDiff = `game ${g}: summarizeGame`;
+  // So is the telemetry record (local games are recorded in the browser,
+  // online games on the server).
+  const meta = { id: `parity-${g}`, mode: 'local', startedAt: 1, finishedAt: 2 };
+  if (!summaryDiff && !same(recordModule.buildMatchRecord(a, meta), browser.buildMatchRecord(b, meta))) summaryDiff = `game ${g}: buildMatchRecord`;
   games++;
 }
-check('bundle summarizes every game identically to the engine', !summaryDiff, summaryDiff);
+check('bundle summarizes and records every game identically to the engine', !summaryDiff, summaryDiff);
 check(`bundle plays identically to the engine (${games} games, ${steps} actions)`, !firstDiff && games === 24, firstDiff);
 
 // ---------------------------------------------------------------------------

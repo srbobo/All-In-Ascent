@@ -28,13 +28,14 @@ const outPath = join(here, 'engine.browser.js');
 
 // Bundled modules in dependency order (each may import only from earlier ones
 // or from ./data.js).
-const MODULES = ['rng.js', 'telemetry.js', 'version.js', 'helpers.js', 'state.js', 'engine.js', 'stats.js'];
+const MODULES = ['rng.js', 'telemetry.js', 'version.js', 'helpers.js', 'state.js', 'engine.js', 'stats.js', 'match-record.js'];
 
 // Data names game.js declares at top level in its GAME DATA section.
 const DATA_GLOBALS = ['CHARACTERS', 'XP_TABLE', 'TRAINING_AREAS', 'ROUTES', 'GEAR_SHOP'];
 
 const IMPORT_RE = /^import\s*\{([^}]*)\}\s*from\s*'([^']+)';[ \t]*$/gm;
-const moduleVar = (file) => `__${file.replace(/\.js$/, '')}`;
+// A JS identifier for each module's exports (match-record.js → __match_record).
+const moduleVar = (file) => `__${file.replace(/\.js$/, '').replace(/\W/g, '_')}`;
 
 // `a, b as c` → [['a', 'a'], ['b', 'c']]
 function parseNames(list) {

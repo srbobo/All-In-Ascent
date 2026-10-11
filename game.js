@@ -281,6 +281,8 @@ const GEAR_SHOP = [
 // AscentEngine.createGame for local play, or the server's state online. null
 // until a game starts.
 let gameState = null;
+// Wall-clock start of the local game, for its telemetry record.
+let gameStartedAt = null;
 
 // UI-only state, kept out of the engine state.
 let gameLog = []; // newest first, max 20 entries
@@ -554,6 +556,7 @@ function startGame() {
  const seed = Math.floor(Math.random() * 2 ** 32);
  // Every game is played with the Grit rules (engine GRIT_RULES).
  gameState = AscentEngine.createGame({ seed, characterKeys: setupCharacterKeys, rules: AscentEngine.GRIT_RULES }).state;
+ gameStartedAt = Date.now();
 
  renderGameBoard();
  addLog(`Game started! Round 1 begins. (seed ${seed})`);
@@ -1077,7 +1080,23 @@ function dispatchAction(wanted, afterRender = null) {
  const before = gameState;
  const { state, events } = AscentEngine.applyAction(before, action);
  gameState = state;
+ if (state.gameEnded && !before.gameEnded) recordLocalGame(state);
  presentEvents(before, events, afterRender);
+}
+
+// Send the finished local game's anonymous match record (the engine builds
+// it) to the designer's telemetry dashboard. Online games are recorded by the
+// server instead. Every local seat is a human at this table.
+function recordLocalGame(state) {
+ if (!window.AscentTelemetry) return;
+ const record = AscentEngine.buildMatchRecord(state, {
+ id: window.AscentTelemetry.newId('local'),
+ mode: 'local',
+ startedAt: gameStartedAt,
+ finishedAt: Date.now(),
+ seats: state.players.map(() => ({ controller: 'human' })),
+ });
+ window.AscentTelemetry.sendMatch(record);
 }
 
 // ===== CHARACTER ABILITY: ROUTE READER STAT SHIFT =====
