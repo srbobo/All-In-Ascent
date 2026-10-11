@@ -32,9 +32,10 @@ import { ENGINE_VERSION_STRING } from './version.js';
 import { ACCESS_CARDS } from './state.js';
 import {
   checkAreaAccess, climbSendProbability, computeClimbXp, computeRestRecovery,
-  getEffectiveClimbEnduranceCost, getEffectiveClimbTimeCost, getEffectiveGearCost,
+  getEffectiveClimbEnduranceCost, getEffectiveClimbTimeCost,
+  usesGrit, gearPrice, gearFunds, trainingGritCost, milestoneGritReward, trainingCap,
   getFailureEnduranceExtra, getSpendableXp, getSuccessEnduranceHeal,
-  canUseStatShift, trainingSpec, trainingCap,
+  canUseStatShift, trainingSpec,
 } from './helpers.js';
 
 export const OBSERVATION_SCHEMA = 'aia-observation/1';
@@ -124,6 +125,11 @@ function describePlayer(state, seat, { full }) {
   const next = XP_TABLE.find(r => r.level === c.level + 1);
   const total = Object.fromEntries(STATS.map(k => [k, c.stats[k] + c.trainingBonuses[k] + c.gearBonuses[k]]));
   const rest = computeRestRecovery(c);
+  if (usesGrit(state.rules)) {
+    // Grit economy: Grit buys training and gear; XP only raises your Level.
+    out.grit = c.grit || 0;
+    out.trainingCap = Number.isFinite(trainingCap(state.rules, c)) ? trainingCap(state.rules, c) : null;
+  }
   out.xp = {
     total: c.xp,
     // Spending XP moves you back toward the start of your Level; it never
@@ -179,7 +185,7 @@ function describeMilestone(state, seat, tier, plans = true) {
     tag: r.tag || null,
     requirements: pickStats(r),
     dice: describeDice(r),
-    time: getEffectiveClimbTimeCost(c, r.time, r),
+    time: getEffectiveClimbTimeCost(c, r.time, r, true),
     endurance: getEffectiveClimbEnduranceCost(c, r, r.endurance),
     done: !!c.milestonesCompleted[tier],
   };
@@ -280,6 +286,7 @@ function describeAction(state, seat, a, i, effects = true) {
         i, type: 'climb', wall: a.area, route: route.name, grade: route.grade, tag: route.tag || null,
         ...(a.area === 'topRope' ? { station: route.belayer } : {}),
         ...climbNumbers(c, route, a.area, attempted, { isMilestone: false, shift: a.shift || null }),
+        ...(usesGrit(state.rules) ? { gritOnCard: route.grit || 0 } : {}),
       };
       if (a.shift) out.shift = { ...a.shift };
       return out;
@@ -289,8 +296,10 @@ function describeAction(state, seat, a, i, effects = true) {
       const others = TIERS.filter(t => t !== a.difficulty);
       return {
         i, type: 'milestone', tier: a.difficulty, wall: m.area, route: m.route.name, grade: m.route.grade,
-        ...climbNumbers(c, m.route, m.area, attempted, { isMilestone: true, shift: null }),
+        ...climbNumbers(c, m.route, m.area, attempted, { isMilestone: true, shift: a.shift || null }),
+        ...(a.shift ? { shift: { ...a.shift } } : {}),
         sendWinsGame: others.every(t => c.milestonesCompleted[t]),
+        ...(usesGrit(state.rules) ? { gritReward: milestoneGritReward(state.rules, a.difficulty) } : {}),
       };
     }
     case 'train': {
@@ -299,6 +308,7 @@ function describeAction(state, seat, a, i, effects = true) {
       return {
         i, type: 'train', station: t.name, stat: t.stat,
         gain: spec.gain, time: spec.time, endurance: spec.endurance,
+        ...(usesGrit(state.rules) ? { gritCost: trainingGritCost(state.rules, c) } : {}),
         ...(effects ? { milestonePSendAfter: milestoneEffect(state, seat, a) } : {}),
       };
     }
@@ -310,10 +320,12 @@ function describeAction(state, seat, a, i, effects = true) {
     }
     case 'buyGear': {
       const g = GEAR_SHOP.find(x => x.name === a.gearName);
-      const cost = getEffectiveGearCost(c, g);
+      // Priced in XP, or in Grit under the Grit-economy rules.
+      const cost = gearPrice(state.rules, c, g);
       const out = {
-        i, type: 'buyGear', card: g.name, cost, time: 1, effect: g.effectDisplay || g.description || '',
-        spendableAfter: getSpendableXp(c) - cost,
+        i, type: 'buyGear', card: g.name, cost, currency: usesGrit(state.rules) ? 'grit' : 'xp',
+        time: 1, effect: g.effectDisplay || g.description || '',
+        spendableAfter: gearFunds(state.rules, c) - cost,
       };
       const after = effects ? milestoneEffect(state, seat, a) : {};
       if (Object.keys(after).length) out.milestonePSendAfter = after;
@@ -331,7 +343,7 @@ function climbNumbers(c, route, area, attempted, { isMilestone, shift }) {
   const xpSend = computeClimbXp(c, route, true);
   const xpFall = computeClimbXp(c, route, false);
   return {
-    time: getEffectiveClimbTimeCost(c, route.time, route),
+    time: getEffectiveClimbTimeCost(c, route.time, route, isMilestone),
     endurance: getEffectiveClimbEnduranceCost(c, route, route.endurance),
     pSend: round3(pSend),
     xp: { send: xpSend, fall: xpFall, expected: round3(pSend * xpSend + (1 - pSend) * xpFall) },
@@ -381,7 +393,9 @@ export function observeText(obs) {
   const L = [];
   L.push(`Round ${obs.round} · You: P${y.playerNum} ${y.character} L${y.level} · ${obs.yourTurn ? 'your turn' : 'waiting'}`);
   L.push(`Stats ${fmtStats(y.stats.total)} · End ${y.endurance.current}/${y.endurance.max} (no refill between rounds) · Time ${y.time}`);
-  L.push(`XP ${y.xp.total} (spendable ${y.xp.spendable}, ${y.xp.toNextLevel ?? '—'} to next Level) · Gear: ${y.equipment.join(', ') || 'none'}`);
+  L.push(y.grit !== undefined
+    ? `Grit ${y.grit} · XP ${y.xp.total} (${y.xp.toNextLevel ?? '—'} to next Level; XP is never spent)${y.trainingCap !== null ? ` · training cap +${y.trainingCap}/stat` : ''} · Gear: ${y.equipment.join(', ') || 'none'}`
+    : `XP ${y.xp.total} (spendable ${y.xp.spendable}, ${y.xp.toNextLevel ?? '—'} to next Level) · Gear: ${y.equipment.join(', ') || 'none'}`);
   L.push(`Ability ${y.ability.name}: ${y.ability.rules}${y.ability.betaBoostActive ? ' [Beta Boost ACTIVE]' : ''}`);
   L.push('Milestones:');
   for (const m of obs.milestones) {
@@ -407,11 +421,11 @@ export function observeText(obs) {
 
 function actionLine(a) {
   switch (a.type) {
-    case 'climb': return `climb ${a.route} (${a.wall}) pSend ${pct(a.pSend)} · T${a.time} E${a.endurance} · XP ${a.xp.send}/${a.xp.fall}${a.shift ? ` · shift ${a.shift.amount} ${SHORT[a.shift.from]}→${SHORT[a.shift.to]}` : ''}`;
-    case 'milestone': return `MILESTONE ${a.tier} ${a.route} pSend ${pct(a.pSend)} · T${a.time} E${a.endurance}${a.sendWinsGame ? ' · SEND WINS' : ''}`;
-    case 'train': return `train ${SHORT[a.stat]} +${a.gain} · T${a.time} E${a.endurance}${effectLine(a.milestonePSendAfter)}`;
+    case 'climb': return `climb ${a.route} (${a.wall}) pSend ${pct(a.pSend)} · T${a.time} E${a.endurance} · XP ${a.xp.send}/${a.xp.fall}${a.gritOnCard ? ` · ${a.gritOnCard} Grit on card` : ''}${a.shift ? ` · shift ${a.shift.amount} ${SHORT[a.shift.from]}→${SHORT[a.shift.to]}` : ''}`;
+    case 'milestone': return `MILESTONE ${a.tier} ${a.route} pSend ${pct(a.pSend)} · T${a.time} E${a.endurance}${a.gritReward ? ` · +${a.gritReward} Grit` : ''}${a.sendWinsGame ? ' · SEND WINS' : ''}`;
+    case 'train': return `train ${SHORT[a.stat]} +${a.gain} · T${a.time} E${a.endurance}${a.gritCost !== undefined ? ` · ${a.gritCost} Grit` : ''}${effectLine(a.milestonePSendAfter)}`;
     case 'rest': return `rest → End ${a.enduranceAfter}${a.grantsBetaBoost ? ' · Beta Boost' : ''}`;
-    case 'buyGear': return `buy ${a.card} (${a.cost} XP → ${a.spendableAfter} left): ${a.effect}${effectLine(a.milestonePSendAfter)}`;
+    case 'buyGear': return `buy ${a.card} (${a.cost} ${a.currency === 'grit' ? 'grit' : 'XP'} → ${a.spendableAfter} left): ${a.effect}${effectLine(a.milestonePSendAfter)}`;
     case 'endTurn': return `call it a day (forfeit ${a.timeForfeited} Time)`;
     default: return a.type;
   }

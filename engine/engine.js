@@ -41,12 +41,14 @@ import {
   checkAreaAccess, canEnterSection, getPlayersInSection,
   canClimbTopRopeRoute, pickFreeBelayerStation,
   getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost,
-  getGearPurchaseTimeCost, getEffectiveGearCost,
+  getGearPurchaseTimeCost,
   getSpendableXp, buildEffectRollArray, resolveClimbDice, computeClimbStats,
   applyDiceToRequirements, resolveClimbOutcome, computeClimbXp,
   getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal,
   describeClimbGearEffects,
   freeSoloCanAttempt, trainingSpec, trainingAllowed, trainingCap,
+  usesGrit, trainingGritCost, gearFunds, gearPrice, payForGear, claimClimbGrit,
+  dealRouteGrit, gearInGame, perRoundGrit, abilityParam,
   computeRestRecovery, applyLevelUpIfNeeded,
   bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, MAX_STAT_SHIFT,
 } from './helpers.js';
@@ -131,12 +133,18 @@ export function getLegalActions(state) {
       const sec = canEnterSection(m.area, player.playerNum, state);
       if (!sec.canEnter) continue;
     }
-    const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route);
+    const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route, true);
     const enduranceCost = getEffectiveClimbEnduranceCost(char, m.route, m.route.endurance);
     if (char.timeRemaining < timeCost) continue;
     if (char.currentEndurance < enduranceCost) continue;
     if (!freeSoloCanAttempt(char, m.route)) continue;
     actions.push({ type: 'milestone', difficulty, area: m.area, routeName: m.route.name });
+    // Rules variant: Versatility's stat shift on a Milestone — offered as a
+    // variant of the attempt, like regular climbs.
+    if (canUseStatShift(char, true)) {
+      const shift = bestRouteReaderShift(char, m.route, m.area, state.attemptedRoutes[player.playerNum], true);
+      if (shift) actions.push({ type: 'milestone', difficulty, area: m.area, routeName: m.route.name, shift });
+    }
   }
 
   // Gear purchases: rotation slots + always-available access cards.
@@ -144,7 +152,8 @@ export function getLegalActions(state) {
   // agents never see a "legal" action that the handler would reject.
   const gearTime = getGearPurchaseTimeCost(char);
   if (char.timeRemaining >= gearTime) {
-    const spendable = getSpendableXp(char);
+    // Spendable XP, or Grit under the Grit-economy rules.
+    const funds = gearFunds(state.rules, char);
     const owned = new Set(char.equipment);
     const buyable = [
       ...state.availableGear,
@@ -152,8 +161,8 @@ export function getLegalActions(state) {
     ];
     for (const gear of buyable) {
       if (owned.has(gear.name)) continue;
-      const cost = getEffectiveGearCost(char, gear);
-      if (spendable < cost) continue;
+      const cost = gearPrice(state.rules, char, gear);
+      if (funds < cost) continue;
       if (char.level < (gear.prerequisiteLevel || 1)) continue;
       if (gear.prerequisiteItems && gear.prerequisiteItems.length > 0) {
         if (!gear.prerequisiteItems.every(p => owned.has(p))) continue;
@@ -209,8 +218,11 @@ export function illegalActionReason(state, wanted) {
   const player = state.players[state.currentPlayerIndex];
   const char = player.character;
   if (match) {
-    if (wanted.shift && (match.type !== 'climb' || !canUseStatShift(char, false))) {
-      return reason('shiftNotAllowed', 'Versatility can be used once per round, by the Route Reader, on a regular route.');
+    if (wanted.shift && !((match.type === 'climb' && canUseStatShift(char, false)) ||
+        (match.type === 'milestone' && canUseStatShift(char, true)))) {
+      return reason('shiftNotAllowed', match.type === 'milestone'
+        ? 'Versatility can be used once per round, by the Route Reader, and not on a Milestone.'
+        : 'Versatility can be used once per round, by the Route Reader, on a regular route.');
     }
     if (wanted.shift && !isWellFormedStatShift(wanted.shift)) {
       return reason('shiftMalformed', `A stat shift moves 1 to ${MAX_STAT_SHIFT} points between two different stats.`);
@@ -233,8 +245,8 @@ export function illegalActionReason(state, wanted) {
     if (sec.canEnter) return null;
     return reason('sectionFull', `You can't climb here right now: ${sec.reason}.`, { occupants: occupantsOf(area) });
   };
-  const costGate = (route) => {
-    const t = getEffectiveClimbTimeCost(char, route.time, route);
+  const costGate = (route, isMilestone = false) => {
+    const t = getEffectiveClimbTimeCost(char, route.time, route, isMilestone);
     const e = getEffectiveClimbEnduranceCost(char, route, route.endurance);
     if (char.timeRemaining < t) return notEnough('notEnoughTime', 'time', t, char.timeRemaining);
     if (char.currentEndurance < e) return notEnough('notEnoughEndurance', 'endurance', e, char.currentEndurance);
@@ -279,7 +291,7 @@ export function illegalActionReason(state, wanted) {
         const full = sectionGate(m.area);
         if (full) return full;
       }
-      return costGate(m.route) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie() : null)
+      return costGate(m.route, true) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie() : null)
         || reason('unavailable', 'That milestone is not available right now.');
     }
     case 'train': {
@@ -300,6 +312,8 @@ export function illegalActionReason(state, wanted) {
         if (perRound !== undefined && (char.trainedThisRound || 0) >= perRound) {
           return reason('trainingLimit', `You can train ${perRound} time${perRound === 1 ? '' : 's'} per round.`, { limit: perRound });
         }
+        const gritCost = trainingGritCost(state.rules, char);
+        if ((char.grit || 0) < gritCost) return notEnough('notEnoughGrit', 'Grit', gritCost, char.grit || 0);
         const cap = trainingCap(state.rules, char);
         return reason('trainingCap', `Training ${area.stat} is capped at +${cap} at Level ${char.level}.`, { cap, stat: area.stat });
       }
@@ -320,9 +334,13 @@ export function illegalActionReason(state, wanted) {
       }
       const timeCost = getGearPurchaseTimeCost(char);
       if (char.timeRemaining < timeCost) return notEnough('notEnoughTime', 'time', timeCost, char.timeRemaining);
-      const cost = getEffectiveGearCost(char, gear);
+      const cost = gearPrice(state.rules, char, gear);
+      if (usesGrit(state.rules)) {
+        const have = gearFunds(state.rules, char);
+        if (have < cost) return notEnough('notEnoughGrit', 'Grit', cost, have);
+      }
       const spendable = getSpendableXp(char);
-      if (spendable < cost) {
+      if (!usesGrit(state.rules) && spendable < cost) {
         return reason('notEnoughXp', `Not enough spendable XP: ${gear.name} costs ${cost} and you have ${spendable} XP earned this level.`,
           { need: cost, have: spendable });
       }
@@ -483,7 +501,7 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   }
 
   // 3. Deduct time (character + gear modified).
-  const timeCost = getEffectiveClimbTimeCost(char, route.time, route);
+  const timeCost = getEffectiveClimbTimeCost(char, route.time, route, isMilestone);
   const timeBefore = char.timeRemaining;
   char.timeRemaining -= timeCost;
 
@@ -500,13 +518,15 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   //      (Route attempted-marks don't feed gear bonuses in v0.7+ data, but use
   //      the pre-climb marks so a preview and the climb see identical input.)
   const effectiveStats = computeClimbStats(char, route, area, attemptedBefore, shift);
-  if (char.betaBoostActive) {
-    char.betaBoostActive = false;
+  // The Beta Boost is spent by this climb; the flag is cleared once the outcome
+  // is known, because a rules variant can make Versatility depend on it.
+  const boostSpent = !!char.betaBoostActive;
+  if (boostSpent) {
     emitter.emit('ability_activated', {
       playerNum: player.playerNum,
       character: char.key,
       ability: 'Beta Boost',
-      effect: '+3 all stats for this climb',
+      effect: `+${abilityParam(char, 'betaBoost') ?? 3} all stats for this climb`,
     });
   }
 
@@ -542,9 +562,13 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   });
 
   // 8. Resolve outcome.
-  const outcome = resolveClimbOutcome(char, effectiveStats, requirements);
+  const outcome = resolveClimbOutcome(char, effectiveStats, requirements, isMilestone);
+  if (boostSpent) char.betaBoostActive = false;
   const xpGained = computeClimbXp(char, route, outcome.success);
   char.xp += xpGained;
+  // Grit economy: a regular send takes the Grit on the card; a milestone
+  // send pays its tier's reward.
+  const gritGained = claimClimbGrit(s.rules, char, route, { isMilestone, success: outcome.success, tier: difficulty });
 
   // 9. Iron Lung failure penalty (Mental Anchor gear bypasses).
   let failPenalty = 0;
@@ -572,13 +596,14 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     requirements,
     effectiveStats,
     xpGained,
+    ...(usesGrit(s.rules) ? { gritGained, gritAfter: char.grit } : {}),
     timeCost,
     enduranceCost: baseEnduranceCost + failPenalty,
     failPenalty,
     // Every gear effect that changed this climb (see describeClimbGearEffects).
     gearEffects: describeClimbGearEffects({
       char, route, effectRollArray: effectArray, diceTrace, appliedModifiers,
-      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed,
+      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed, isMilestone,
     }),
     resourcesDelta: {
       time: { before: timeBefore, after: char.timeRemaining, delta: -timeCost },
@@ -636,6 +661,10 @@ function handleTrain(s, rng, action, emitter) {
   // Old Climbing Journal (gear) boosts every session by +N; a rules variant
   // (state.rules) may change the Time, Endurance or bonus.
   const spec = trainingSpec(s.rules, area, char);
+  // Grit economy: a session costs Grit, except Training Partner's free one.
+  const gritCost = trainingGritCost(s.rules, char);
+  if (usesGrit(s.rules) && gritCost === 0 && !s.rules.characters?.[char.key]?.freeTraining) char.freeSessionUsed = true;
+  if (gritCost) char.grit -= gritCost;
   char.location = area.name;
   char.timeRemaining -= spec.time;
   char.currentEndurance -= spec.endurance;
@@ -695,14 +724,15 @@ function handleBuyGear(s, rng, action, emitter) {
   const gear = GEAR_SHOP.find(g => g.name === action.gearName);
   if (!gear) throw new Error(`buyGear: no gear "${action.gearName}"`);
 
-  const effectiveCost = getEffectiveGearCost(char, gear);
+  // XP, or Grit under the Grit-economy rules (XP is then never spent).
+  const effectiveCost = gearPrice(s.rules, char, gear);
   const timeCost = getGearPurchaseTimeCost(char);
   const xpBefore = char.xp;
   const timeBefore = char.timeRemaining;
 
   char.location = 'gearShop';
   char.timeRemaining -= timeCost;
-  char.xp -= effectiveCost;
+  payForGear(s.rules, char, effectiveCost);
   char.equipment.push(gear.name);
 
   // Permanent stat & endurance effects from the purchased item.
@@ -742,12 +772,13 @@ function handleBuyGear(s, rng, action, emitter) {
     playerNum: player.playerNum,
     gearName: gear.name,
     cost: effectiveCost,
+    currency: usesGrit(s.rules) ? 'grit' : 'xp',
     nominalCost: gear.cost,
     timeCost,
     gearApplied,
     resourcesDelta: {
       time: { before: timeBefore, after: char.timeRemaining, delta: -timeCost },
-      xp: { before: xpBefore, after: char.xp, delta: -effectiveCost },
+      xp: { before: xpBefore, after: char.xp, delta: char.xp - xpBefore },
     },
   });
 }
@@ -767,7 +798,7 @@ function replaceGearInRotation(s, rng, purchasedName) {
     ...ownedByAny,
     ...ACCESS_CARDS,
   ]);
-  const pool = GEAR_SHOP.filter(g => !unavailable.has(g.name));
+  const pool = GEAR_SHOP.filter(g => !unavailable.has(g.name) && gearInGame(s.rules, g));
 
   if (pool.length === 0) {
     s.availableGear.splice(idx, 1);
@@ -821,6 +852,7 @@ function postActionHousekeeping(s, rng, emitter) {
     xp: char.xp,
     level: char.level,
     spendableXp: getSpendableXp(char),
+    ...(usesGrit(s.rules) ? { grit: char.grit } : {}),
   });
 
   // 3. Victory check. If this player just completed all 3 milestones, the
@@ -884,14 +916,14 @@ function endRound(s, rng, emitter) {
   //   2 → refresh bouldering,    advance to 0
   let cleared;
   if (s.routeClearingPosition === 0) {
-    s.availableRoutes.leadClimbing = rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing'), 5);
+    s.availableRoutes.leadClimbing = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing'), 5));
     cleared = 'leadClimbing';
   } else if (s.routeClearingPosition === 1) {
     // Refresh all belayer stations together (2×belayerCount routes).
-    s.availableRoutes.topRope = drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope'));
+    s.availableRoutes.topRope = dealRouteGrit(s.rules, drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope')));
     cleared = 'topRope';
   } else {
-    s.availableRoutes.bouldering = rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering'), 5);
+    s.availableRoutes.bouldering = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering'), 5));
     cleared = 'bouldering';
   }
   s.routeClearingPosition = (s.routeClearingPosition + 1) % 3;
@@ -906,6 +938,9 @@ function endRound(s, rng, emitter) {
     c.timeRemaining = 10 + approachBonus;
     c.abilityUsed = false;
     c.trainedThisRound = 0;
+    c.freeSessionUsed = false;
+    // Grit economy: the per-round allowance.
+    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key);
     c.location = 'lobby';
     c.belayerStation = null;
   }

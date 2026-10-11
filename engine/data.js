@@ -224,6 +224,11 @@ export const ROUTES = {
 // trainingBonusBoost — every training session grants `value` extra stat bonus
 // milestoneBuffDiceBonus — every buff die (modifier −1) on milestone climbs is +`value` (max 6)
 // negateOneNerfDie — on every climb, treat one nerf die (modifier +1) as 0
+// trainingCapBonus — raises the per-stat training cap by `value` (training-cap rules only)
+// freeTrainingSession — once per round, a training session costs no Grit (Grit-economy rules)
+//
+// `variantOnly: 'trainingCap'` cards are only dealt in games played with a
+// training cap (an experimental rules variant); the standard game never sees them.
 export const GEAR_SHOP = [
  // ===== ACCESS CARDS (gate Lead climbing area; Top Rope is open to all) =====
  // RuleModifications (2026-06-27): Harness removed — Top Rope requires no gear,
@@ -249,4 +254,8 @@ export const GEAR_SHOP = [
  { name: "Old Climbing Journal", cost: 100, category: "Training Equipment", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "trainingBonusBoost", description: "Track every session and pattern of progress", effectDisplay: "Training sessions give +6 instead of +5", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Climbing Coach", cost: 180, category: "Strategy Gear", statEffect: "none", value: 1, routeFilter: [], holdFeatureFilter: [], effectKind: "milestoneBuffDiceBonus", description: "Expert guidance for the routes that matter most", effectDisplay: "On milestone climbs, every buff die is +1 (max 6)", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
  { name: "Mountain Mentor", cost: 200, category: "Strategy Gear", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "negateOneNerfDie", description: "Years of wisdom in your ear", effectDisplay: "On every climb, treat one nerf die as 0", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+
+ // ===== TRAINING CARDS (experimental: training-cap rules only) =====
+ { name: "Hangboard Program", cost: 100, gritCost: 4, variantOnly: "trainingCap", category: "Training Equipment", statEffect: "none", value: 5, routeFilter: [], holdFeatureFilter: [], effectKind: "trainingCapBonus", description: "A structured plan squeezes more out of every board session", effectDisplay: "Your training cap is +5 higher in every stat", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
+ { name: "Training Partner", cost: 75, gritCost: 3, variantOnly: "trainingCap", category: "Training Equipment", statEffect: "none", value: 0, routeFilter: [], holdFeatureFilter: [], effectKind: "freeTrainingSession", description: "Someone to count your reps and keep you honest", effectDisplay: "Once per round, a training session costs no Grit", prerequisiteItems: [], prerequisiteLevel: 1, accessRequirement: null, restBonus: 0 },
 ];

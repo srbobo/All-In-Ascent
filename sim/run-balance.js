@@ -4,6 +4,9 @@
 //       Rounds to ring the bell, per character, playing alone.
 //   node sim/run-balance.js pairs [--agent=planner] [--games=100]
 //       2-player round robin, every ordered pair of characters.
+//   node sim/run-balance.js multi --players=3 [--agent=planner] [--games=10]
+//       3- or 4-player games: every set of characters in every seat order.
+//       Fair share is 1/players for each climber and each seat.
 //   node sim/run-balance.js vs --agent=planner --opponent=heuristic [--games=60]
 //       Bot A vs bot B: every character pair, both seat orders. Measures the
 //       BOT, not the characters (each bot plays every character equally).
@@ -13,6 +16,7 @@
 //   --workers=N                   worker threads (default: cores − 1)
 //   --max-rounds=200              stop a game here (counted as unfinished)
 //   --params='{"pMin":0.4}'       planner weight overrides
+//   --rules='{"trainCapBase":10}' rules variant (state.rules) for every game
 //   --json=path                   also write raw results
 //
 // Seeds are fixed by default, so a run is reproducible; change --seeds /
@@ -36,6 +40,7 @@ const opponent = flag('opponent', 'heuristic');
 const maxRounds = Number(flag('max-rounds', 200));
 const workers = flag('workers') ? Number(flag('workers')) : undefined;
 const params = flag('params') ? JSON.parse(flag('params')) : null;
+const rules = flag('rules') ? JSON.parse(flag('rules')) : null;
 const seedBase = Number(flag('seed-base', 1));
 const jsonOut = flag('json');
 
@@ -55,24 +60,32 @@ const pad = (s, n) => String(s).padEnd(n);
 let tasks = [];
 if (mode === 'solo') {
   const seeds = parseSeeds(flag('seeds', '1-300'));
-  for (const c of chars) for (const seed of seeds) tasks.push({ chars: [c], seed, agents: [agent], maxRounds, params });
+  for (const c of chars) for (const seed of seeds) tasks.push({ chars: [c], seed, agents: [agent], maxRounds, params, rules });
 } else if (mode === 'pairs') {
   const games = Number(flag('games', 100));
   for (const a of chars) for (const b of chars) {
     if (a === b) continue;
-    for (let g = 0; g < games; g++) tasks.push({ chars: [a, b], seed: seedBase + g, agents: [agent, agent], maxRounds, params });
+    for (let g = 0; g < games; g++) tasks.push({ chars: [a, b], seed: seedBase + g, agents: [agent, agent], maxRounds, params, rules });
+  }
+} else if (mode === 'multi') {
+  const n = Number(flag('players', 3));
+  const games = Number(flag('games', 10));
+  const combos = (arr, k) => (k === 0 ? [[]] : arr.flatMap((x, i) => combos(arr.slice(i + 1), k - 1).map(c => [x, ...c])));
+  const perms = (arr) => (arr.length <= 1 ? [arr] : arr.flatMap((x, i) => perms([...arr.slice(0, i), ...arr.slice(i + 1)]).map(p => [x, ...p])));
+  for (const set of combos(chars, n)) for (const order of perms(set)) {
+    for (let g = 0; g < games; g++) tasks.push({ chars: order, seed: seedBase + g, agents: order.map(() => agent), maxRounds, params, rules });
   }
 } else if (mode === 'vs') {
   const games = Number(flag('games', 60));
   for (const a of chars) for (const b of chars) {
     if (a === b) continue;
     for (let g = 0; g < games; g++) {
-      tasks.push({ chars: [a, b], seed: seedBase + g, agents: [agent, opponent], maxRounds, params });
-      tasks.push({ chars: [a, b], seed: seedBase + g, agents: [opponent, agent], maxRounds, params });
+      tasks.push({ chars: [a, b], seed: seedBase + g, agents: [agent, opponent], maxRounds, params, rules });
+      tasks.push({ chars: [a, b], seed: seedBase + g, agents: [opponent, agent], maxRounds, params, rules });
     }
   }
 } else {
-  console.error(`unknown mode "${mode}" (solo | pairs | vs)`);
+  console.error(`unknown mode "${mode}" (solo | pairs | multi | vs)`);
   process.exit(1);
 }
 
@@ -92,6 +105,7 @@ const msDec = mean(results.map(r => r.msPerDecision));
 
 console.log(`\nengine v${ENGINE_VERSION_STRING} · mode ${mode} · ${results.length} games in ${secs.toFixed(0)}s · ${msDec.toFixed(2)} ms/decision · max ${maxRounds} rounds`);
 if (params) console.log(`planner params: ${JSON.stringify(params)}`);
+if (rules) console.log(`rules variant: ${JSON.stringify(rules)}`);
 
 if (mode === 'solo') {
   console.log(`agent: ${agent}\n`);
@@ -136,6 +150,28 @@ if (mode === 'solo') {
     });
     console.log(pad(a, 13) + cells.join(''));
   }
+} else if (mode === 'multi') {
+  const n = results[0].chars.length;
+  const fair = 1 / n;
+  const decided = results.filter(r => r.winnerSeat >= 0);
+  const rounds = medianCI(decided.map(r => r.rounds));
+  console.log(`agent: ${agent} · ${n} players · fair share ${pct(fair)} · finished ${pct(decided.length / results.length)} · median ${rounds.median} rounds [${rounds.lo}–${rounds.hi}]\n`);
+  console.log(`${pad('climber', 13)}${pad('win rate [95% CI]', 26)}${pad('vs fair', 9)}games`);
+  for (const c of chars) {
+    const rs = results.filter(r => r.chars.includes(c));
+    const wins = rs.filter(r => r.winnerSeat >= 0 && r.chars[r.winnerSeat] === c).length;
+    const w = wilson(wins, rs.length);
+    console.log(`${pad(c, 13)}${pad(ci(w), 26)}${pad(`${w.p >= fair ? '+' : ''}${Math.round(100 * (w.p - fair))} pts`, 9)}${rs.length}`);
+  }
+  console.log('\nseat win rates:');
+  for (let i = 0; i < n; i++) {
+    console.log(`  seat ${i + 1}: ${ci(wilson(decided.filter(r => r.winnerSeat === i).length, decided.length))}`);
+  }
+  const share = { train: 0, climb: 0, milestone: 0, rest: 0, buyGear: 0 };
+  let tot = 0;
+  for (const r of results) for (const t of r.timeSpent) for (const [k, v] of Object.entries(t)) { if (k in share) share[k] += v; tot += v; }
+  const market = mean(results.flatMap(r => r.gear.map(g => g.filter(x => !['Belay Device', 'Locking Carabiner', 'Lead Rope'].includes(x)).length)));
+  console.log(`\nTime: train ${pct(share.train / tot)} · climb ${pct(share.climb / tot)} · milestone ${pct(share.milestone / tot)} · rest ${pct(share.rest / tot)} · gear ${pct(share.buyGear / tot)} · market gear per climber ${market.toFixed(2)}`);
 } else {
   console.log(`${agent} vs ${opponent}, every character pair, both seat orders\n`);
   const mine = (r) => r.agents.indexOf(agent);
@@ -153,6 +189,6 @@ if (mode === 'solo') {
 }
 
 if (jsonOut) {
-  writeFileSync(jsonOut, JSON.stringify({ engine: ENGINE_VERSION_STRING, mode, agent, opponent, params, maxRounds, results }, null, 1));
+  writeFileSync(jsonOut, JSON.stringify({ engine: ENGINE_VERSION_STRING, mode, agent, opponent, params, rules, maxRounds, results }, null, 1));
   console.log(`\nraw results → ${jsonOut}`);
 }

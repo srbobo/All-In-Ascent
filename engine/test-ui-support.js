@@ -133,11 +133,16 @@ const climbEvents = (events) => ({
   let disagreement = '';
   // Standard rules, plus balance-experiment variants (state.rules) that change
   // training costs and add training limits.
-  const VARIANTS = [null, { trainTime: 3, trainBonus: 4, trainEnduranceMult: 1.5, trainCapBase: 10, trainCapPerLevel: 5, trainPerRound: 1 }];
+  const VARIANTS = [
+    null,
+    { trainTime: 3, trainBonus: 4, trainEnduranceMult: 1.5, trainCapBase: 10, trainCapPerLevel: 5, trainPerRound: 1 },
+    // Grit economy + training cap: training and gear cost Grit.
+    { grit: { start: 1, perRound: 1 }, trainCapBase: 10, trainCapPerLevel: 5 },
+  ];
   for (let g = 0; g < 16 && !disagreement; g++) {
     const rng = createRng(500 + g);
     const keys = rng.shuffle(['technician', 'sprinter', 'ironLung', 'routeReader', 'freeSolo']).slice(0, 1 + (g % 4));
-    let { state } = createGame({ seed: 900 + g, characterKeys: keys, rules: VARIANTS[g % 2] });
+    let { state } = createGame({ seed: 900 + g, characterKeys: keys, rules: VARIANTS[g % VARIANTS.length] });
     for (let i = 0; i < 250 && !state.gameEnded && !disagreement; i++) {
       const legal = getLegalActions(state);
       for (const wanted of candidates(state)) {

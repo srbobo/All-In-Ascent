@@ -1,4 +1,4 @@
-// AUTO-GENERATED FROM engine/{rng,telemetry,version,state,helpers,engine}.js — DO NOT EDIT BY HAND.
+// AUTO-GENERATED FROM engine/{rng,telemetry,version,helpers,state,engine}.js — DO NOT EDIT BY HAND.
 //
 // Regenerate with: node engine/build-browser.js
 // The rules engine as one classic script, so local play (game.js) runs the
@@ -171,6 +171,39 @@ const __version = (function () {
 //   `node engine/build-data.js` (run by the test/playtest scripts; standalone
 //   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
 //
+// 1.0.0 (2026-10-11): Grit — experience and currency split. MAJOR.
+//   The Grit economy is the game's new core mechanic, packaged as GRIT_RULES
+//   (helpers.js): XP only raises your Level and is never spent; Grit — taken
+//   from fresh route cards by the first climber to send them, and paid for
+//   Milestone sends — buys training and gear; training is capped at 10 + 5
+//   per Level; seats start with 0 / 2 / 4 / 6 Grit; and the five climbers get
+//   trait-preserving balance changes (see 0.8.2 below and
+//   docs/CPU_PLAYTEST_AUDIT.md §10–14). Major bump — baselines from 0.x are
+//   not comparable. Games created without a rules object still play the 0.8
+//   rules until the rulebook and UI move to Grit.
+// 0.8.2 (2026-10-10): Grit economy + training-cap cards, as rules variants.
+//   The standard game is unchanged (same outcomes, same RNG streams).
+//   - state.rules.grit: experience and currency split. XP only raises your
+//     Level and is never spent; Grit buys training sessions and gear.
+//     Route cards carry 1–3 Grit by grade band when dealt (setup and every
+//     Setter reset); the first climber to SEND a route takes it. Milestone
+//     sends pay 2 / 3 / 4. Optional start Grit and per-round allowance.
+//   - Two variant-only cards, dealt only in training-cap games: Hangboard
+//     Program (+5 training cap in every stat) and Training Partner (once per
+//     round, a training session costs no Grit).
+//   - Refusal reason code notEnoughGrit; climb_resolved reports gritGained.
+//   - GRIT_RULES (helpers.js) is the adopted preset: cards 2 / 3 / 4 Grit,
+//     training cap 10 + 5 per Level, seats start with 0 / 2 / 4 / 6 Grit,
+//     and trait-preserving character balance (Route Reader near-miss ≤ 3 +
+//     stat shift on Milestones; Technician +1 Time on Milestones only;
+//     Sprinter 85% XP; Iron Lung stat growth −0.5; Free Solo +2 Grit a round).
+//   - Per-character rules hooks: rules.characters[key] = { gritStart,
+//     gritPerRound, trainCapMultiplier, uncapped, freeTraining, ability
+//     (DEFAULT_ABILITY numbers), body (starting stats / Endurance / growth) }.
+//     The climber keeps its Beta Boost until a climb's outcome is decided, and
+//     the suggested stat shift follows the climber's send rule (passRule) —
+//     no change under the standard rules.
+//   Patch — variants only.
 // 0.8.1 (2026-10-10): One engine for local and online play.
 //   - Power Spotting's success heal stops at max endurance but never lowers
 //     endurance: a successful climb used to cap any surplus from rest-bonus
@@ -287,387 +320,10 @@ const __version = (function () {
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-const ENGINE_VERSION = { major: 0, minor: 8, patch: 1 };
+const ENGINE_VERSION = { major: 1, minor: 0, patch: 0 };
 const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;
 
 return { ENGINE_VERSION, ENGINE_VERSION_STRING };
-})();
-
-// ---- engine/state.js ----
-const __state = (function () {
-'use strict';
-const { ROUTES, GEAR_SHOP, CHARACTERS } = __data;
-const { createRng } = __rng;
-const { makeEmitter } = __telemetry;
-const { ENGINE_VERSION_STRING } = __version;
-// Game state factory.
-//
-// Responsibilities:
-//   - createGame({ seed, characterKeys }) → { state, events }
-//       Produces a brand-new game ready for the first player's first turn.
-//       All randomness (milestone picks, route/shop shuffles) is derived
-//       from the seed so identical (seed, characters) always produce the
-//       identical opening position.
-//
-// Non-responsibilities (handled elsewhere):
-//   - getLegalActions / applyAction / isTerminal live in engine.js
-//   - UI rendering is not this module's concern
-//
-// State shape note:
-//   state.attemptedRoutes is a PLAIN OBJECT, not a Set, so the whole state
-//   object serializes cleanly to JSON. Keys look like "bouldering:Crux Problem"
-//   and values are true. This matches the Set-based semantics from game.js.
-
-
-
-
-
-
-// Gear items that are NEVER in the random 3-slot shop rotation. They are
-// always available for purchase from a separate "access card" section,
-// gated by prerequisites.
-//
-// RuleModifications (2026-06-27): Top Rope no longer requires any gear, so the
-// Harness card was removed. These three cards now gate ONLY Lead Climbing.
-const ACCESS_CARDS = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
-
-// Number of top-rope routes assigned to each belayer station.
-const ROUTES_PER_BELAYER = 2;
-
-// Number of Top Rope belayer stations for a game with `playerCount` players:
-// one fewer than the number of players, but never fewer than 1. A solo game
-// gets a single station (the "Auto-Belay") — without it, a solo player could
-// never attempt the Top Rope milestone every game includes.
-function belayerCountFor(playerCount) {
-  return Math.max(1, playerCount - 1);
-}
-
-// The routes of `area` that may be dealt to the wall: the area's deck minus
-// this game's milestone routes. Milestone cards sit on the milestone board for
-// the whole game, so they never also appear as a regular route.
-function regularRoutePool(milestoneRoutes, area) {
-  const milestoneNames = new Set(
-    Object.values(milestoneRoutes || {})
-      .filter(m => m && m.area === area)
-      .map(m => m.route.name),
-  );
-  return ROUTES[area].filter(r => !milestoneNames.has(r.name));
-}
-
-// Draw the Top Rope rotation as N belayer stations of ROUTES_PER_BELAYER routes
-// each, where N = belayerCount. Returns a FLAT array of 2×belayerCount routes,
-// each tagged with a `belayer` index (0-based station). Keeping a flat array
-// (rather than nested arrays) preserves every existing `.find/.forEach/.map`
-// over availableRoutes.topRope; stations are derived from the tag. `pool` is
-// the deck to draw from (regularRoutePool for topRope).
-function drawTopRopeStations(rng, belayerCount, pool = ROUTES.topRope) {
-  const count = Math.max(0, belayerCount) * ROUTES_PER_BELAYER;
-  const drawn = count > 0 ? rng.pickN(pool, count) : [];
-  return drawn.map((route, i) => ({ ...route, belayer: Math.floor(i / ROUTES_PER_BELAYER) }));
-}
-
-// ---------- Public API ----------
-
-// `rules` (optional): balance-experiment overrides, stored on the state as
-// state.rules — see trainingSpec in helpers.js. Omit for the standard rules.
-function createGame({ seed, characterKeys, rules = null }) {
-  // Validate inputs up front — these are the pipeline's guarantees,
-  // so a bad input is a programming bug, not runtime noise.
-  if (!Array.isArray(characterKeys) || characterKeys.length < 1 || characterKeys.length > 4) {
-    throw new Error('characterKeys must be an array of 1–4 character keys');
-  }
-  if (new Set(characterKeys).size !== characterKeys.length) {
-    // Per playtest design decision (2026-04-21): no duplicate characters in a game.
-    throw new Error('duplicate character keys are not allowed');
-  }
-  for (const key of characterKeys) {
-    if (!CHARACTERS[key]) throw new Error(`unknown character key: ${key}`);
-  }
-  if (typeof seed !== 'number' || !Number.isFinite(seed)) {
-    throw new Error('seed must be a finite number');
-  }
-
-  const rng = createRng(seed);
-  const emitter = makeEmitter(0);
-
-  // Build players.
-  const players = characterKeys.map((key, i) => makePlayer(i + 1, key));
-
-  // Top Rope belayer stations: N − 1 belayers for N players, minimum 1 (solo
-  // Auto-Belay). Fixed from round 1 — no time-based unlock ramp.
-  const belayerCount = belayerCountFor(players.length);
-
-  // Pick milestone routes FIRST (matches game.js:773 ordering — milestones
-  // are selected before the per-area route rotation is drawn).
-  const milestones = pickMilestoneRoutes(rng);
-
-  // Draw the opening rotation. Bouldering and Lead keep a flat list of 5;
-  // Top Rope is split into belayerCount stations of 2 routes each.
-  // Milestone routes are excluded from every wall's deck.
-  const availableRoutes = {
-    bouldering: rng.pickN(regularRoutePool(milestones, 'bouldering'), 5),
-    topRope: drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope')),
-    leadClimbing: rng.pickN(regularRoutePool(milestones, 'leadClimbing'), 5),
-  };
-
-  // Draw 3 non-access-card items for the shop rotation.
-  const availableGear = initializeGearShop(rng);
-
-  // Seed per-player attempt tracking.
-  const attemptedRoutes = {};
-  for (const p of players) attemptedRoutes[p.playerNum] = {};
-
-  const state = {
-    engineVersion: ENGINE_VERSION_STRING,
-    seed,
-    round: 1,
-    currentPlayerIndex: 0,
-    players,
-    availableRoutes,
-    availableGear,
-    milestoneRoutes: milestones,
-    // Route-clearing token positions (game.js comments at line 240):
-    //   0 → next end-of-round clear is Lead
-    //   1 → next end-of-round clear is Top Rope
-    //   2 → next end-of-round clear is Bouldering
-    // Rotates 0 → 1 → 2 → 0 at end of each round.
-    routeClearingPosition: 0,
-    // Top Rope belayer-station count = number of players − 1, minimum 1
-    // (belayerCountFor). Fixed for the whole game. Each station holds 2 routes and
-    // admits at most 1 climber. Lead Climbing is separately capped at 1 climber
-    // and is no longer tied to this count.
-    belayerCount,
-    attemptedRoutes,
-    ...(rules ? { rules: { ...rules } } : {}),
-    gameEnded: false,
-    winner: null,
-    pendingLevelUp: null,
-    // Complete structured event log. Unbounded; no 20-entry cap.
-    events: [],
-    // RNG state snapshot. applyAction restores the PRNG from this so the
-    // sequence of random numbers continues exactly where createGame left
-    // off. Allows applyAction to be "pure" in the state-in/state-out sense
-    // while still having deterministic randomness.
-    rngState: rng.getState(),
-  };
-
-  // Emit the bootstrap events: a game_start describing everything needed
-  // to reconstruct the opening position, then the first turn_start.
-  emitter.emit('game_start', {
-    seed,
-    engineVersion: ENGINE_VERSION_STRING,
-    players: players.map(p => ({
-      playerNum: p.playerNum,
-      characterKey: p.character.key,
-      characterName: p.character.name,
-      archetype: p.character.archetype,
-      startingStats: { ...p.character.stats },
-      startingEndurance: p.character.maxEndurance,
-      specialAbility: p.character.specialAbility.name,
-    })),
-    milestoneRoutes: serializeMilestones(milestones),
-    // Top Rope belayer-station count for this game (players − 1).
-    belayerCount,
-    // Full snapshot of opening rotation so a replay can reconstruct without
-    // re-running the PRNG from seed.
-    initialAvailableRoutes: summarizeRoutes(availableRoutes),
-    initialAvailableGear: availableGear.map(g => g.name),
-  });
-
-  emitter.emit('turn_start', {
-    round: 1,
-    playerNum: players[0].playerNum,
-    timeRemaining: players[0].character.timeRemaining,
-    endurance: players[0].character.currentEndurance,
-  });
-
-  // Persist the emitted events on state.
-  state.events = emitter.events.slice();
-
-  // Return both the full state AND the just-emitted delta. Callers
-  // streaming to JSONL only need the delta; callers needing the running
-  // log use state.events.
-  return { state, events: emitter.events.slice() };
-}
-
-// ---------- Helpers ----------
-
-// Build a player object in its initial state. Matches the shape produced by
-// selectCharacter in game.js:732-748 with one exception: we deep-clone the
-// character template up front so no mutation leaks back to CHARACTERS.
-function makePlayer(playerNum, characterKey) {
-  const tmpl = CHARACTERS[characterKey];
-  // Deep-clone so the per-player `specialAbility.used` flag (and any
-  // future per-player mutation) doesn't bleed into the shared template.
-  const charBase = JSON.parse(JSON.stringify(tmpl));
-  return {
-    playerNum,
-    character: {
-      ...charBase,
-      key: characterKey,
-      level: 1,
-      xp: 0,
-      currentEndurance: tmpl.startingEndurance,
-      maxEndurance: tmpl.startingEndurance,
-      stats: { ...tmpl.startingStats },
-      equipment: [],
-      trainingBonuses: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
-      gearBonuses: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
-      timeRemaining: 10,
-      abilityUsed: false,
-      betaBoostActive: false,
-      location: 'lobby',
-      // Which Top Rope belayer station (0-based index) this player currently
-      // occupies, or null when not at a station. Set when climbing a top-rope
-      // route; cleared to null on entering any other area and at round end.
-      belayerStation: null,
-      milestonesCompleted: { beginner: false, intermediate: false, expert: false },
-    },
-  };
-}
-
-// Categorize every route in ROUTES into a difficulty bucket, then pick one
-// route from each bucket for the three milestones.
-//
-// Engine v0.4.0 (Scenario 2C — area exclusion): the three milestones MUST
-// span all three climbing areas (bouldering / topRope / leadClimbing). This
-// is enforced via SEQUENTIAL AREA EXCLUSION:
-//   1. Beginner is picked freely from the beginner bucket.
-//   2. Intermediate is picked from routes in tiers whose area differs from
-//      the beginner pick.
-//   3. Expert is picked from routes whose area differs from BOTH prior picks.
-// The route deck is dense enough in each non-beginner cell (Bouldering has
-// 12 int / 7 exp, Top Rope 10 int / 8 exp, Lead 9 int / 7 exp) that step 2
-// and step 3 always have candidates regardless of step 1's draw.
-//
-// This guarantees every game touches all three climbing areas AND has one
-// beginner, one intermediate, one expert — solving the "3-expert / 3-beginner
-// bad draw" problem that plagued v0.3.x.
-//
-// Grade-to-bucket mapping mirrors game.js:523-545 exactly.
-function pickMilestoneRoutes(rng) {
-  const beginner = [];
-  const intermediate = [];
-  const expert = [];
-
-  for (const area of Object.keys(ROUTES)) {
-    for (const route of ROUTES[area]) {
-      const { grade } = route;
-      // Bouldering V-grade buckets.
-      if (['V0', 'V1', 'V2'].includes(grade)) {
-        beginner.push({ area, route });
-      } else if (['V3', 'V4', 'V5', 'V6', 'V7'].includes(grade)) {
-        intermediate.push({ area, route });
-      } else if (['V8', 'V9', 'V10', 'V11', 'V12'].includes(grade)) {
-        expert.push({ area, route });
-      }
-      // Top-rope YDS buckets.
-      else if (['5.6', '5.7', '5.8'].includes(grade)) {
-        beginner.push({ area, route });
-      } else if (['5.9', '5.10a', '5.10b', '5.10d', '5.11b', '5.11c'].includes(grade)) {
-        intermediate.push({ area, route });
-      } else if (['5.12a', '5.12b', '5.12d', '5.13a', '5.13c'].includes(grade)) {
-        expert.push({ area, route });
-      }
-      // Lead-climbing-specific bucket overrides (game.js:538-545).
-      else if (area === 'leadClimbing' && ['5.8', '5.9'].includes(grade)) {
-        beginner.push({ area, route });
-      } else if (area === 'leadClimbing' && ['5.10a', '5.10b', '5.10d', '5.11a', '5.11b', '5.11c'].includes(grade)) {
-        intermediate.push({ area, route });
-      } else if (area === 'leadClimbing' && ['5.12a', '5.12b', '5.12d', '5.13a', '5.14a'].includes(grade)) {
-        expert.push({ area, route });
-      }
-      // Grades that don't fall into any bucket (e.g. 5.11a top-rope, 5.11d
-      // lead, 5.13b, 5.15a…) are simply ineligible as milestones. That
-      // matches the behavior in game.js — unmatched grades silently skip.
-    }
-  }
-
-  // Guard: every bucket must have at least one candidate.
-  if (!beginner.length || !intermediate.length || !expert.length) {
-    throw new Error(
-      `milestone bucket empty: beginner=${beginner.length}, ` +
-      `intermediate=${intermediate.length}, expert=${expert.length}`
-    );
-  }
-
-  // === Scenario 2C: sequential area-exclusion sampling ===
-  // 1. Beginner — free pick from any area.
-  const beg = rng.pick(beginner);
-
-  // 2. Intermediate — only from routes whose area differs from beg.area.
-  const intCandidates = intermediate.filter(r => r.area !== beg.area);
-  if (!intCandidates.length) {
-    throw new Error(
-      `no intermediate routes outside beginner area "${beg.area}". ` +
-      `Route deck composition has drifted and Scenario 2C cannot satisfy ` +
-      `"three different areas" constraint.`
-    );
-  }
-  const int = rng.pick(intCandidates);
-
-  // 3. Expert — only from routes whose area differs from BOTH prior picks.
-  const expCandidates = expert.filter(
-    r => r.area !== beg.area && r.area !== int.area
-  );
-  if (!expCandidates.length) {
-    throw new Error(
-      `no expert routes outside areas "${beg.area}" and "${int.area}". ` +
-      `Route deck composition has drifted and Scenario 2C cannot satisfy ` +
-      `"three different areas" constraint.`
-    );
-  }
-  const exp = rng.pick(expCandidates);
-
-  return { beginner: beg, intermediate: int, expert: exp };
-}
-
-// Initialize the 3-slot random gear shop. Access cards are handled
-// separately (they're always available for purchase, not rotated in).
-function initializeGearShop(rng) {
-  const nonAccessGear = GEAR_SHOP.filter(g => !ACCESS_CARDS.includes(g.name));
-  return rng.pickN(nonAccessGear, 3);
-}
-
-// ---------- Event payload helpers ----------
-
-// Compact representation of the milestones for the game_start event.
-// We don't serialize the full route object because the replay tool can
-// re-look-up routes by name from data.js.
-function serializeMilestones(milestones) {
-  return {
-    beginner: {
-      area: milestones.beginner.area,
-      routeName: milestones.beginner.route.name,
-      grade: milestones.beginner.route.grade,
-    },
-    intermediate: {
-      area: milestones.intermediate.area,
-      routeName: milestones.intermediate.route.name,
-      grade: milestones.intermediate.route.grade,
-    },
-    expert: {
-      area: milestones.expert.area,
-      routeName: milestones.expert.route.name,
-      grade: milestones.expert.route.grade,
-    },
-  };
-}
-
-// Summarize the opening route rotation by name only; callers can look up
-// the full route data from engine/data.js if they need requirements/etc.
-function summarizeRoutes(availableRoutes) {
-  return {
-    bouldering: availableRoutes.bouldering.map(r => r.name),
-    topRope: availableRoutes.topRope.map(r => r.name),
-    leadClimbing: availableRoutes.leadClimbing.map(r => r.name),
-  };
-}
-
-// Exported for engine.js internal use (action handlers will need to
-// distinguish access cards from rotation gear when computing legal actions).
-
-return { belayerCountFor, regularRoutePool, drawTopRopeStations, createGame, ACCESS_CARDS };
 })();
 
 // ---- engine/helpers.js ----
@@ -927,13 +583,48 @@ function computeEffectiveStats(char, route, area, attemptedRoutesForPlayer) {
 function computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift = null) {
   let stats = computeEffectiveStats(char, route, area, attemptedRoutesForPlayer);
   if (char.betaBoostActive) {
+    const b = abilityParam(char, 'betaBoost') ?? 3;
     stats = {
-      strength: stats.strength + 3, technique: stats.technique + 3,
-      focus: stats.focus + 3, flexibility: stats.flexibility + 3,
+      strength: stats.strength + b, technique: stats.technique + b,
+      focus: stats.focus + b, flexibility: stats.flexibility + b,
     };
   }
   if (shift) stats = applyStatShiftToStats(stats, shift);
   return stats;
+}
+
+// =============================================================================
+// CHARACTER ABILITY PARAMETERS (balance experiments)
+// =============================================================================
+// Each ability's numbers, as printed. A rules variant can tune them per
+// character with rules.characters[key].ability, which createGame copies onto
+// the climber as char.abilityParams. Absent, abilities play exactly as printed.
+//   routeReader.milestonePasses  stats a Milestone needs (3 = Versatility applies)
+//   routeReader.boostOnly        3-of-4 only while Beta Boost is active
+//   routeReader.nearMiss         the 4th stat may miss by at most this (null = any)
+//   routeReader.shiftOnMilestones  Versatility's stat shift may be used on Milestones
+//   technician.extraTimeOn       where Perfect Beta's +1 Time applies: 'all' | 'milestone' | 'regular'
+const DEFAULT_ABILITY = Object.freeze({
+  sprinter: { timeReduction: 2, xpMultiplier: 0.5, focusCrux: true },
+  technician: { reqReduction: 5, extraTime: 1, extraTimeOn: 'all' },
+  ironLung: { failXpBonus: 0.5, failEndurance: 5 },
+  routeReader: { betaBoost: 3, milestonePasses: 3, boostOnly: false, nearMiss: null, shiftOnMilestones: false },
+});
+
+function abilityParam(char, name) {
+  const own = char && char.abilityParams;
+  if (own && own[name] !== undefined) return own[name];
+  return (DEFAULT_ABILITY[char && char.key] || {})[name];
+}
+
+// How many stats a climb needs, and how far a Route Reader's 4th may miss.
+function passRule(char, isMilestone = false) {
+  if (char.key !== 'routeReader') return { needed: 4, nearMiss: Infinity };
+  const all4 = (isMilestone && abilityParam(char, 'milestonePasses') === 4) ||
+    (abilityParam(char, 'boostOnly') && !char.betaBoostActive);
+  if (all4) return { needed: 4, nearMiss: Infinity };
+  const nm = abilityParam(char, 'nearMiss');
+  return { needed: 3, nearMiss: nm === null || nm === undefined ? Infinity : nm };
 }
 
 // =============================================================================
@@ -944,10 +635,15 @@ function computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift = 
 // Sprinter's "Flash Speed": -2 (min 1). Technician's "Perfect Beta": +1.
 // Engine v0.3.0 also applies gear effectKind 'timeCostReduction' for tagged routes
 // (Trick Foot Manual: Toe/Heel Hook climbs cost 1 less time).
-function getEffectiveClimbTimeCost(char, baseTime, route = null) {
+function getEffectiveClimbTimeCost(char, baseTime, route = null, isMilestone = false) {
   let t = baseTime;
-  if (char.key === 'sprinter') t = Math.max(1, t - 2);
-  if (char.key === 'technician') t += 1;
+  if (char.key === 'sprinter') t = Math.max(1, t - abilityParam(char, 'timeReduction'));
+  if (char.key === 'technician') {
+    const on = abilityParam(char, 'extraTimeOn');
+    if (on === 'all' || (on === 'milestone' && isMilestone) || (on === 'regular' && !isMilestone)) {
+      t += abilityParam(char, 'extraTime');
+    }
+  }
   // Tag-targeted time-cost reduction gear
   if (route && route.tag) {
     for (const gearName of char.equipment || []) {
@@ -978,7 +674,7 @@ function getEffectiveClimbEnduranceCost(char, route, baseEndurance) {
 // XP multiplier applied to base success/fail XP before Iron Lung's bonus.
 // Sprinter's "Flash Speed": 0.5. Everyone else: 1.0.
 function getXpMultiplier(char) {
-  return char.key === 'sprinter' ? 0.5 : 1.0;
+  return char.key === 'sprinter' ? abilityParam(char, 'xpMultiplier') : 1.0;
 }
 
 // Time cost for a gear-shop purchase: Gear Bag makes shopping free.
@@ -1016,7 +712,7 @@ function getSpendableXp(char) {
 // Returns a fresh array — does not mutate the route.
 function buildEffectRollArray(char, route) {
   const effects = (route.rollEffect || []).map(e => ({ ...e }));
-  if (char.key === 'sprinter') {
+  if (char.key === 'sprinter' && abilityParam(char, 'focusCrux')) {
     effects.push({ stat: 'focus', modifier: 1, source: 'sprinter_flash_speed' });
   }
   return effects;
@@ -1133,7 +829,7 @@ function makeDiceContext(effects, char, route, isMilestone, stats) {
   // stat-blind choices leave it alone (it counts for nothing).
   const mentorDefault = mentor ? (live.find(i => mods[i] === 1) ?? null) : null;
   return {
-    char, route, effects, stats, n, mods, live, mentor, mentorDefault,
+    char, route, effects, stats, n, mods, live, mentor, mentorDefault, isMilestone,
     // Dice a stat-blind choice may pick: live, and not the one Mentor negates.
     pickable: stats ? live : live.filter(i => i !== mentorDefault),
     reroll: find('rerollOnTag', true) || null,
@@ -1150,13 +846,14 @@ function makeDiceContext(effects, char, route, isMilestone, stats) {
 // worst stat, or the 3rd-best for a Route Reader). Higher is better.
 function scoreDice(ctx, dice, mentorIndex) {
   const { requirements } = applyDiceToRequirements(ctx.char, ctx.route, ctx.effects, dice, { mentorIndex });
-  return scoreRequirements(ctx.char, ctx.stats, requirements);
+  return scoreRequirements(ctx.char, ctx.stats, requirements, ctx.isMilestone);
 }
 
-function scoreRequirements(char, stats, requirements) {
+// Same send rule as resolveClimbOutcome (passRule), as a score.
+function scoreRequirements(char, stats, requirements, isMilestone = false) {
   const margins = STAT_KEYS.map(k => stats[k] - requirements[k]).sort((a, b) => b - a);
-  const needed = char.key === 'routeReader' ? 3 : 4;
-  const deciding = margins[needed - 1];
+  const { needed, nearMiss } = passRule(char, isMilestone);
+  const deciding = needed === 4 ? margins[3] : Math.min(margins[2], margins[3] + nearMiss);
   return [deciding >= 0 ? 1 : 0, deciding, margins[0] + margins[1] + margins[2] + margins[3]];
 }
 
@@ -1288,7 +985,8 @@ function climbSendProbability(char, route, area, attemptedRoutesForPlayer = {}, 
   // stats and the route — and bots ask about the same climbs every turn.
   const memoKey = `${char.key}|${char.equipment.join(',')}|${stats.strength},${stats.technique},${stats.focus},${stats.flexibility}|` +
     `${isMilestone ? 1 : 0}|${route.strength},${route.technique},${route.focus},${route.flexibility}|${route.tag || ''}|` +
-    `${(route.rollEffect || []).map(e => `${e.stat}${e.modifier}`).join(',')}`;
+    `${(route.rollEffect || []).map(e => `${e.stat}${e.modifier}`).join(',')}|` +
+    `${char.betaBoostActive ? 1 : 0}|${char.abilityParams ? JSON.stringify(char.abilityParams) : ''}`;
   const hit = SEND_MEMO.get(memoKey);
   if (hit) return { ...hit, stats };
   const result = exactSendProbability(char, route, isMilestone, stats);
@@ -1314,7 +1012,7 @@ function exactSendProbability(char, route, isMilestone, stats) {
       (draw) => {
         const res = finishClimbDice(rolls.slice(), draw, effects, char, route, isMilestone, stats);
         const { requirements } = applyDiceToRequirements(char, route, effects, res.dice, { mentorIndex: res.mentorIndex });
-        return scoreRequirements(char, stats, requirements);
+        return scoreRequirements(char, stats, requirements, isMilestone);
       },
       (score, weight) => {
         pSend += (score[0] * weight) / combos;
@@ -1412,8 +1110,9 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts =
 
   // Technician's blanket -5 to all requirements, floored at 0.
   if (char.key === 'technician') {
+    const cut = abilityParam(char, 'reqReduction');
     for (const k of Object.keys(requirements)) {
-      requirements[k] = Math.max(0, requirements[k] - 5);
+      requirements[k] = Math.max(0, requirements[k] - cut);
     }
   }
   return { requirements, appliedModifiers };
@@ -1427,7 +1126,7 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts =
 // Route Reader's "Versatility" passive: succeeds if 3 of 4 stats pass.
 // All other characters: must pass all 4.
 // Returns { success, perStatPass }.
-function resolveClimbOutcome(char, effectiveStats, requirements) {
+function resolveClimbOutcome(char, effectiveStats, requirements, isMilestone = false) {
   const perStatPass = {
     strength:    effectiveStats.strength    >= requirements.strength,
     technique:   effectiveStats.technique   >= requirements.technique,
@@ -1435,8 +1134,13 @@ function resolveClimbOutcome(char, effectiveStats, requirements) {
     flexibility: effectiveStats.flexibility >= requirements.flexibility,
   };
   const passCount = Object.values(perStatPass).filter(Boolean).length;
-  const needed = char.key === 'routeReader' ? 3 : 4;
-  return { success: passCount >= needed, perStatPass, passCount };
+  const { needed, nearMiss } = passRule(char, isMilestone);
+  let success = passCount >= needed;
+  // A Route Reader's one failing stat may have to be a near miss (variant).
+  if (success && passCount < 4 && Number.isFinite(nearMiss)) {
+    success = STAT_KEYS.every(k => effectiveStats[k] - requirements[k] >= -nearMiss);
+  }
+  return { success, perStatPass, passCount };
 }
 
 // Compute XP for a climb result.
@@ -1452,7 +1156,7 @@ function computeClimbXp(char, route, success) {
   const base = success ? route.xpSuccess : route.xpFail;
   let xp = base * getXpMultiplier(char);
   if (!success && char.key === 'ironLung') {
-    xp += Math.floor(xp * 0.5);
+    xp += Math.floor(xp * abilityParam(char, 'failXpBonus'));
   }
   // Confidence Building: failed climbs get +N bonus XP
   if (!success) {
@@ -1472,7 +1176,7 @@ function getFailureEnduranceExtra(char) {
     const gear = GEAR_SHOP.find(g => g.name === gearName);
     if (gear && gear.effectKind === 'ignoreFailPenalty') return 0;
   }
-  return char.key === 'ironLung' ? 5 : 0;
+  return char.key === 'ironLung' ? abilityParam(char, 'failEndurance') : 0;
 }
 
 // Engine v0.3.0 — Power Spotting heals endurance after every successful climb.
@@ -1513,12 +1217,12 @@ function ownedGearWithEffect(char, effectKind) {
 // `diceTrace` is the trace from rollClimbDice; `appliedModifiers` comes from
 // applyDiceToRequirements.
 function describeClimbGearEffects({
-  char, route, effectRollArray, diceTrace, appliedModifiers, success, timeCost, enduranceCost, healed,
+  char, route, effectRollArray, diceTrace, appliedModifiers, success, timeCost, enduranceCost, healed, isMilestone = false,
 }) {
   const out = [];
   const names = (kind) => ownedGearWithEffect(char, kind).map(g => g.name).join(', ');
 
-  const charOnlyTime = getEffectiveClimbTimeCost(char, route.time);
+  const charOnlyTime = getEffectiveClimbTimeCost(char, route.time, null, isMilestone);
   if (timeCost < charOnlyTime) {
     out.push({ gear: names('timeCostReduction'), effectKind: 'timeCostReduction', from: charOnlyTime, to: timeCost });
   }
@@ -1543,7 +1247,7 @@ function describeClimbGearEffects({
     }
     if (char.key === 'ironLung') {
       for (const g of ownedGearWithEffect(char, 'ignoreFailPenalty')) {
-        out.push({ gear: g.name, effectKind: 'ignoreFailPenalty', endurance: 5 });
+        out.push({ gear: g.name, effectKind: 'ignoreFailPenalty', endurance: abilityParam(char, 'failEndurance') });
       }
     }
   } else if (healed > 0) {
@@ -1576,6 +1280,33 @@ function getTrainingBonusBoost(char) {
 //   trainCapBase,        cap on the TRAINING bonus per stat: base + perLevel ×
 //   trainCapPerLevel     (Level − 1). Omit trainCapBase for no cap.
 //   trainPerRound        max sessions per climber per round (standard: no limit)
+// Grit economy (`rules.grit`, an object; off when absent). Experience and
+// currency are separate: XP only raises your Level and is never spent; Grit
+// buys training and gear.
+//   routeGrit          Grit placed on a route card when it is dealt, by grade
+//                      band [easy, mid, hard] (default [1, 2, 3]). The first
+//                      climber to SEND the route takes it.
+//   milestoneGrit      Grit for sending each milestone (per climber)
+//                      (default { beginner: 2, intermediate: 3, expert: 4 }).
+//   trainCost          Grit per training session (default 1).
+//   gearPriceDivisor   gear price in Grit = max(1, round(XP cost / divisor))
+//                      unless the card prints a gritCost (default 25).
+//   start              Grit each climber starts with (default 0).
+//   seatStart          extra starting Grit by seat, e.g. [0, 1, 2, 3] —
+//                      compensates later seats for acting after seat 1.
+//   perRound           Grit each climber gains at the start of every round
+//                      after the first (default 0) — a floor so nobody is
+//                      locked out of training when no route is in reach.
+// Per-character overrides (`rules.characters[key]`):
+//   gritStart          this climber's starting Grit (instead of grit.start)
+//   trainCapMultiplier × this climber's training cap (default 1)
+//   uncapped           true: no training cap for this climber
+//   body               { startingStats, startingEndurance, growth } (each partial):
+//                      this climber's numbers (applied by createGame)
+//   gritPerRound       this climber's per-round Grit (instead of grit.perRound)
+//   freeTraining       true: this climber's training sessions cost no Grit
+// Cards marked `variantOnly: 'trainingCap'` exist only in games with a training
+// cap (trainCapBase set): they are never dealt in the standard game.
 
 // Time, Endurance and stat gain of one session at `area` for `char`.
 function trainingSpec(rules, area, char) {
@@ -1591,15 +1322,158 @@ function trainingSpec(rules, area, char) {
 function trainingCap(rules, char) {
   const r = rules || {};
   if (r.trainCapBase === undefined || r.trainCapBase === null) return Infinity;
-  return r.trainCapBase + (r.trainCapPerLevel ?? 0) * (char.level - 1);
+  const own = (r.characters && r.characters[char.key]) || {};
+  if (own.uncapped) return Infinity;
+  // Hangboard Program (trainingCapBonus) raises the cap.
+  let bonus = 0;
+  for (const n of char.equipment || []) {
+    const g = GEAR_SHOP.find(x => x.name === n);
+    if (g && g.effectKind === 'trainingCapBonus') bonus += g.value || 0;
+  }
+  return (r.trainCapBase + (r.trainCapPerLevel ?? 0) * (char.level - 1)) * (own.trainCapMultiplier ?? 1) + bonus;
 }
 
-// May `char` train `stat` once more under the variant's cap / per-round limit?
-// (Time, Endurance and station occupancy are checked by the caller.)
+// May `char` train `stat` once more under the variant's cap / per-round limit
+// / Grit cost? (Time, Endurance and station occupancy are checked by the caller.)
 function trainingAllowed(rules, char, stat, gain) {
   const r = rules || {};
   if (r.trainPerRound !== undefined && (char.trainedThisRound || 0) >= r.trainPerRound) return false;
+  if ((char.grit || 0) < trainingGritCost(rules, char)) return false;
   return char.trainingBonuses[stat] + gain <= trainingCap(rules, char);
+}
+
+// ----- Grit economy -----
+
+const DEFAULT_ROUTE_GRIT = [1, 2, 3];
+const DEFAULT_MILESTONE_GRIT = { beginner: 2, intermediate: 3, expert: 4 };
+
+// The adopted Grit rules (2026-10-11, docs/CPU_PLAYTEST_AUDIT.md §11–13):
+//   - route cards carry 2 / 3 / 4 Grit by grade band; first send takes it;
+//   - training cap 10 + 5 per Level above 1;
+//   - no per-round allowance, but later seats start with 0 / 2 / 4 / 6 Grit
+//     (seat 1 otherwise wins ~61% of 2-player games);
+//   - trait-preserving character balance (package B3):
+//       Route Reader: Versatility's 4th stat may miss by at most 3, and the
+//         stat shift also works on Milestones;
+//       Technician: Perfect Beta's +1 Time applies on Milestones only;
+//       Sprinter: sends earn 85% XP (was 50%);
+//       Iron Lung: Relentless as printed; stat growth −0.5 per Level in each stat;
+//       Free Solo: +2 Grit every round (it can only send routes it already
+//         beats, so without an income it soft-locks).
+const GRIT_RULES = Object.freeze({
+  grit: { start: 0, perRound: 0, routeGrit: [2, 3, 4], seatStart: [0, 2, 4, 6] },
+  trainCapBase: 10,
+  trainCapPerLevel: 5,
+  characters: {
+    routeReader: { ability: { nearMiss: 3, shiftOnMilestones: true } },
+    technician: { ability: { extraTimeOn: 'milestone' } },
+    sprinter: { ability: { xpMultiplier: 0.85 } },
+    ironLung: { body: { growth: { strength: 2, technique: 2, focus: 2.5, flexibility: 1.5 } } },
+    freeSolo: { gritPerRound: 2 },
+  },
+});
+
+// Grit a climber gains at the start of each round after the first.
+function perRoundGrit(rules, key) {
+  const own = rules.characters && rules.characters[key];
+  return (own && own.gritPerRound !== undefined) ? own.gritPerRound : (rules.grit.perRound ?? 0);
+}
+
+// Starting Grit for a climber under `rules` (seat is 0-based).
+function startingGrit(rules, key, seat = 0) {
+  const own = rules.characters && rules.characters[key];
+  const base = (own && own.gritStart !== undefined) ? own.gritStart : (rules.grit.start ?? 0);
+  return base + ((rules.grit.seatStart && rules.grit.seatStart[seat]) || 0);
+}
+
+function usesGrit(rules) {
+  return !!(rules && rules.grit);
+}
+
+// Grade band of a route: 0 easy (V0–V2, 5.6–5.9), 1 mid (V3–V7, 5.10–5.11),
+// 2 hard (V8+, 5.12+).
+function gradeBand(route) {
+  const g = String(route.grade || '');
+  if (g.startsWith('V')) {
+    const v = Number(g.slice(1));
+    return v <= 2 ? 0 : v <= 7 ? 1 : 2;
+  }
+  const m = g.match(/^5\.(\d+)/);
+  const yds = m ? Number(m[1]) : 0;
+  return yds <= 9 ? 0 : yds <= 11 ? 1 : 2;
+}
+
+// Grit a freshly dealt route card carries.
+function routeGritValue(rules, route) {
+  const table = (rules.grit && rules.grit.routeGrit) || DEFAULT_ROUTE_GRIT;
+  return table[gradeBand(route)] ?? 0;
+}
+
+// Copies of `routes` with their Grit placed, when the Grit economy is on;
+// otherwise `routes` unchanged. Used whenever route cards are dealt.
+function dealRouteGrit(rules, routes) {
+  if (!usesGrit(rules)) return routes;
+  return routes.map(r => ({ ...r, grit: routeGritValue(rules, r) }));
+}
+
+function milestoneGritReward(rules, tier) {
+  if (!usesGrit(rules)) return 0;
+  const table = rules.grit.milestoneGrit || DEFAULT_MILESTONE_GRIT;
+  return table[tier] || 0;
+}
+
+// Grit the next training session costs `char` (0 without the economy, or
+// when Training Partner's free session is still unused this round).
+function trainingGritCost(rules, char) {
+  if (!usesGrit(rules)) return 0;
+  if (rules.characters && rules.characters[char.key] && rules.characters[char.key].freeTraining) return 0;
+  if (ownsEffect(char, 'freeTrainingSession') && !char.freeSessionUsed) return 0;
+  return rules.grit.trainCost ?? 1;
+}
+
+// Price of `gear` for `char`: Grit in the Grit economy, else XP.
+function gearPrice(rules, char, gear) {
+  if (!usesGrit(rules)) return getEffectiveGearCost(char, gear);
+  if (typeof gear.gritCost === 'number') return gear.gritCost;
+  const div = rules.grit.gearPriceDivisor || 25;
+  return Math.max(1, Math.round(gear.cost / div));
+}
+
+// What `char` can spend on gear: Grit, or XP earned since the Level began.
+function gearFunds(rules, char) {
+  return usesGrit(rules) ? (char.grit || 0) : getSpendableXp(char);
+}
+
+// Pay for gear (mutates char). In the Grit economy XP is never spent.
+function payForGear(rules, char, cost) {
+  if (usesGrit(rules)) char.grit = (char.grit || 0) - cost;
+  else char.xp -= cost;
+}
+
+// Is `gear` part of this game's deck? (variantOnly cards need their variant.)
+function gearInGame(rules, gear) {
+  if (!gear.variantOnly) return true;
+  if (gear.variantOnly === 'trainingCap') return !!(rules && rules.trainCapBase !== undefined && rules.trainCapBase !== null);
+  return false;
+}
+
+// Grit a climb earns `char`, applied in place: a regular send takes the
+// Grit on the route card (and empties the card); a milestone send pays its
+// tier's reward. Falls earn nothing. `route` is the card in play (bots pass a
+// copy). Returns the Grit gained.
+function claimClimbGrit(rules, char, route, { isMilestone, success, tier }) {
+  if (!usesGrit(rules) || !success) return 0;
+  const gained = isMilestone ? milestoneGritReward(rules, tier) : (route.grit || 0);
+  if (!isMilestone) route.grit = 0;
+  char.grit = (char.grit || 0) + gained;
+  return gained;
+}
+
+function ownsEffect(char, kind) {
+  return (char.equipment || []).some(n => {
+    const g = GEAR_SHOP.find(x => x.name === n);
+    return g && g.effectKind === kind;
+  });
 }
 
 // =============================================================================
@@ -1673,7 +1547,7 @@ function isWellFormedStatShift(shift) {
 
 // May this character use a stat shift right now on this kind of climb?
 function canUseStatShift(char, isMilestone) {
-  return char.key === 'routeReader' && !char.abilityUsed && !isMilestone;
+  return char.key === 'routeReader' && !char.abilityUsed && (!isMilestone || abilityParam(char, 'shiftOnMilestones'));
 }
 
 // Return a copy of `stats` with the shift applied.
@@ -1687,13 +1561,19 @@ function applyStatShiftToStats(stats, shift) {
 // (stat − base requirement). We maximise that margin, then prefer the smallest
 // amount that achieves it. Only offered when the margin is under 6 (one die's
 // swing). Read-only: does not consume the ability.
-function bestRouteReaderShift(char, route, area, attemptedRoutesForPlayer) {
+function bestRouteReaderShift(char, route, area, attemptedRoutesForPlayer, isMilestone = false) {
   if (char.key !== 'routeReader') return null;
   let stats = computeEffectiveStats(char, route, area, attemptedRoutesForPlayer);
   if (char.betaBoostActive) {
-    stats = Object.fromEntries(SHIFT_STATS.map(k => [k, stats[k] + 3]));
+    const b = abilityParam(char, 'betaBoost') ?? 3;
+    stats = Object.fromEntries(SHIFT_STATS.map(k => [k, stats[k] + b]));
   }
-  const deciding = (st) => SHIFT_STATS.map(k => st[k] - route[k]).sort((a, b) => b - a)[2];
+  // The margin that settles the climb under this climber's send rule (passRule).
+  const { needed, nearMiss } = passRule(char, isMilestone);
+  const deciding = (st) => {
+    const m = SHIFT_STATS.map(k => st[k] - route[k]).sort((a, b) => b - a);
+    return needed === 4 ? m[3] : Math.min(m[2], m[3] + nearMiss);
+  };
   const baseline = deciding(stats);
   // A single die swings a requirement by at most 6. With a bigger margin the
   // climb is already safe, so don't offer (or waste) the once-per-round shift.
@@ -1762,7 +1642,14 @@ function applyLevelUpIfNeeded(char) {
   if (!nextRow) return { leveledUp: false };
   if (char.xp < nextRow.cumulative) return { leveledUp: false };
 
-  const tmpl = CHARACTERS[char.key];
+  // The climber's own body numbers (a rules variant may have adjusted them at
+  // setup — rules.characters[key].body), else the character template's.
+  const base = CHARACTERS[char.key];
+  const tmpl = {
+    startingStats: char.startingStats || base.startingStats,
+    startingEndurance: char.startingEndurance ?? base.startingEndurance,
+    growth: char.growth || base.growth,
+  };
   const oldStats = { ...char.stats };
   const oldMaxEndurance = char.maxEndurance;
   char.level += 1;
@@ -1908,7 +1795,410 @@ function dispatchToolCall(legalActions, toolCall) {
   }
 }
 
-return { checkAreaAccess, getSectionCapacity, getOccupiedBelayerStations, isBelayerStationFree, canClimbTopRopeRoute, pickFreeBelayerStation, isTrainingEquipment, getPlayersInSection, canEnterSection, calculateGearBonuses, computeEffectiveStats, computeClimbStats, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, getXpMultiplier, getGearPurchaseTimeCost, getEffectiveGearCost, getSpendableXp, buildEffectRollArray, rollClimbDice, resolveClimbDice, climbSendProbability, applyDiceToRequirements, resolveClimbOutcome, computeClimbXp, getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal, describeClimbGearEffects, getTrainingBonusBoost, trainingSpec, trainingCap, trainingAllowed, freeSoloCanAttempt, applyBetaBoostIfActive, MAX_STAT_SHIFT, isWellFormedStatShift, canUseStatShift, applyStatShiftToStats, bestRouteReaderShift, computeRestRecovery, getGearMaxEnduranceBonus, applyLevelUpIfNeeded, dispatchToolCall };
+return { checkAreaAccess, getSectionCapacity, getOccupiedBelayerStations, isBelayerStationFree, canClimbTopRopeRoute, pickFreeBelayerStation, isTrainingEquipment, getPlayersInSection, canEnterSection, calculateGearBonuses, computeEffectiveStats, computeClimbStats, DEFAULT_ABILITY, abilityParam, passRule, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, getXpMultiplier, getGearPurchaseTimeCost, getEffectiveGearCost, getSpendableXp, buildEffectRollArray, rollClimbDice, resolveClimbDice, climbSendProbability, applyDiceToRequirements, resolveClimbOutcome, computeClimbXp, getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal, describeClimbGearEffects, getTrainingBonusBoost, trainingSpec, trainingCap, trainingAllowed, GRIT_RULES, perRoundGrit, startingGrit, usesGrit, gradeBand, routeGritValue, dealRouteGrit, milestoneGritReward, trainingGritCost, gearPrice, gearFunds, payForGear, gearInGame, claimClimbGrit, freeSoloCanAttempt, applyBetaBoostIfActive, MAX_STAT_SHIFT, isWellFormedStatShift, canUseStatShift, applyStatShiftToStats, bestRouteReaderShift, computeRestRecovery, getGearMaxEnduranceBonus, applyLevelUpIfNeeded, dispatchToolCall };
+})();
+
+// ---- engine/state.js ----
+const __state = (function () {
+'use strict';
+const { ROUTES, GEAR_SHOP, CHARACTERS } = __data;
+const { createRng } = __rng;
+const { makeEmitter } = __telemetry;
+const { ENGINE_VERSION_STRING } = __version;
+const { dealRouteGrit, gearInGame, startingGrit, usesGrit } = __helpers;
+// Game state factory.
+//
+// Responsibilities:
+//   - createGame({ seed, characterKeys }) → { state, events }
+//       Produces a brand-new game ready for the first player's first turn.
+//       All randomness (milestone picks, route/shop shuffles) is derived
+//       from the seed so identical (seed, characters) always produce the
+//       identical opening position.
+//
+// Non-responsibilities (handled elsewhere):
+//   - getLegalActions / applyAction / isTerminal live in engine.js
+//   - UI rendering is not this module's concern
+//
+// State shape note:
+//   state.attemptedRoutes is a PLAIN OBJECT, not a Set, so the whole state
+//   object serializes cleanly to JSON. Keys look like "bouldering:Crux Problem"
+//   and values are true. This matches the Set-based semantics from game.js.
+
+
+
+
+
+
+
+// Gear items that are NEVER in the random 3-slot shop rotation. They are
+// always available for purchase from a separate "access card" section,
+// gated by prerequisites.
+//
+// RuleModifications (2026-06-27): Top Rope no longer requires any gear, so the
+// Harness card was removed. These three cards now gate ONLY Lead Climbing.
+const ACCESS_CARDS = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
+
+// Number of top-rope routes assigned to each belayer station.
+const ROUTES_PER_BELAYER = 2;
+
+// Number of Top Rope belayer stations for a game with `playerCount` players:
+// one fewer than the number of players, but never fewer than 1. A solo game
+// gets a single station (the "Auto-Belay") — without it, a solo player could
+// never attempt the Top Rope milestone every game includes.
+function belayerCountFor(playerCount) {
+  return Math.max(1, playerCount - 1);
+}
+
+// The routes of `area` that may be dealt to the wall: the area's deck minus
+// this game's milestone routes. Milestone cards sit on the milestone board for
+// the whole game, so they never also appear as a regular route.
+function regularRoutePool(milestoneRoutes, area) {
+  const milestoneNames = new Set(
+    Object.values(milestoneRoutes || {})
+      .filter(m => m && m.area === area)
+      .map(m => m.route.name),
+  );
+  return ROUTES[area].filter(r => !milestoneNames.has(r.name));
+}
+
+// Draw the Top Rope rotation as N belayer stations of ROUTES_PER_BELAYER routes
+// each, where N = belayerCount. Returns a FLAT array of 2×belayerCount routes,
+// each tagged with a `belayer` index (0-based station). Keeping a flat array
+// (rather than nested arrays) preserves every existing `.find/.forEach/.map`
+// over availableRoutes.topRope; stations are derived from the tag. `pool` is
+// the deck to draw from (regularRoutePool for topRope).
+function drawTopRopeStations(rng, belayerCount, pool = ROUTES.topRope) {
+  const count = Math.max(0, belayerCount) * ROUTES_PER_BELAYER;
+  const drawn = count > 0 ? rng.pickN(pool, count) : [];
+  return drawn.map((route, i) => ({ ...route, belayer: Math.floor(i / ROUTES_PER_BELAYER) }));
+}
+
+// ---------- Public API ----------
+
+// `rules` (optional): balance-experiment overrides, stored on the state as
+// state.rules — see trainingSpec in helpers.js. Omit for the standard rules.
+function createGame({ seed, characterKeys, rules = null }) {
+  // Validate inputs up front — these are the pipeline's guarantees,
+  // so a bad input is a programming bug, not runtime noise.
+  if (!Array.isArray(characterKeys) || characterKeys.length < 1 || characterKeys.length > 4) {
+    throw new Error('characterKeys must be an array of 1–4 character keys');
+  }
+  if (new Set(characterKeys).size !== characterKeys.length) {
+    // Per playtest design decision (2026-04-21): no duplicate characters in a game.
+    throw new Error('duplicate character keys are not allowed');
+  }
+  for (const key of characterKeys) {
+    if (!CHARACTERS[key]) throw new Error(`unknown character key: ${key}`);
+  }
+  if (typeof seed !== 'number' || !Number.isFinite(seed)) {
+    throw new Error('seed must be a finite number');
+  }
+
+  const rng = createRng(seed);
+  const emitter = makeEmitter(0);
+
+  // Build players.
+  const players = characterKeys.map((key, i) => makePlayer(i + 1, key));
+  // Grit economy: every climber starts with rules.grit.start Grit.
+  if (usesGrit(rules)) players.forEach((p, i) => { p.character.grit = startingGrit(rules, p.character.key, i); });
+  // Rules-variant ability tuning (rules.characters[key].ability), copied onto
+  // the climber so every helper sees it (abilityParam in helpers.js), and body
+  // tuning (rules.characters[key].body: startingStats / startingEndurance /
+  // growth, each partial), applied to the climber's own copy of its numbers.
+  for (const p of players) {
+    const own = rules && rules.characters && rules.characters[p.character.key];
+    if (!own) continue;
+    if (own.ability) p.character.abilityParams = { ...own.ability };
+    if (own.body) applyBody(p.character, own.body);
+  }
+
+  // Top Rope belayer stations: N − 1 belayers for N players, minimum 1 (solo
+  // Auto-Belay). Fixed from round 1 — no time-based unlock ramp.
+  const belayerCount = belayerCountFor(players.length);
+
+  // Pick milestone routes FIRST (matches game.js:773 ordering — milestones
+  // are selected before the per-area route rotation is drawn).
+  const milestones = pickMilestoneRoutes(rng);
+
+  // Draw the opening rotation. Bouldering and Lead keep a flat list of 5;
+  // Top Rope is split into belayerCount stations of 2 routes each.
+  // Milestone routes are excluded from every wall's deck.
+  // Grit-economy rules place Grit on every card as it is dealt.
+  const availableRoutes = {
+    bouldering: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'bouldering'), 5)),
+    topRope: dealRouteGrit(rules, drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope'))),
+    leadClimbing: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'leadClimbing'), 5)),
+  };
+
+  // Draw 3 non-access-card items for the shop rotation.
+  const availableGear = initializeGearShop(rng, rules);
+
+  // Seed per-player attempt tracking.
+  const attemptedRoutes = {};
+  for (const p of players) attemptedRoutes[p.playerNum] = {};
+
+  const state = {
+    engineVersion: ENGINE_VERSION_STRING,
+    seed,
+    round: 1,
+    currentPlayerIndex: 0,
+    players,
+    availableRoutes,
+    availableGear,
+    milestoneRoutes: milestones,
+    // Route-clearing token positions (game.js comments at line 240):
+    //   0 → next end-of-round clear is Lead
+    //   1 → next end-of-round clear is Top Rope
+    //   2 → next end-of-round clear is Bouldering
+    // Rotates 0 → 1 → 2 → 0 at end of each round.
+    routeClearingPosition: 0,
+    // Top Rope belayer-station count = number of players − 1, minimum 1
+    // (belayerCountFor). Fixed for the whole game. Each station holds 2 routes and
+    // admits at most 1 climber. Lead Climbing is separately capped at 1 climber
+    // and is no longer tied to this count.
+    belayerCount,
+    attemptedRoutes,
+    ...(rules ? { rules: { ...rules } } : {}),
+    gameEnded: false,
+    winner: null,
+    pendingLevelUp: null,
+    // Complete structured event log. Unbounded; no 20-entry cap.
+    events: [],
+    // RNG state snapshot. applyAction restores the PRNG from this so the
+    // sequence of random numbers continues exactly where createGame left
+    // off. Allows applyAction to be "pure" in the state-in/state-out sense
+    // while still having deterministic randomness.
+    rngState: rng.getState(),
+  };
+
+  // Emit the bootstrap events: a game_start describing everything needed
+  // to reconstruct the opening position, then the first turn_start.
+  emitter.emit('game_start', {
+    seed,
+    engineVersion: ENGINE_VERSION_STRING,
+    players: players.map(p => ({
+      playerNum: p.playerNum,
+      characterKey: p.character.key,
+      characterName: p.character.name,
+      archetype: p.character.archetype,
+      startingStats: { ...p.character.stats },
+      startingEndurance: p.character.maxEndurance,
+      specialAbility: p.character.specialAbility.name,
+    })),
+    milestoneRoutes: serializeMilestones(milestones),
+    // Top Rope belayer-station count for this game (players − 1).
+    belayerCount,
+    // Full snapshot of opening rotation so a replay can reconstruct without
+    // re-running the PRNG from seed.
+    initialAvailableRoutes: summarizeRoutes(availableRoutes),
+    initialAvailableGear: availableGear.map(g => g.name),
+  });
+
+  emitter.emit('turn_start', {
+    round: 1,
+    playerNum: players[0].playerNum,
+    timeRemaining: players[0].character.timeRemaining,
+    endurance: players[0].character.currentEndurance,
+  });
+
+  // Persist the emitted events on state.
+  state.events = emitter.events.slice();
+
+  // Return both the full state AND the just-emitted delta. Callers
+  // streaming to JSONL only need the delta; callers needing the running
+  // log use state.events.
+  return { state, events: emitter.events.slice() };
+}
+
+// ---------- Helpers ----------
+
+// Build a player object in its initial state. Matches the shape produced by
+// selectCharacter in game.js:732-748 with one exception: we deep-clone the
+// character template up front so no mutation leaks back to CHARACTERS.
+// Adjust a fresh (Level 1) climber's starting stats, Endurance and growth.
+function applyBody(c, body) {
+  if (body.startingStats) c.startingStats = { ...c.startingStats, ...body.startingStats };
+  if (body.growth) c.growth = { ...c.growth, ...body.growth };
+  if (body.startingEndurance !== undefined) c.startingEndurance = body.startingEndurance;
+  c.stats = { ...c.startingStats };
+  c.maxEndurance = c.startingEndurance;
+  c.currentEndurance = c.startingEndurance;
+}
+
+function makePlayer(playerNum, characterKey) {
+  const tmpl = CHARACTERS[characterKey];
+  // Deep-clone so the per-player `specialAbility.used` flag (and any
+  // future per-player mutation) doesn't bleed into the shared template.
+  const charBase = JSON.parse(JSON.stringify(tmpl));
+  return {
+    playerNum,
+    character: {
+      ...charBase,
+      key: characterKey,
+      level: 1,
+      xp: 0,
+      currentEndurance: tmpl.startingEndurance,
+      maxEndurance: tmpl.startingEndurance,
+      stats: { ...tmpl.startingStats },
+      equipment: [],
+      trainingBonuses: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
+      gearBonuses: { strength: 0, technique: 0, focus: 0, flexibility: 0 },
+      timeRemaining: 10,
+      abilityUsed: false,
+      betaBoostActive: false,
+      location: 'lobby',
+      // Which Top Rope belayer station (0-based index) this player currently
+      // occupies, or null when not at a station. Set when climbing a top-rope
+      // route; cleared to null on entering any other area and at round end.
+      belayerStation: null,
+      milestonesCompleted: { beginner: false, intermediate: false, expert: false },
+    },
+  };
+}
+
+// Categorize every route in ROUTES into a difficulty bucket, then pick one
+// route from each bucket for the three milestones.
+//
+// Engine v0.4.0 (Scenario 2C — area exclusion): the three milestones MUST
+// span all three climbing areas (bouldering / topRope / leadClimbing). This
+// is enforced via SEQUENTIAL AREA EXCLUSION:
+//   1. Beginner is picked freely from the beginner bucket.
+//   2. Intermediate is picked from routes in tiers whose area differs from
+//      the beginner pick.
+//   3. Expert is picked from routes whose area differs from BOTH prior picks.
+// The route deck is dense enough in each non-beginner cell (Bouldering has
+// 12 int / 7 exp, Top Rope 10 int / 8 exp, Lead 9 int / 7 exp) that step 2
+// and step 3 always have candidates regardless of step 1's draw.
+//
+// This guarantees every game touches all three climbing areas AND has one
+// beginner, one intermediate, one expert — solving the "3-expert / 3-beginner
+// bad draw" problem that plagued v0.3.x.
+//
+// Grade-to-bucket mapping mirrors game.js:523-545 exactly.
+function pickMilestoneRoutes(rng) {
+  const beginner = [];
+  const intermediate = [];
+  const expert = [];
+
+  for (const area of Object.keys(ROUTES)) {
+    for (const route of ROUTES[area]) {
+      const { grade } = route;
+      // Bouldering V-grade buckets.
+      if (['V0', 'V1', 'V2'].includes(grade)) {
+        beginner.push({ area, route });
+      } else if (['V3', 'V4', 'V5', 'V6', 'V7'].includes(grade)) {
+        intermediate.push({ area, route });
+      } else if (['V8', 'V9', 'V10', 'V11', 'V12'].includes(grade)) {
+        expert.push({ area, route });
+      }
+      // Top-rope YDS buckets.
+      else if (['5.6', '5.7', '5.8'].includes(grade)) {
+        beginner.push({ area, route });
+      } else if (['5.9', '5.10a', '5.10b', '5.10d', '5.11b', '5.11c'].includes(grade)) {
+        intermediate.push({ area, route });
+      } else if (['5.12a', '5.12b', '5.12d', '5.13a', '5.13c'].includes(grade)) {
+        expert.push({ area, route });
+      }
+      // Lead-climbing-specific bucket overrides (game.js:538-545).
+      else if (area === 'leadClimbing' && ['5.8', '5.9'].includes(grade)) {
+        beginner.push({ area, route });
+      } else if (area === 'leadClimbing' && ['5.10a', '5.10b', '5.10d', '5.11a', '5.11b', '5.11c'].includes(grade)) {
+        intermediate.push({ area, route });
+      } else if (area === 'leadClimbing' && ['5.12a', '5.12b', '5.12d', '5.13a', '5.14a'].includes(grade)) {
+        expert.push({ area, route });
+      }
+      // Grades that don't fall into any bucket (e.g. 5.11a top-rope, 5.11d
+      // lead, 5.13b, 5.15a…) are simply ineligible as milestones. That
+      // matches the behavior in game.js — unmatched grades silently skip.
+    }
+  }
+
+  // Guard: every bucket must have at least one candidate.
+  if (!beginner.length || !intermediate.length || !expert.length) {
+    throw new Error(
+      `milestone bucket empty: beginner=${beginner.length}, ` +
+      `intermediate=${intermediate.length}, expert=${expert.length}`
+    );
+  }
+
+  // === Scenario 2C: sequential area-exclusion sampling ===
+  // 1. Beginner — free pick from any area.
+  const beg = rng.pick(beginner);
+
+  // 2. Intermediate — only from routes whose area differs from beg.area.
+  const intCandidates = intermediate.filter(r => r.area !== beg.area);
+  if (!intCandidates.length) {
+    throw new Error(
+      `no intermediate routes outside beginner area "${beg.area}". ` +
+      `Route deck composition has drifted and Scenario 2C cannot satisfy ` +
+      `"three different areas" constraint.`
+    );
+  }
+  const int = rng.pick(intCandidates);
+
+  // 3. Expert — only from routes whose area differs from BOTH prior picks.
+  const expCandidates = expert.filter(
+    r => r.area !== beg.area && r.area !== int.area
+  );
+  if (!expCandidates.length) {
+    throw new Error(
+      `no expert routes outside areas "${beg.area}" and "${int.area}". ` +
+      `Route deck composition has drifted and Scenario 2C cannot satisfy ` +
+      `"three different areas" constraint.`
+    );
+  }
+  const exp = rng.pick(expCandidates);
+
+  return { beginner: beg, intermediate: int, expert: exp };
+}
+
+// Initialize the 3-slot random gear shop. Access cards are handled
+// separately (they're always available for purchase, not rotated in).
+function initializeGearShop(rng, rules = null) {
+  // Variant-only cards are dealt only when their rules variant is in play.
+  const nonAccessGear = GEAR_SHOP.filter(g => !ACCESS_CARDS.includes(g.name) && gearInGame(rules, g));
+  return rng.pickN(nonAccessGear, 3);
+}
+
+// ---------- Event payload helpers ----------
+
+// Compact representation of the milestones for the game_start event.
+// We don't serialize the full route object because the replay tool can
+// re-look-up routes by name from data.js.
+function serializeMilestones(milestones) {
+  return {
+    beginner: {
+      area: milestones.beginner.area,
+      routeName: milestones.beginner.route.name,
+      grade: milestones.beginner.route.grade,
+    },
+    intermediate: {
+      area: milestones.intermediate.area,
+      routeName: milestones.intermediate.route.name,
+      grade: milestones.intermediate.route.grade,
+    },
+    expert: {
+      area: milestones.expert.area,
+      routeName: milestones.expert.route.name,
+      grade: milestones.expert.route.grade,
+    },
+  };
+}
+
+// Summarize the opening route rotation by name only; callers can look up
+// the full route data from engine/data.js if they need requirements/etc.
+function summarizeRoutes(availableRoutes) {
+  return {
+    bouldering: availableRoutes.bouldering.map(r => r.name),
+    topRope: availableRoutes.topRope.map(r => r.name),
+    leadClimbing: availableRoutes.leadClimbing.map(r => r.name),
+  };
+}
+
+// Exported for engine.js internal use (action handlers will need to
+// distinguish access cards from rotation gear when computing legal actions).
+
+return { belayerCountFor, regularRoutePool, drawTopRopeStations, createGame, ACCESS_CARDS };
 })();
 
 // ---- engine/engine.js ----
@@ -1918,7 +2208,7 @@ const { GEAR_SHOP, TRAINING_AREAS } = __data;
 const { createRng } = __rng;
 const { makeEmitter } = __telemetry;
 const { ACCESS_CARDS, drawTopRopeStations, regularRoutePool } = __state;
-const { checkAreaAccess, canEnterSection, getPlayersInSection, canClimbTopRopeRoute, pickFreeBelayerStation, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, getGearPurchaseTimeCost, getEffectiveGearCost, getSpendableXp, buildEffectRollArray, resolveClimbDice, computeClimbStats, applyDiceToRequirements, resolveClimbOutcome, computeClimbXp, getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal, describeClimbGearEffects, freeSoloCanAttempt, trainingSpec, trainingAllowed, trainingCap, computeRestRecovery, applyLevelUpIfNeeded, bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, MAX_STAT_SHIFT } = __helpers;
+const { checkAreaAccess, canEnterSection, getPlayersInSection, canClimbTopRopeRoute, pickFreeBelayerStation, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, getGearPurchaseTimeCost, getSpendableXp, buildEffectRollArray, resolveClimbDice, computeClimbStats, applyDiceToRequirements, resolveClimbOutcome, computeClimbXp, getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal, describeClimbGearEffects, freeSoloCanAttempt, trainingSpec, trainingAllowed, trainingCap, usesGrit, trainingGritCost, gearFunds, gearPrice, payForGear, claimClimbGrit, dealRouteGrit, gearInGame, perRoundGrit, abilityParam, computeRestRecovery, applyLevelUpIfNeeded, bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, MAX_STAT_SHIFT } = __helpers;
 // Engine public API.
 //
 // This is the surface that everything else (UI adapter, agents, simulation
@@ -2038,12 +2328,18 @@ function getLegalActions(state) {
       const sec = canEnterSection(m.area, player.playerNum, state);
       if (!sec.canEnter) continue;
     }
-    const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route);
+    const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route, true);
     const enduranceCost = getEffectiveClimbEnduranceCost(char, m.route, m.route.endurance);
     if (char.timeRemaining < timeCost) continue;
     if (char.currentEndurance < enduranceCost) continue;
     if (!freeSoloCanAttempt(char, m.route)) continue;
     actions.push({ type: 'milestone', difficulty, area: m.area, routeName: m.route.name });
+    // Rules variant: Versatility's stat shift on a Milestone — offered as a
+    // variant of the attempt, like regular climbs.
+    if (canUseStatShift(char, true)) {
+      const shift = bestRouteReaderShift(char, m.route, m.area, state.attemptedRoutes[player.playerNum], true);
+      if (shift) actions.push({ type: 'milestone', difficulty, area: m.area, routeName: m.route.name, shift });
+    }
   }
 
   // Gear purchases: rotation slots + always-available access cards.
@@ -2051,7 +2347,8 @@ function getLegalActions(state) {
   // agents never see a "legal" action that the handler would reject.
   const gearTime = getGearPurchaseTimeCost(char);
   if (char.timeRemaining >= gearTime) {
-    const spendable = getSpendableXp(char);
+    // Spendable XP, or Grit under the Grit-economy rules.
+    const funds = gearFunds(state.rules, char);
     const owned = new Set(char.equipment);
     const buyable = [
       ...state.availableGear,
@@ -2059,8 +2356,8 @@ function getLegalActions(state) {
     ];
     for (const gear of buyable) {
       if (owned.has(gear.name)) continue;
-      const cost = getEffectiveGearCost(char, gear);
-      if (spendable < cost) continue;
+      const cost = gearPrice(state.rules, char, gear);
+      if (funds < cost) continue;
       if (char.level < (gear.prerequisiteLevel || 1)) continue;
       if (gear.prerequisiteItems && gear.prerequisiteItems.length > 0) {
         if (!gear.prerequisiteItems.every(p => owned.has(p))) continue;
@@ -2116,8 +2413,11 @@ function illegalActionReason(state, wanted) {
   const player = state.players[state.currentPlayerIndex];
   const char = player.character;
   if (match) {
-    if (wanted.shift && (match.type !== 'climb' || !canUseStatShift(char, false))) {
-      return reason('shiftNotAllowed', 'Versatility can be used once per round, by the Route Reader, on a regular route.');
+    if (wanted.shift && !((match.type === 'climb' && canUseStatShift(char, false)) ||
+        (match.type === 'milestone' && canUseStatShift(char, true)))) {
+      return reason('shiftNotAllowed', match.type === 'milestone'
+        ? 'Versatility can be used once per round, by the Route Reader, and not on a Milestone.'
+        : 'Versatility can be used once per round, by the Route Reader, on a regular route.');
     }
     if (wanted.shift && !isWellFormedStatShift(wanted.shift)) {
       return reason('shiftMalformed', `A stat shift moves 1 to ${MAX_STAT_SHIFT} points between two different stats.`);
@@ -2140,8 +2440,8 @@ function illegalActionReason(state, wanted) {
     if (sec.canEnter) return null;
     return reason('sectionFull', `You can't climb here right now: ${sec.reason}.`, { occupants: occupantsOf(area) });
   };
-  const costGate = (route) => {
-    const t = getEffectiveClimbTimeCost(char, route.time, route);
+  const costGate = (route, isMilestone = false) => {
+    const t = getEffectiveClimbTimeCost(char, route.time, route, isMilestone);
     const e = getEffectiveClimbEnduranceCost(char, route, route.endurance);
     if (char.timeRemaining < t) return notEnough('notEnoughTime', 'time', t, char.timeRemaining);
     if (char.currentEndurance < e) return notEnough('notEnoughEndurance', 'endurance', e, char.currentEndurance);
@@ -2186,7 +2486,7 @@ function illegalActionReason(state, wanted) {
         const full = sectionGate(m.area);
         if (full) return full;
       }
-      return costGate(m.route) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie() : null)
+      return costGate(m.route, true) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie() : null)
         || reason('unavailable', 'That milestone is not available right now.');
     }
     case 'train': {
@@ -2207,6 +2507,8 @@ function illegalActionReason(state, wanted) {
         if (perRound !== undefined && (char.trainedThisRound || 0) >= perRound) {
           return reason('trainingLimit', `You can train ${perRound} time${perRound === 1 ? '' : 's'} per round.`, { limit: perRound });
         }
+        const gritCost = trainingGritCost(state.rules, char);
+        if ((char.grit || 0) < gritCost) return notEnough('notEnoughGrit', 'Grit', gritCost, char.grit || 0);
         const cap = trainingCap(state.rules, char);
         return reason('trainingCap', `Training ${area.stat} is capped at +${cap} at Level ${char.level}.`, { cap, stat: area.stat });
       }
@@ -2227,9 +2529,13 @@ function illegalActionReason(state, wanted) {
       }
       const timeCost = getGearPurchaseTimeCost(char);
       if (char.timeRemaining < timeCost) return notEnough('notEnoughTime', 'time', timeCost, char.timeRemaining);
-      const cost = getEffectiveGearCost(char, gear);
+      const cost = gearPrice(state.rules, char, gear);
+      if (usesGrit(state.rules)) {
+        const have = gearFunds(state.rules, char);
+        if (have < cost) return notEnough('notEnoughGrit', 'Grit', cost, have);
+      }
       const spendable = getSpendableXp(char);
-      if (spendable < cost) {
+      if (!usesGrit(state.rules) && spendable < cost) {
         return reason('notEnoughXp', `Not enough spendable XP: ${gear.name} costs ${cost} and you have ${spendable} XP earned this level.`,
           { need: cost, have: spendable });
       }
@@ -2390,7 +2696,7 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   }
 
   // 3. Deduct time (character + gear modified).
-  const timeCost = getEffectiveClimbTimeCost(char, route.time, route);
+  const timeCost = getEffectiveClimbTimeCost(char, route.time, route, isMilestone);
   const timeBefore = char.timeRemaining;
   char.timeRemaining -= timeCost;
 
@@ -2407,13 +2713,15 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   //      (Route attempted-marks don't feed gear bonuses in v0.7+ data, but use
   //      the pre-climb marks so a preview and the climb see identical input.)
   const effectiveStats = computeClimbStats(char, route, area, attemptedBefore, shift);
-  if (char.betaBoostActive) {
-    char.betaBoostActive = false;
+  // The Beta Boost is spent by this climb; the flag is cleared once the outcome
+  // is known, because a rules variant can make Versatility depend on it.
+  const boostSpent = !!char.betaBoostActive;
+  if (boostSpent) {
     emitter.emit('ability_activated', {
       playerNum: player.playerNum,
       character: char.key,
       ability: 'Beta Boost',
-      effect: '+3 all stats for this climb',
+      effect: `+${abilityParam(char, 'betaBoost') ?? 3} all stats for this climb`,
     });
   }
 
@@ -2449,9 +2757,13 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   });
 
   // 8. Resolve outcome.
-  const outcome = resolveClimbOutcome(char, effectiveStats, requirements);
+  const outcome = resolveClimbOutcome(char, effectiveStats, requirements, isMilestone);
+  if (boostSpent) char.betaBoostActive = false;
   const xpGained = computeClimbXp(char, route, outcome.success);
   char.xp += xpGained;
+  // Grit economy: a regular send takes the Grit on the card; a milestone
+  // send pays its tier's reward.
+  const gritGained = claimClimbGrit(s.rules, char, route, { isMilestone, success: outcome.success, tier: difficulty });
 
   // 9. Iron Lung failure penalty (Mental Anchor gear bypasses).
   let failPenalty = 0;
@@ -2479,13 +2791,14 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     requirements,
     effectiveStats,
     xpGained,
+    ...(usesGrit(s.rules) ? { gritGained, gritAfter: char.grit } : {}),
     timeCost,
     enduranceCost: baseEnduranceCost + failPenalty,
     failPenalty,
     // Every gear effect that changed this climb (see describeClimbGearEffects).
     gearEffects: describeClimbGearEffects({
       char, route, effectRollArray: effectArray, diceTrace, appliedModifiers,
-      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed,
+      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed, isMilestone,
     }),
     resourcesDelta: {
       time: { before: timeBefore, after: char.timeRemaining, delta: -timeCost },
@@ -2543,6 +2856,10 @@ function handleTrain(s, rng, action, emitter) {
   // Old Climbing Journal (gear) boosts every session by +N; a rules variant
   // (state.rules) may change the Time, Endurance or bonus.
   const spec = trainingSpec(s.rules, area, char);
+  // Grit economy: a session costs Grit, except Training Partner's free one.
+  const gritCost = trainingGritCost(s.rules, char);
+  if (usesGrit(s.rules) && gritCost === 0 && !s.rules.characters?.[char.key]?.freeTraining) char.freeSessionUsed = true;
+  if (gritCost) char.grit -= gritCost;
   char.location = area.name;
   char.timeRemaining -= spec.time;
   char.currentEndurance -= spec.endurance;
@@ -2602,14 +2919,15 @@ function handleBuyGear(s, rng, action, emitter) {
   const gear = GEAR_SHOP.find(g => g.name === action.gearName);
   if (!gear) throw new Error(`buyGear: no gear "${action.gearName}"`);
 
-  const effectiveCost = getEffectiveGearCost(char, gear);
+  // XP, or Grit under the Grit-economy rules (XP is then never spent).
+  const effectiveCost = gearPrice(s.rules, char, gear);
   const timeCost = getGearPurchaseTimeCost(char);
   const xpBefore = char.xp;
   const timeBefore = char.timeRemaining;
 
   char.location = 'gearShop';
   char.timeRemaining -= timeCost;
-  char.xp -= effectiveCost;
+  payForGear(s.rules, char, effectiveCost);
   char.equipment.push(gear.name);
 
   // Permanent stat & endurance effects from the purchased item.
@@ -2649,12 +2967,13 @@ function handleBuyGear(s, rng, action, emitter) {
     playerNum: player.playerNum,
     gearName: gear.name,
     cost: effectiveCost,
+    currency: usesGrit(s.rules) ? 'grit' : 'xp',
     nominalCost: gear.cost,
     timeCost,
     gearApplied,
     resourcesDelta: {
       time: { before: timeBefore, after: char.timeRemaining, delta: -timeCost },
-      xp: { before: xpBefore, after: char.xp, delta: -effectiveCost },
+      xp: { before: xpBefore, after: char.xp, delta: char.xp - xpBefore },
     },
   });
 }
@@ -2674,7 +2993,7 @@ function replaceGearInRotation(s, rng, purchasedName) {
     ...ownedByAny,
     ...ACCESS_CARDS,
   ]);
-  const pool = GEAR_SHOP.filter(g => !unavailable.has(g.name));
+  const pool = GEAR_SHOP.filter(g => !unavailable.has(g.name) && gearInGame(s.rules, g));
 
   if (pool.length === 0) {
     s.availableGear.splice(idx, 1);
@@ -2728,6 +3047,7 @@ function postActionHousekeeping(s, rng, emitter) {
     xp: char.xp,
     level: char.level,
     spendableXp: getSpendableXp(char),
+    ...(usesGrit(s.rules) ? { grit: char.grit } : {}),
   });
 
   // 3. Victory check. If this player just completed all 3 milestones, the
@@ -2791,14 +3111,14 @@ function endRound(s, rng, emitter) {
   //   2 → refresh bouldering,    advance to 0
   let cleared;
   if (s.routeClearingPosition === 0) {
-    s.availableRoutes.leadClimbing = rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing'), 5);
+    s.availableRoutes.leadClimbing = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing'), 5));
     cleared = 'leadClimbing';
   } else if (s.routeClearingPosition === 1) {
     // Refresh all belayer stations together (2×belayerCount routes).
-    s.availableRoutes.topRope = drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope'));
+    s.availableRoutes.topRope = dealRouteGrit(s.rules, drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope')));
     cleared = 'topRope';
   } else {
-    s.availableRoutes.bouldering = rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering'), 5);
+    s.availableRoutes.bouldering = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering'), 5));
     cleared = 'bouldering';
   }
   s.routeClearingPosition = (s.routeClearingPosition + 1) % 3;
@@ -2813,6 +3133,9 @@ function endRound(s, rng, emitter) {
     c.timeRemaining = 10 + approachBonus;
     c.abilityUsed = false;
     c.trainedThisRound = 0;
+    c.freeSessionUsed = false;
+    // Grit economy: the per-round allowance.
+    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key);
     c.location = 'lobby';
     c.belayerStation = null;
   }
@@ -2859,11 +3182,6 @@ return {
   makeEmitter: __telemetry.makeEmitter,
   ENGINE_VERSION: __version.ENGINE_VERSION,
   ENGINE_VERSION_STRING: __version.ENGINE_VERSION_STRING,
-  belayerCountFor: __state.belayerCountFor,
-  regularRoutePool: __state.regularRoutePool,
-  drawTopRopeStations: __state.drawTopRopeStations,
-  createGame: __state.createGame,
-  ACCESS_CARDS: __state.ACCESS_CARDS,
   checkAreaAccess: __helpers.checkAreaAccess,
   getSectionCapacity: __helpers.getSectionCapacity,
   getOccupiedBelayerStations: __helpers.getOccupiedBelayerStations,
@@ -2876,6 +3194,9 @@ return {
   calculateGearBonuses: __helpers.calculateGearBonuses,
   computeEffectiveStats: __helpers.computeEffectiveStats,
   computeClimbStats: __helpers.computeClimbStats,
+  DEFAULT_ABILITY: __helpers.DEFAULT_ABILITY,
+  abilityParam: __helpers.abilityParam,
+  passRule: __helpers.passRule,
   getEffectiveClimbTimeCost: __helpers.getEffectiveClimbTimeCost,
   getEffectiveClimbEnduranceCost: __helpers.getEffectiveClimbEnduranceCost,
   getXpMultiplier: __helpers.getXpMultiplier,
@@ -2897,6 +3218,20 @@ return {
   trainingSpec: __helpers.trainingSpec,
   trainingCap: __helpers.trainingCap,
   trainingAllowed: __helpers.trainingAllowed,
+  GRIT_RULES: __helpers.GRIT_RULES,
+  perRoundGrit: __helpers.perRoundGrit,
+  startingGrit: __helpers.startingGrit,
+  usesGrit: __helpers.usesGrit,
+  gradeBand: __helpers.gradeBand,
+  routeGritValue: __helpers.routeGritValue,
+  dealRouteGrit: __helpers.dealRouteGrit,
+  milestoneGritReward: __helpers.milestoneGritReward,
+  trainingGritCost: __helpers.trainingGritCost,
+  gearPrice: __helpers.gearPrice,
+  gearFunds: __helpers.gearFunds,
+  payForGear: __helpers.payForGear,
+  gearInGame: __helpers.gearInGame,
+  claimClimbGrit: __helpers.claimClimbGrit,
   freeSoloCanAttempt: __helpers.freeSoloCanAttempt,
   applyBetaBoostIfActive: __helpers.applyBetaBoostIfActive,
   MAX_STAT_SHIFT: __helpers.MAX_STAT_SHIFT,
@@ -2908,6 +3243,11 @@ return {
   getGearMaxEnduranceBonus: __helpers.getGearMaxEnduranceBonus,
   applyLevelUpIfNeeded: __helpers.applyLevelUpIfNeeded,
   dispatchToolCall: __helpers.dispatchToolCall,
+  belayerCountFor: __state.belayerCountFor,
+  regularRoutePool: __state.regularRoutePool,
+  drawTopRopeStations: __state.drawTopRopeStations,
+  createGame: __state.createGame,
+  ACCESS_CARDS: __state.ACCESS_CARDS,
   getLegalActions: __engine.getLegalActions,
   findLegalAction: __engine.findLegalAction,
   illegalActionReason: __engine.illegalActionReason,
