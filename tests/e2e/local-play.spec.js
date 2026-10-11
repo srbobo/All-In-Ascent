@@ -9,6 +9,7 @@ import { createGame } from '../../engine/state.js';
 import { illegalActionReason } from '../../engine/engine.js';
 import { ROUTES, GEAR_SHOP } from '../../engine/data.js';
 import { ENGINE_VERSION_STRING } from '../../engine/version.js';
+import { GRIT_RULES, gearPrice } from '../../engine/helpers.js';
 import {
   seedPageRandom, collectPageErrors, collectDialogs, startLocalGame, playRandomly, replayInEngine, asJson, cardAction,
 } from './support.js';
@@ -167,9 +168,82 @@ test('a Route Reader can cancel the stat-shift dialog at no cost', async ({ page
   expect(errors).toEqual([]);
 });
 
-test('the card gallery (cards.html) still loads game data without the engine', async ({ page }) => {
+test('the card gallery (cards.html) loads game data and Grit values', async ({ page }) => {
   const errors = collectPageErrors(page);
   await page.goto('/cards.html');
   await expect(page.locator('.aia-card').first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('Grit is the currency: seat Grit, Grit prices, and a first send takes the card\'s Grit', async ({ page }) => {
+  const errors = collectPageErrors(page);
+  collectDialogs(page);
+  await seedPageRandom(page, 77);
+  await page.goto('/index.html');
+  await startLocalGame(page, ['The Iron Lung', 'The Route Reader']);
+
+  // Local games use the Grit rules; later seats start with more Grit.
+  const s0 = await page.evaluate(() => getGameState());
+  expect(s0.rules).toEqual(asJson(GRIT_RULES));
+  expect(s0.players.map(p => p.character.grit)).toEqual([0, 2]);
+  await expect(page.locator('#grit-1')).toHaveText(/^0/);
+  await expect(page.locator('#grit-2')).toHaveText(/^2/);
+
+  // Gear is priced in Grit, never XP; with 0 Grit nothing is affordable.
+  const shop = page.locator('#gearShop');
+  await expect(shop).toContainText('Gear costs Grit and 1 time. XP is never spent.');
+  await expect(shop).toContainText('0 Grit to spend');
+  const shown = await page.evaluate(() => [...document.querySelectorAll('.gear-card')].map(el => ({
+    name: el.dataset.gearSlot,
+    price: el.querySelector('.aia-card__price--grit b')?.textContent ?? null,
+    reason: el.querySelector('.aia-card__reason')?.textContent ?? '',
+  })));
+  expect(shown.length).toBeGreaterThan(0);
+  const me = s0.players[0].character;
+  for (const g of shown) {
+    const price = gearPrice(s0.rules, me, GEAR_SHOP.find(x => x.name === g.name));
+    expect(g.price, g.name).toBe(String(price));
+    expect(g.reason, g.name).toMatch(new RegExp(`Need ${price} Grit · you have 0|Needs .* first`));
+  }
+  expect(shown.some(g => g.reason.startsWith('Need ')), 'some card is blocked only by Grit').toBe(true);
+
+  // Training costs 1 Grit; route cards carry the Grit dealt onto them.
+  for (const cost of await page.locator('.training-area .aia-cost--grit b').allTextContents()) expect(cost).toBe('1');
+  for (const route of s0.availableRoutes.bouldering) {
+    const card = page.locator('#boulderingRoutes .route-card', { hasText: route.name }).first();
+    expect(route.grit).toBeGreaterThan(0);
+    await expect(card.locator('.aia-cost--grit b')).toHaveText(String(route.grit));
+  }
+
+  // A sure send: the climber takes the card's Grit and the card shows it claimed.
+  const state = asJson(s0);
+  Object.assign(state.players[0].character.stats, { strength: 99, technique: 99, focus: 99, flexibility: 99 });
+  state.players[1].character.grit = 8; // for the purchase below, on P2's turn
+  await page.evaluate((s) => { setGameState(s); renderGameBoard(); }, state);
+  const route = state.availableRoutes.bouldering[0];
+  await cardAction(page, '#boulderingRoutes', route.name).click();
+  await expect(page.locator('#climbModal')).toHaveClass(/show/);
+  await expect(page.locator('#climbModal')).toContainText(`+${route.grit} Grit`);
+  await page.click('#climbModal .action-buttons button');
+  const s1 = await page.evaluate(() => getGameState());
+  expect(s1.players[0].character.grit).toBe(route.grit);
+  expect(s1.availableRoutes.bouldering.find(r => r.name === route.name).grit).toBe(0);
+  await expect(page.locator('#grit-1')).toHaveText(new RegExp(`^${route.grit}`));
+  const claimed = page.locator('#boulderingRoutes .route-card', { hasText: route.name }).first().locator('.aia-cost--grit');
+  await expect(claimed).toHaveClass(/is-claimed/);
+  await expect(claimed.locator('b')).toHaveText('0');
+
+  // Turns alternate: on P2's turn, buying gear spends Grit and leaves XP alone.
+  await expect(page.locator('#turnIndicator')).toContainText("Player 2's turn");
+  const p2 = s1.players[1].character;
+  const buyable = await page.evaluate(() => [...document.querySelectorAll('.gear-card')]
+    .find(el => el.querySelector('.aia-card__action').getAttribute('aria-disabled') !== 'true')?.dataset.gearSlot);
+  expect(buyable, '8 Grit should afford at least one card').toBeTruthy();
+  const price = gearPrice(s1.rules, p2, GEAR_SHOP.find(g => g.name === buyable));
+  await page.locator(`.gear-card[data-gear-slot="${buyable}"] .aia-card__action`).click();
+  await expect.poll(() => page.evaluate(n => getGameState().players[1].character.equipment.includes(n), buyable)).toBe(true);
+  const s2 = await page.evaluate(() => getGameState());
+  expect(s2.players[1].character.grit).toBe(8 - price);
+  expect(s2.players[1].character.xp).toBe(p2.xp);
   expect(errors).toEqual([]);
 });

@@ -280,14 +280,20 @@ check('belayerCountFor(4) = 3', belayerCountFor(4) === 3);
 // =============================================================================
 // ROUTE READER STAT SHIFT
 // =============================================================================
-const silo = ROUTES.bouldering.find(r => r.name === 'Strength Silo'); // 55/18/20/15, no gear modifiers
+// A route the Route Reader (15/19/22/14) just misses: Str −3, Tech +1, Focus +2,
+// Flex −2. Two stats fail, so even with Versatility (3 of 4, the 4th within 3)
+// it falls — unless a shift fixes one of them.
+const silo = { ...ROUTES.bouldering.find(r => r.name === 'Strength Silo'), name: 'Shift Test', strength: 18, technique: 18, focus: 20, flexibility: 16, rollEffect: [] };
+const passesBase = (st, route) => {
+  const m = ['strength', 'technique', 'focus', 'flexibility'].map(k => st[k] - route[k]).sort((a, b) => b - a);
+  return m[2] >= 0 && m[3] >= -3;
+};
 {
   const rr = charBase('routeReader');
-  // Margins vs Strength Silo: Str −40, Tech +1, Focus +2, Flex −1. Moving 2
-  // from Strength to Flexibility makes 3 stats pass.
   const shift = bestRouteReaderShift(rr, silo, 'bouldering', {});
-  check('bestRouteReaderShift: Strength → Flexibility by 2',
-    shift && shift.from === 'strength' && shift.to === 'flexibility' && shift.amount === 2, JSON.stringify(shift));
+  const shifted = shift && { ...rr.stats, [shift.from]: rr.stats[shift.from] - shift.amount, [shift.to]: rr.stats[shift.to] + shift.amount };
+  check('bestRouteReaderShift turns a just-missed climb into a send (Versatility, 1.1.0)',
+    shift && !passesBase(rr.stats, silo) && passesBase(shifted, silo), JSON.stringify(shift));
   check('bestRouteReaderShift: null for other climbers', bestRouteReaderShift(charBase('ironLung'), silo, 'bouldering', {}) === null);
   const safe = { ...silo, strength: 5, technique: 5, focus: 5, flexibility: 5 };
   check('bestRouteReaderShift: null when the climb is already safe', bestRouteReaderShift(rr, safe, 'bouldering', {}) === null);
@@ -308,7 +314,10 @@ const silo = ROUTES.bouldering.find(r => r.name === 'Strength Silo'); // 55/18/2
   check('shift climb emits Versatility activation',
     res.events.some(e => e.type === 'ability_activated' && e.payload.ability === 'Versatility'));
   const resolved = res.events.find(e => e.type === 'climb_resolved');
-  check('shift is applied to the climb stats (Flexibility 14 → 16)', resolved && resolved.payload.effectiveStats.flexibility === 16);
+  const base = state.players[0].character.stats;
+  check('shift is applied to the climb stats',
+    resolved && resolved.payload.effectiveStats[variant.shift.to] === base[variant.shift.to] + variant.shift.amount &&
+    resolved.payload.effectiveStats[variant.shift.from] === base[variant.shift.from] - variant.shift.amount);
 
   // Hand the turn back to the Route Reader, same round, with time to climb.
   ({ state } = res);
@@ -321,10 +330,11 @@ const silo = ROUTES.bouldering.find(r => r.name === 'Strength Silo'); // 55/18/2
   check('a second shift in the same round is rejected',
     plain && throws(() => applyAction(state, { ...plain, shift: { from: 'strength', to: 'focus', amount: 1 } })));
   const tier = Object.keys(state.milestoneRoutes)[0];
-  check('a shift on a milestone is rejected',
-    throws(() => applyAction({ ...state, players: state.players.map((p, i) => i === 0
-      ? { ...p, character: { ...p.character, abilityUsed: false } } : p) },
-    { type: 'milestone', difficulty: tier, shift: { from: 'strength', to: 'focus', amount: 1 } })));
+  // Since 1.1.0 the shift also works on Milestones; a rules variant can turn that off.
+  const offMilestones = { ...state, players: state.players.map((p, i) => i === 0
+    ? { ...p, character: { ...p.character, abilityUsed: false, abilityParams: { shiftOnMilestones: false } } } : p) };
+  check('a shift on a milestone is rejected when shiftOnMilestones is off',
+    throws(() => applyAction(offMilestones, { type: 'milestone', difficulty: tier, shift: { from: 'strength', to: 'focus', amount: 1 } })));
 }
 {
   const { state } = createGame({ seed: 11, characterKeys: ['ironLung', 'routeReader'] });

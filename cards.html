@@ -118,15 +118,22 @@
 <script src="design/icons.js"></script>
 <script src="design/card-art.js"></script>
 <script src="design/cards.js"></script>
+<script src="engine/engine.browser.js"></script>
 <script>
   AIAArt.mount();
+  // The deck as printed for the Grit rules: route cards carry their Grit,
+  // training costs Grit and gear is priced in Grit — all read from the engine.
+  const E = window.AscentEngine;
+  const RULES = E.GRIT_RULES;
+  const nobody = { key: '', equipment: [] };
+  const route = (area) => (r) => AIACards.route(r, { area, grit: E.routeGritValue(RULES, r) });
   const groups = {
     climbers: () => Object.entries(CHARACTERS).map(([k, c]) => AIACards.climber(k, c)),
-    bouldering: () => ROUTES.bouldering.map(r => AIACards.route(r, { area: 'bouldering' })),
-    topRope: () => ROUTES.topRope.map(r => AIACards.route(r, { area: 'topRope' })),
-    leadClimbing: () => ROUTES.leadClimbing.map(r => AIACards.route(r, { area: 'leadClimbing' })),
-    training: () => TRAINING_AREAS.map(a => AIACards.training(a)),
-    gear: () => GEAR_SHOP.map(g => AIACards.gear(g)),
+    bouldering: () => ROUTES.bouldering.map(route('bouldering')),
+    topRope: () => ROUTES.topRope.map(route('topRope')),
+    leadClimbing: () => ROUTES.leadClimbing.map(route('leadClimbing')),
+    training: () => TRAINING_AREAS.map(a => AIACards.training(a, { gritCost: E.trainingGritCost(RULES, nobody) })),
+    gear: () => GEAR_SHOP.map(g => AIACards.gear(g, { price: E.gearPrice(RULES, nobody, g), currency: 'grit' })),
   };
   for (const [g, build] of Object.entries(groups)) {
     const sec = document.querySelector(`[data-group="${g}"]`);

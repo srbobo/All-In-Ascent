@@ -68,9 +68,12 @@ test('online client plays a game against the GameRoom and bots', async ({ page }
   await expect.poll(async () => JSON.stringify(await page.evaluate(() => getGameState())), { timeout: 5000 })
     .toBe(JSON.stringify(asJson(room.state)));
 
-  // And the server's game replays from its seed through the engine.
+  // And the server's game replays from its seed through the engine, with the
+  // Grit rules it was created with.
+  expect(room.state.rules, 'online games are played with the Grit rules').toBeTruthy();
+  expect(room.state.rules.grit).toBeTruthy();
   const keys = room.state.players.map(p => p.character.key);
-  let { state } = createGame({ seed: room.state.seed, characterKeys: keys });
+  let { state } = createGame({ seed: room.state.seed, characterKeys: keys, rules: room.state.rules });
   for (const e of room.state.events.filter(ev => ev.type === 'action_chosen')) ({ state } = applyAction(state, e.payload.action));
   expect(asJson(state)).toEqual(asJson(room.state));
   expect(errors).toEqual([]);

@@ -110,7 +110,7 @@ export async function playRandomly(page, steps) {
 // else touched the state), the result equals the browser's state.
 export function replayInEngine(browserState) {
   const characterKeys = browserState.players.map(p => p.character.key);
-  let { state } = createGame({ seed: browserState.seed, characterKeys });
+  let { state } = createGame({ seed: browserState.seed, characterKeys, rules: browserState.rules || null });
   for (const e of browserState.events.filter(ev => ev.type === 'action_chosen')) {
     ({ state } = applyAction(state, e.payload.action));
   }

@@ -20,6 +20,10 @@
      setCode  footer set code override
      costs    { time, endurance } as this climber pays them (route cards);
               an adjusted cost is marked and its base is read out
+     grit     Grit on a route card (taken by the first climber to send it),
+              or a Milestone's Grit reward; omit when there is no Grit
+     price, currency  gear price as this climber pays it ('grit' or 'xp')
+     gritCost Grit a training session costs (training cards)
 
    Requires design/card-art.js (window.AIAArt).
    ========================================================================== */
@@ -168,6 +172,7 @@
             <span class="aia-cost aia-cost--time${cost.time !== r.time ? ' is-adjusted' : ''}" title="Time cost${cost.time !== r.time ? ` (base ${r.time})` : ''}">${icon('time')}<b>${cost.time}</b><span class="sr-only"> time${cost.time !== r.time ? `, base ${r.time}` : ''}</span></span>
             <span class="aia-cost aia-cost--endurance${cost.endurance !== r.endurance ? ' is-adjusted' : ''}" title="Endurance cost${cost.endurance !== r.endurance ? ` (base ${r.endurance})` : ''}">${icon('endurance')}<b>${cost.endurance}</b><span class="sr-only"> endurance${cost.endurance !== r.endurance ? `, base ${r.endurance}` : ''}</span></span>
             <span class="aia-cost aia-cost--xp" title="XP on send / on fall">${icon('xp')}<b>${r.xpSuccess}</b><span class="aia-cost__fail" aria-hidden="true">/${r.xpFail}</span><span class="sr-only"> XP on a send, ${r.xpFail} XP on a fall</span></span>
+            ${gritMarkup(o.grit, !!ms)}
           </div>
           ${o.extra || ''}
           <footer class="aia-card__foot">
@@ -178,6 +183,14 @@
         ${actionMarkup(id, o.action)}
       </article>`);
     return wireAction(node, o.action);
+  }
+
+  // Grit chip for a route card (Grit on the card) or a Milestone (its reward).
+  function gritMarkup(grit, isMilestone) {
+    if (grit === undefined || grit === null) return '';
+    const title = isMilestone ? 'Grit for sending this Milestone' : grit ? 'Grit on this card: the first climber to send it takes it' : 'This card\'s Grit has been taken';
+    const sr = isMilestone ? ' Grit for sending it' : grit ? ' Grit on the card' : ' Grit, already taken';
+    return `<span class="aia-cost aia-cost--grit${!isMilestone && !grit ? ' is-claimed' : ''}" title="${esc(title)}">${icon('grit')}<b>${isMilestone ? '+' : ''}${grit}</b><span class="sr-only">${sr}</span></span>`;
   }
 
   // ========================================================================
@@ -199,7 +212,9 @@
           <div class="aia-card__art">
             ${Art().gear(g)}
             ${reasonMarkup(id, o.action)}
-            <span class="aia-card__price" title="Cost">${icon('xp')}<b>${g.cost}</b><span>XP</span></span>
+            ${o.currency === 'grit'
+              ? `<span class="aia-card__price aia-card__price--grit" title="Cost in Grit">${icon('grit')}<b>${o.price ?? g.cost}</b><span>Grit</span></span>`
+              : `<span class="aia-card__price" title="Cost">${icon('xp')}<b>${o.price ?? g.cost}</b><span>XP</span></span>`}
             ${access ? `<span class="aia-card__art-chips"><span class="aia-chip aia-chip--access">${icon('lock')}${esc(g.accessRequirement)} access</span></span>` : ''}
           </div>
           <div class="aia-rules">
@@ -295,6 +310,7 @@
           <div class="aia-costs">
             <span class="aia-cost aia-cost--time">${icon('time')}<b>${a.time}</b><span class="sr-only"> time</span></span>
             <span class="aia-cost aia-cost--endurance">${icon('endurance')}<b>${a.endurance}</b><span class="sr-only"> endurance</span></span>
+            ${o.gritCost !== undefined ? `<span class="aia-cost aia-cost--grit" title="Grit per session">${icon('grit')}<b>${o.gritCost}</b><span class="sr-only"> Grit</span></span>` : ''}
             <span class="aia-cost aia-cost--stat">${icon(a.stat)}<b>+${bonus}</b><span class="sr-only"> ${s.name}</span></span>
           </div>
           <footer class="aia-card__foot">

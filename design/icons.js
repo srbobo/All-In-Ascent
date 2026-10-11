@@ -64,6 +64,7 @@
     endurance: '<path d="M13 2L5 13h6l-1 9 8-11h-6z"/>',
     time: '<circle cx="12" cy="13" r="8"/><path d="M12 13V8.5M12 13l3 2M10 2h4"/>',
     xp: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+    grit: '<path d="M7 4h10l4 5-9 11L3 9z"/><path d="M3 9h18M10 4l-1.5 5L12 20l3.5-11L14 4"/>',
     die: '<rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
     lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2.5"/>',
     check: '<path d="M4.5 12.5l4.5 4.5 10-10"/>',
