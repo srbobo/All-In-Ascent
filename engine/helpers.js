@@ -272,11 +272,16 @@ export function computeClimbStats(char, route, area, attemptedRoutesForPlayer, s
 //   routeReader.nearMiss         the 4th stat may miss by at most this (null = any)
 //   routeReader.shiftOnMilestones  Versatility's stat shift may be used on Milestones
 //   technician.extraTimeOn       where Perfect Beta's +1 Time applies: 'all' | 'milestone' | 'regular'
+// As printed since 1.1.0 (trait-preserving balance, docs/CPU_PLAYTEST_AUDIT.md
+// §13): Sprinter 85% XP (was 50%), Technician's +1 Time on Milestones only
+// (was every climb), Route Reader's 4th stat may miss by at most 3 (was any
+// amount) and the stat shift also works on Milestones. Iron Lung's growth
+// change lives in the character data (game.js).
 export const DEFAULT_ABILITY = Object.freeze({
-  sprinter: { timeReduction: 2, xpMultiplier: 0.5, focusCrux: true },
-  technician: { reqReduction: 5, extraTime: 1, extraTimeOn: 'all' },
+  sprinter: { timeReduction: 2, xpMultiplier: 0.85, focusCrux: true },
+  technician: { reqReduction: 5, extraTime: 1, extraTimeOn: 'milestone' },
   ironLung: { failXpBonus: 0.5, failEndurance: 5 },
-  routeReader: { betaBoost: 3, milestonePasses: 3, boostOnly: false, nearMiss: null, shiftOnMilestones: false },
+  routeReader: { betaBoost: 3, milestonePasses: 3, boostOnly: false, nearMiss: 3, shiftOnMilestones: true },
 });
 
 export function abilityParam(char, name) {
@@ -1015,30 +1020,22 @@ export function trainingAllowed(rules, char, stat, gain) {
 const DEFAULT_ROUTE_GRIT = [1, 2, 3];
 const DEFAULT_MILESTONE_GRIT = { beginner: 2, intermediate: 3, expert: 4 };
 
-// The adopted Grit rules (2026-10-11, docs/CPU_PLAYTEST_AUDIT.md §11–13):
-//   - route cards carry 2 / 3 / 4 Grit by grade band; first send takes it;
-//   - training cap 10 + 5 per Level above 1;
-//   - no per-round allowance, but later seats start with 0 / 2 / 4 / 6 Grit
-//     (seat 1 otherwise wins ~61% of 2-player games);
-//   - trait-preserving character balance (package B3):
-//       Route Reader: Versatility's 4th stat may miss by at most 3, and the
-//         stat shift also works on Milestones;
-//       Technician: Perfect Beta's +1 Time applies on Milestones only;
-//       Sprinter: sends earn 85% XP (was 50%);
-//       Iron Lung: Relentless as printed; stat growth −0.5 per Level in each stat;
-//       Free Solo: +2 Grit every round (it can only send routes it already
-//         beats, so without an income it soft-locks).
+// The game's rules (1.1.0): the Grit economy. Local and online play create
+// every game with these (docs/CPU_PLAYTEST_AUDIT.md §10–14):
+//   - route cards carry 2 / 3 / 4 Grit by grade band; the first climber to
+//     send a route takes it; Milestone sends pay 2 / 3 / 4;
+//   - training costs 1 Grit and is capped at 10 + 5 per Level above 1;
+//   - gear is priced in Grit; XP only raises your Level and is never spent;
+//   - later seats start with 0 / 2 / 4 / 6 Grit;
+//   - Free Solo gains 2 Grit every round (it can only send routes it already
+//     beats, so without an income it soft-locks).
+// The climbers' balance changes are printed abilities (DEFAULT_ABILITY) and
+// character data, so they apply under any rules.
 export const GRIT_RULES = Object.freeze({
   grit: { start: 0, perRound: 0, routeGrit: [2, 3, 4], seatStart: [0, 2, 4, 6] },
   trainCapBase: 10,
   trainCapPerLevel: 5,
-  characters: {
-    routeReader: { ability: { nearMiss: 3, shiftOnMilestones: true } },
-    technician: { ability: { extraTimeOn: 'milestone' } },
-    sprinter: { ability: { xpMultiplier: 0.85 } },
-    ironLung: { body: { growth: { strength: 2, technique: 2, focus: 2.5, flexibility: 1.5 } } },
-    freeSolo: { gritPerRound: 2 },
-  },
+  characters: { freeSolo: { gritPerRound: 2 } },
 });
 
 // Grit a climber gains at the start of each round after the first.

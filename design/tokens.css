@@ -94,6 +94,8 @@
   --c-endurance:    var(--marigold);
   --c-time:         var(--cobalt);
   --c-xp:           var(--cobalt);
+  --c-grit:         var(--raspberry);      /* currency: earned by first sends */
+  --grit-text:      var(--raspberry-text);
 
   /* ---------- Semantic · climbing areas ----------------------------------- */
   --area-bouldering:   var(--coral);

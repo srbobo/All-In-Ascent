@@ -323,7 +323,8 @@ const FIGURES = {
   <text x="72" y="310" ${FM} font-size="11" fill="#5a4530">ENDURANCE</text><text x="170" y="311" text-anchor="end" ${FB} font-size="18" fill="#2a1d12">14</text>
   <rect x="66" y="324" width="76" height="30" rx="6" fill="#b6d62d" stroke="#2a1d12" stroke-width="1.5"/><text x="104" y="344" text-anchor="middle" ${FM} font-size="11" font-weight="700" fill="#2a1d12">SEND 28</text>
   <rect x="150" y="324" width="74" height="30" rx="6" fill="#f4ede0" stroke="#2a1d12" stroke-width="1.5"/><text x="187" y="344" text-anchor="middle" ${FM} font-size="11" font-weight="700" fill="#2a1d12">FALL 10</text>
-  ${num(30, 46, 1)}${num(262, 40, 2)}${num(30, 98, 3)}${num(30, 186, 4)}${num(262, 160, 5)}${num(30, 296, 6)}${num(262, 339, 7)}
+  <circle cx="206" cy="296" r="15" fill="#c4286c" stroke="#2a1d12" stroke-width="1.5"/><text x="206" y="301" text-anchor="middle" ${FB} font-size="14" fill="#fff">2</text>
+  ${num(30, 46, 1)}${num(262, 40, 2)}${num(30, 98, 3)}${num(30, 186, 4)}${num(262, 160, 5)}${num(30, 296, 6)}${num(262, 339, 7)}${num(262, 280, 8)}
 </svg>
 <ol class="anatomy">
   <li><strong>Name, wall, and grade.</strong></li>
@@ -333,6 +334,7 @@ const FIGURES = {
   <li><strong>Dice icons.</strong> Roll one die per icon. Green subtracts; red adds.</li>
   <li><strong>Costs.</strong> Time and Endurance, paid before you roll.</li>
   <li><strong>XP.</strong> Send XP if you succeed, Fall XP if you don't.</li>
+  <li><strong>Grit.</strong> Tokens placed when the card is dealt (2 here, for a V0). The first climber to send it takes them.</li>
 </ol></div>`;
   },
 

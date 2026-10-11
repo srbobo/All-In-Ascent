@@ -193,7 +193,8 @@ export function planPSend(m, x) {
 
 function deficit(m, x) {
   const d = STATS.map((_, s) => Math.max(0, m.expReq[s] - x[s] - m.bonus[s]));
-  if (m.needed === 3) { d.sort((a, b) => b - a); d[0] = 0; }
+  // 3 of 4: the worst stat only has to come within nearMiss (Infinity = ignore it).
+  if (m.needed === 3) { d.sort((a, b) => b - a); d[0] = Math.max(0, d[0] - m.nearMiss); }
   return d[0] + d[1] + d[2] + d[3];
 }
 
