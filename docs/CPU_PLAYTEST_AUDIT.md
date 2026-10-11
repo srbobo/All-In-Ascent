@@ -536,3 +536,248 @@ Endurance becomes the pacing limit.
 
 Caveat: the planner was built and tuned under the standard rules. Under a cap it plays less
 cleanly (the stall guard fires more often), so treat the cap rows as direction, not final numbers.
+
+---
+
+## 10. Token economy + training cap (engine v0.8.2 rules variant)
+
+*The currency is now named **Grit** (`rules.grit`). This section's "tokens" are Grit.*
+
+**Rules tested (`rules.tokens`):**
+- XP only raises your Level and is never spent. Tokens buy training (1 per session) and gear
+  (XP price ÷ 25).
+- Every route card is dealt with 1–3 tokens by grade band. The first climber to **send** it takes
+  them.
+- Milestone sends pay 2 / 3 / 4 tokens.
+- Climbers start with 3 tokens and gain +1 every round.
+- Two training cards appear only in capped games: Hangboard Program (+5 cap) and Training
+  Partner (one free session per round).
+
+The planner never idles while anything useful is legal. Each variant ran 300 solo games and a
+400-game round robin. Output: `results/tokens-v0.8/variants.txt`.
+
+| Variant | Median solo rounds (Tech / Spr / IL / FS / RR) | Time training | Time climbing | Market gear / game | Ends at Level |
+|---|---|---|---|---|---|
+| Standard rules | 13 / 14 / 13 / 11 / 10 | 61% | 14% | 0.6 | 2.4 |
+| Cap 10+5/Level only | 23 / 27 / 18 / 63 / 15 | 17% | 40% | 2.9 | 8.0 |
+| Tokens, no cap | 20 / 24 / 20 / 27 / 13 | 30% | 27% | 0.4 | 6.0 |
+| **Tokens + cap 10+5/Level** | 22 / 26 / 20 / 34 / 13 | 21% | **44%** | **3.0** | 8.3 |
+| Tokens + cap 15+5/Level | 21 / 24 / 20 / 29 / 13 | 24% | 43% | 2.0 | 7.8 |
+| Tokens + cap 20+5/Level | 20 / 24 / 20 / 26 / 12 | 26% | 41% | 1.6 | 7.3 |
+| Tokens + cap 10+10/Level | 19 / 24 / 20 / 27 / 12 | 27% | 33% | 1.3 | 6.6 |
+| Tokens + cap 10+5, no allowance | 35 / 40 / 29 / **150** / 16 | 9% | 30% | 1.1 | 8.8 (88% finish) |
+
+**Findings**
+- **The cap is what makes gear matter.** Tokens alone shift Time toward climbing, but gear stays
+  rare (0.4 cards a game). Adding the cap triples gear purchases. The tightest cap, 10 + 5 per
+  Level, gives the most climbing and the most gear.
+- **The per-round allowance is required.** Without it, Free Solo soft-locks. It can't train with
+  no tokens, and it can't start a route it doesn't already meet, so it waits on lucky route draws.
+- **Training cards in the tokens + cap 10 game:** Hangboard Program was bought in 26% of games,
+  Training Partner in 36%.
+- **Characters under tokens + cap 10** (2-player win rates):
+
+  | Climber | Win rate |
+  |---|---|
+  | Route Reader | 100% |
+  | Iron Lung | 64% |
+  | Technician | 59% |
+  | Sprinter | 23% (up from 6% today) |
+  | Free Solo | 5% |
+
+  Route Reader needs a nerf and Free Solo needs a buff under any token rules.
+- Resting still takes 21–31% of Time, because climbing drains Endurance. That's the next pacing
+  lever: cheaper climbs, or a bigger Rest.
+
+---
+
+## 11. Grit rules: starting Grit and Free Solo (2026-10-11)
+
+Chosen direction: Grit, the training cap of 10 + 5 per Level, first send claims the Grit, and no
+blanket starting Grit or per-round allowance (preset `GRIT_RULES`). Per-character overrides
+(`rules.characters[key]`) cover starting Grit, cap multiplier or no cap, per-round Grit, and
+free training. Each variant ran 300 solo games and a 400-game round robin. Output:
+`results/grit-v0.8/freesolo.txt` and `archetype.txt`.
+
+| Variant | Median solo rounds (Tech / Spr / IL / FS / RR) | Finished | Time climbing | Gear / game |
+|---|---|---|---|---|
+| GRIT_RULES (start 0, no allowance) | 40 / 45 / 31 / **150** / 17 | 80% | 26% | 0.4 |
+| + Free Solo starts with 3 or 5 Grit | 40 / 45 / 31 / **150** / 17 | 88–89% | 32–33% | 0.8 |
+| + Free Solo 3–5 Grit **and** cap ×2, ×3 or none | 40 / 45 / 31 / **150** / 17 | 85–86% | 29% | 0.6 |
+| Archetype start (FS 3, IL 2, Spr 2, Tech 1, RR 0) | 38 / 43 / 29 / **150** / 17 | 88% | 31% | 0.9 |
+| Archetype start + **Free Solo +1 Grit a round** | 38 / 43 / 29 / 34 / 17 | 100% | 49% | 1.9 |
+| Archetype start + **Free Solo trains free** (capped) | 38 / 43 / 29 / 34 / 17 | 100% | 50% | 1.6 |
+| **Archetype start + Free Solo +1 a round + cards worth 2/3/4** | 29 / 34 / 24 / 34 / 15 | 100% | 46% | 2.6 |
+
+2-player win rates (Tech / Spr / IL / FS / RR):
+
+| Variant | Tech | Spr | IL | FS | RR |
+|---|---|---|---|---|---|
+| Archetype start | 38% | 36% | 73% | 4% | 100% |
+| + Free Solo +1 Grit a round | 16% | 14% | 63% | 58% | 100% |
+| + Free Solo trains free | 16% | 13% | 59% | 62% | 100% |
+| + Free Solo +1 a round + cards 2/3/4 | 29% | 16% | 68% | 37% | 100% |
+
+**Findings**
+- **Free Solo's problem is income, not the cap.** Starting Grit only delays the soft-lock, and
+  raising or removing its cap changes nothing. Free Solo only earns Grit by sending routes it
+  already beats, which rarely appear. A steady Free Solo income fixes it completely: either +1
+  Grit a round, or free training. Both work about equally well. On their own they overshoot
+  (Free Solo goes from 4% to about 60%).
+- **Grit income is too low overall without the allowance.** Games run 30–45 rounds, with half the
+  Time spent resting. Raising card values from 1/2/3 to 2/3/4 Grit cuts about 9 rounds, lifts
+  gear to 2.6 cards a game, and brings Free Solo back to 37%.
+- **Still to fix:** Route Reader wins 100% in every variant, so it needs an ability nerf. Sprinter
+  (about 16%) and Technician (about 29%) trail Iron Lung (about 68%).
+
+**Chosen (2026-10-11): `GRIT_RULES`.** Cards worth 2/3/4 Grit, no starting Grit, no
+allowance except Free Solo +1 Grit a round, and a training cap of 10 + 5 per Level. Archetype
+starting Grit is undecided and off. The preset was confirmed over 500 solo games and a 600-game
+round robin:
+
+| Climber | Median solo rounds | 2-player win rate |
+|---|---|---|
+| Technician | 29 | 37% |
+| Sprinter | 35 | 13% |
+| Iron Lung | 24 | 71% |
+| Free Solo | 37.5 | 29% |
+| Route Reader | 15 | 100% |
+
+- Every game finished.
+- Time split: climbing 46%, training 17%, resting 25%.
+- Gear: 2.5 market cards per game. Hangboard Program was bought in 25% of games, Training
+  Partner in 32%.
+- Seat 1 wins 54%.
+- Next: a Route Reader nerf, and buffs for Sprinter and Technician.
+
+---
+
+## 12. Character changes under GRIT_RULES (2026-10-11)
+
+Ability numbers can be tuned per character with `rules.characters[key].ability`; with no tuning
+each ability plays as printed (`DEFAULT_ABILITY` in `engine/helpers.js`). Each variant ran 300
+solo games and a 400-game 2-player round robin. Output: `results/characters-v0.8/`.
+
+**Single changes** (2-player win rates; GRIT_RULES today: Tech 36 · Spr 14 · IL 72 · FS 28 · RR 100):
+
+| Change | Result |
+|---|---|
+| Route Reader: Milestones need all 4 stats | RR 99%, no real effect |
+| Route Reader: 3-of-4 only with Beta Boost | RR 100%. Resting first is easy, so it barely bites. |
+| **Route Reader: the 4th stat may miss by at most 3** (at most 5) | **RR 57%** (69%). Iron Lung then rises to 86–88%. |
+| Sprinter: full XP / **75% XP** / no extra Focus crux die | Spr 54% / **30%** / 24% |
+| **Technician: no extra Time** / requirements −7 | **Tech 47%** / 50% (the −7 pushes Sprinter down to 9%) |
+| Iron Lung: falls +25% XP / no fall bonus | IL 73% / 67% |
+
+**Combinations**
+
+| Package | Tech | Spr | IL | FS | RR | Spread | Seat 1 wins |
+|---|---|---|---|---|---|---|---|
+| D: RR miss ≤ 3 · Spr 75% XP · Tech no extra Time · IL no fall bonus | 58 | 48 | 66 | 24 | 54 | 41 | 64% |
+| **D + Free Solo +2 Grit a round** | 56 | 41 | 53 | 48 | 51 | **15** | 64% |
+| D + FS +2/round + seats start with 0/1/2/3 Grit | 60 | 39 | 57 | 43 | 51 | 21 | 59% |
+| D + FS +2/round + seats start with 0/2/4/6 Grit | 64 | 33 | 55 | 52 | 47 | 31 | **49%** |
+
+**Findings**
+- **The near-miss rule is the Route Reader nerf that works.** It keeps the ability's identity and
+  stops it from ignoring its worst stat entirely.
+- **D + Free Solo +2 Grit a round balances the five characters** to within 15 points of each other.
+- **Seat order now matters more:** seat 1 wins 64%, because the first climber reaches fresh Grit
+  first. Starting later seats with 0/2/4/6 Grit brings seat 1 back to 49%. This shifts the
+  characters again, so Sprinter would need another small buff.
+- **Caveats:** these runs are 2-player only (±8 points per character at this sample size). 3–4
+  player games still need checking.
+
+---
+
+## 13. Trait-preserving balance (2026-10-11)
+
+Goal: keep each climber's trait, both its upside and its cost, and balance by tuning numbers.
+New tuning hooks: Technician `extraTimeOn` ('all' | 'milestone' | 'regular'), Route Reader
+`shiftOnMilestones`, and per-character `body` (starting stats, starting Endurance, growth).
+Output: `results/characters-v0.8/traits*.txt` and `diversity-traits.txt`.
+
+**What each climber's lever turned out to be**
+- **Route Reader:** the 4th stat may miss by at most 3, and Versatility's stat shift also works
+  on Milestones. This lands it at 48–54%, and the shift is used about 10 times a game.
+- **Technician:** keep the +1 Time, but only on Milestones: 48–57%. On regular routes only, it
+  drops to 29%.
+- **Iron Lung:** its strength is its body, not Relentless. Changing the fall bonus or fall cost,
+  or removing the bonus entirely, leaves it at 65–86%. Endurance changes do nothing. Slowing its
+  stat growth by 0.5 per stat per Level brings it to 41–45% with Relentless exactly as printed
+  (−0.25 per stat gives 61%).
+- **Sprinter:** 85% XP on sends (was 50%), with −2 Time and the extra Focus crux die kept.
+- **Free Solo:** +2 Grit every round.
+
+**Package B3** (the five changes above, on GRIT_RULES), 2-player win rates:
+
+| Variant | Tech | Spr | IL | FS | RR | Spread | Seat 1 wins |
+|---|---|---|---|---|---|---|---|
+| B3 | 57 | 50 | 42 | 47 | 54 | 16 | 61% |
+| B3 + seats start with 0/1/2/3 Grit | 49 | 57 | 44 | 41 | 58 | 17 | 56% |
+| **B3 + seats start with 0/2/4/6 Grit** | 52 | 55 | 41 | 48 | 54 | **15** | **53%** |
+
+**Variety check (B3 against Package D):** both keep the climbers equally distinct.
+
+| | Package D | B3 |
+|---|---|---|
+| Asymmetry | 0.89 | 0.90 |
+| Identity ratio | 2.29 | 2.39 |
+| Replay variety | 0.39 | 0.38 |
+| Turns with a close call | 13% | 12% |
+
+B3 keeps every trait's trade-off: Relentless as printed, Technician's +1 Time on Milestones,
+Sprinter's half-speed XP softened to 85%, and Versatility used on Milestones.
+
+**Correction to §12's variety finding.** "Versatility drops to 0.2 uses a game under Package D"
+was a measurement artifact. The engine's suggested stat shift didn't account for the near-miss
+rule, so it was rarely offered. With the suggestion following the climber's send rule, Package D
+also uses Versatility about 8 times a game. Decision tension (about 12%) and fixed Milestone
+order remain structural issues, not character ones.
+
+---
+
+## 14. Adopted GRIT_RULES (B3 + seat Grit) checked at 2, 3 and 4 players (2026-10-11)
+
+`GRIT_RULES` now holds the adopted ruleset: the B3 character package plus seats starting with
+0 / 2 / 4 / 6 Grit. Each run covered every character set in every seat order (600 games per
+player count). Output: `results/grit-final/`.
+
+**Win rates by player count** (fair share is 50% / 33% / 25%):
+
+| Players | Tech | Spr | IL | FS | RR |
+|---|---|---|---|---|---|
+| 2 (fresh seeds) | 53% | 59% | 44% | 33% | 61% |
+| 3 | 38% | 38% | **23%** | 39% | 28% |
+| 4 | 33% | **39%** | **11%** | 28% | **13.5%** |
+
+**Seat win rates:**
+
+| Players | Seat 1 | Seat 2 | Seat 3 | Seat 4 |
+|---|---|---|---|---|
+| 2 | 42% | 58% | | |
+| 3 | 26% | 36% | 39% | |
+| 4 | 15% | 23% | 24% | **38%** |
+
+Every game finished. Median length: 26 rounds at 3 players, 25 at 4. Time split: climbing 52–53%,
+training 14%, resting 23%. Each climber bought about 2.1–2.3 market cards.
+
+**With the milder seat scale 0 / 1 / 2 / 3 Grit:**
+
+| Players | Seat win rates | Tech | Spr | IL | FS | RR |
+|---|---|---|---|---|---|---|
+| 3 | 38 / 26 / 36% | 37% | 36% | 25% | 43% | 25% |
+| 4 | **25 / 21 / 23 / 31%** | 33% | 30% | 12% | 38% | 13% |
+
+**Findings**
+- **0 / 2 / 4 / 6 over-compensates at 3–4 players.** Seat 4's 6 Grit makes it the strongest seat.
+  0 / 1 / 2 / 3 is close to fair at 4 players and acceptable at 3. A seat scale that depends on
+  player count (or a flat +1 per later seat) is the likely answer.
+- **Balance depends on player count.** With more climbers racing for the same fresh Grit,
+  volume climbers (Sprinter, Technician) and Free Solo, which has its own income, gain. Iron Lung
+  and Route Reader fall to about half their fair share at 4 players. The B3 Iron Lung nerf
+  (stat growth −0.5) is too strong in multiplayer.
+- **Next tuning pass:** set the seat scale per player count; soften the Iron Lung nerf (growth
+  −0.25, which was 61% in 2-player games); give Route Reader something for contested walls;
+  check whether Free Solo's +2 Grit should scale down with more players. All of this can be done
+  with the existing hooks and `node sim/run-balance.js multi --players=N`.
