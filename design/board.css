@@ -457,6 +457,62 @@ main { padding: var(--sp-5) var(--gutter) var(--sp-7); }
 .final-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--sp-2) var(--sp-4); text-align: left; margin-bottom: var(--sp-4); }
 .final-stats div { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--rule); padding: var(--sp-1) 0; }
 
+/* ---------- Post-game summary (game.js showGameSummary) -------------------- */
+.summary { text-align: left; }
+.summary > .eyebrow, .summary > h2 { text-align: center; }
+.summary .victory-banner { text-align: center; }
+.summary-section { margin-top: var(--sp-6); }
+.summary-section h3 { font-size: var(--fs-lg); font-weight: 800; margin-bottom: var(--sp-2); }
+.summary-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.summary-note { margin-bottom: var(--sp-3); font-size: var(--fs-sm); color: var(--ink-soft); }
+.summary-chip { flex: none; }
+.summary-you { color: var(--ink-soft); font-weight: 600; }
+.summary .final-standings li { align-items: center; justify-content: flex-start; gap: var(--sp-3); }
+.summary-rank { font-family: var(--font-display); font-weight: 800; font-size: var(--fs-lg); min-width: 1.2em; }
+.summary-name { flex: 1 1 12rem; min-width: 0; }
+.summary-tiers { display: inline-flex; gap: var(--sp-1); }
+.summary-tier { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 50%; font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; color: var(--ink-muted); box-shadow: inset 0 0 0 2px var(--rule); }
+.summary-tier.done { background: var(--marigold); color: var(--on-marigold); box-shadow: none; }
+.summary-meta { font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.summary-legend { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); margin: 0 0 var(--sp-2); list-style: none; font-size: var(--fs-sm); color: var(--ink-soft); }
+.summary-legend li { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.summary-swatch { display: inline-block; flex: none; width: 0.9rem; height: 0.9rem; border-radius: 3px; vertical-align: -0.1em; margin-right: var(--sp-1); }
+.summary-marker-key { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; background: var(--ink); color: var(--chalk); font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; }
+.summary-chart { position: relative; }
+.summary-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.summary-chart .sc-grid { stroke: var(--rule); stroke-width: 1; }
+.summary-chart .sc-round { stroke: var(--rule); stroke-width: 1; opacity: 0.5; }
+.summary-chart .sc-tick { font-family: var(--font-mono); font-size: 11px; fill: var(--ink-muted); }
+.summary-chart .sc-axis { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; fill: var(--ink-soft); }
+.summary-chart .sc-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.summary-chart .sc-marker circle { stroke: var(--paper); stroke-width: 2; }
+.summary-chart .sc-marker text { font-family: var(--font-mono); font-size: 11px; font-weight: 700; pointer-events: none; }
+.summary-chart .sc-cross { stroke: var(--ink-soft); stroke-width: 1; pointer-events: none; }
+.summary-chart .sc-hit { fill: transparent; }
+.summary-chart .sc-marker { cursor: help; }
+.sc-tip { position: absolute; top: var(--sp-2); z-index: 2; display: grid; gap: 2px; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); background: var(--ink); color: var(--chalk); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; box-shadow: var(--shadow-panel); }
+.sc-tip[hidden] { display: none; }
+.summary-details { margin-top: var(--sp-3); }
+.summary-details > summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+/* position: relative keeps the .sr-only cells inside the scroll box. */
+.summary-table-wrap { position: relative; overflow-x: auto; }
+.summary-table { font-size: var(--fs-sm); }
+.summary-table thead th { vertical-align: bottom; white-space: nowrap; }
+.summary-stats td { vertical-align: top; font-variant-numeric: tabular-nums; }
+.summary-stats tbody th { white-space: nowrap; vertical-align: top; }
+.summary-sub { display: block; font-size: var(--fs-2xs); color: var(--ink-soft); font-weight: 500; text-transform: none; letter-spacing: 0; }
+.summary-lead { font-weight: 800; }
+.summary-bars { display: grid; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.summary-bar-row { display: grid; grid-template-columns: auto minmax(4rem, 9rem) 1fr; align-items: center; gap: var(--sp-2); }
+.summary-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: var(--fs-sm); }
+.summary-bar { display: flex; gap: 2px; height: 1.75rem; border-radius: 4px; overflow: hidden; }
+.summary-seg { display: grid; place-items: center; min-width: 3px; font-family: var(--font-mono); font-size: var(--fs-2xs); font-weight: 700; }
+.summary-actions { justify-content: center; flex-wrap: wrap; margin-top: var(--sp-6); }
+@media (max-width: 40rem) {
+  .summary-bar-row { grid-template-columns: auto 1fr; }
+  .summary-bar { grid-column: 1 / -1; }
+}
+
 /* ---------- Online lobby (online-mode.js) --------------------------------- */
 .online-lobby { display: grid; gap: var(--sp-4); max-width: 60rem; margin: 0 auto var(--sp-6); padding: var(--sp-6); background: var(--paper); border-radius: var(--r-lg); box-shadow: var(--shadow-panel); }
 .online-lobby h3 { font-size: var(--fs-lg); font-weight: 800; margin-bottom: var(--sp-3); }

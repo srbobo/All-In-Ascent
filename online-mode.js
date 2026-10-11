@@ -317,12 +317,19 @@
       console.error('renderGameBoard failed:', e);
     }
 
-    if (terminal) {
-      const winSeat = terminal.winner
-        ? OnlineMode.seats[terminal.winner - 1]
-        : null;
-      const winName = winSeat?.username || (terminal.winner ? `Player ${terminal.winner}` : '—');
-      toast(`Game over: ${winName} wins (${terminal.reason})`, 12000);
+    // Game over: the same post-game summary local play shows (game.js
+    // showGameSummary), with the players' usernames.
+    if (serverState.gameEnded && !OnlineMode.summaryShown) {
+      OnlineMode.summaryShown = true;
+      const names = {};
+      const seatsByPlayer = OnlineMode.seats.filter(Boolean);
+      serverState.players.forEach((p, i) => { if (seatsByPlayer[i]) names[p.playerNum] = seatsByPlayer[i].username; });
+      const mine = seatsByPlayer.findIndex(s => !s.isBot && s.username === OnlineMode.me.username);
+      window.showGameSummary(serverState, {
+        names,
+        you: mine >= 0 ? serverState.players[mine].playerNum : null,
+        online: true,
+      });
     }
   }
 

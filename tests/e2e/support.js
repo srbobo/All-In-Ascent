@@ -2,7 +2,8 @@
 
 import { expect } from '@playwright/test';
 import { createGame } from '../../engine/state.js';
-import { applyAction } from '../../engine/engine.js';
+import { applyAction, getLegalActions } from '../../engine/engine.js';
+import { createHeuristicAgent } from '../../sim/agents/heuristic.js';
 
 // Make the page's Math.random a seeded PRNG (mulberry32) so a run — the local
 // game seed and every random UI choice — is reproducible.
@@ -119,3 +120,67 @@ export function replayInEngine(browserState) {
 
 // Plain-JSON copy (drops undefined fields the same way page.evaluate does).
 export const asJson = (x) => JSON.parse(JSON.stringify(x));
+
+// A complete game played by the heuristic CPU, stopped one action before the
+// end: { before, last, final } — the state before the winning milestone send,
+// that action, and the finished state. With `winner`, tries seeds from `seed`
+// up until that playerNum wins. Tests load `before` into the page and send the
+// last milestone through the UI to reach the post-game summary.
+export async function nearlyFinishedGame({ seed, characterKeys, winner = null, tries = 30 }) {
+  const agent = createHeuristicAgent();
+  for (let s = seed; s < seed + tries; s++) {
+    let { state } = createGame({ seed: s, characterKeys });
+    let before = state;
+    let last = null;
+    for (let i = 0; i < 4000 && !state.gameEnded; i++) {
+      const legal = getLegalActions(state);
+      const { actionIndex } = await agent.chooseAction({ state, legalActions: legal });
+      before = state;
+      last = legal[actionIndex];
+      ({ state } = applyAction(state, last));
+    }
+    if (state.gameEnded && (winner === null || state.winner === winner)) return { before, last, final: state };
+  }
+  throw new Error(`no finished game with winner ${winner} in seeds ${seed}..${seed + tries - 1}`);
+}
+
+// The post-game summary on the page shows the engine's numbers for `final`
+// (engine/stats.js summarizeGame): standings order, the statistics table, one
+// chart line per climber and one marker per milestone sent. `names` maps
+// playerNum → the name the page should show. Shared by the local and online
+// specs, so both modes are held to the same screen.
+export async function expectSummaryShows(page, final, names) {
+  const { summarizeGame } = await import('../../engine/stats.js');
+  const sum = summarizeGame(final);
+  const summary = page.locator('#victoryModal [data-testid="game-summary"]');
+  await expect(summary).toBeVisible();
+  await expect(summary.locator('#victoryTitle')).toHaveText('Top out!');
+  const winner = sum.players.find(p => p.playerNum === sum.winner);
+  await expect(summary.locator('.victory-banner')).toContainText(`${names[sum.winner]} · ${winner.characterName}`);
+
+  const order = await summary.locator('.final-standings li').evaluateAll(lis => lis.map(li => Number(li.dataset.player)));
+  expect(order).toEqual(sum.standings);
+  for (const p of sum.players) await expect(summary.locator('.final-standings')).toContainText(names[p.playerNum]);
+
+  const row = async (label) => summary.locator('.summary-stats tbody tr', { has: page.locator('th', { hasText: label }) })
+    .first().locator('td').evaluateAll(tds => tds.map(td => {
+      // Visible text only (drop the screen-reader "(most)" note).
+      const c = td.cloneNode(true);
+      c.querySelectorAll('.sr-only').forEach(e => e.remove());
+      return c.textContent.trim();
+    }));
+  const first = (cells) => cells.map(c => parseInt(c, 10));
+  expect(first(await row('Routes attempted'))).toEqual(sum.players.map(p => p.climbs.attempts));
+  expect(first(await row('Training sessions'))).toEqual(sum.players.map(p => p.trainingSessions));
+  expect(first(await row('Gear bought'))).toEqual(sum.players.map(p => p.gear.length));
+  expect(first(await row('Rests'))).toEqual(sum.players.map(p => p.rests));
+  expect(first(await row('Final Level'))).toEqual(sum.players.map(p => p.final.level));
+  expect(await row('Milestones sent')).toEqual(sum.players.map(p => (p.milestones.length
+    ? p.milestones.map(m => `${m.tier[0].toUpperCase()}${m.tier.slice(1)} · round ${m.round}`).join('') : '—')));
+
+  await expect(summary.locator('#summaryChart .sc-line')).toHaveCount(sum.players.length);
+  await expect(summary.locator('#summaryChart .sc-marker'))
+    .toHaveCount(sum.players.reduce((t, p) => t + p.milestones.length, 0));
+  await expect(summary.locator('.summary-bar-row')).toHaveCount(sum.players.length);
+  return sum;
+}

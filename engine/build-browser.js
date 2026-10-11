@@ -28,7 +28,7 @@ const outPath = join(here, 'engine.browser.js');
 
 // Bundled modules in dependency order (each may import only from earlier ones
 // or from ./data.js).
-const MODULES = ['rng.js', 'telemetry.js', 'version.js', 'helpers.js', 'state.js', 'engine.js'];
+const MODULES = ['rng.js', 'telemetry.js', 'version.js', 'helpers.js', 'state.js', 'engine.js', 'stats.js'];
 
 // Data names game.js declares at top level in its GAME DATA section.
 const DATA_GLOBALS = ['CHARACTERS', 'XP_TABLE', 'TRAINING_AREAS', 'ROUTES', 'GEAR_SHOP'];
