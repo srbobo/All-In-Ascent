@@ -29,11 +29,25 @@ body::before {
 }
 
 /* ---------- Site header -------------------------------------------------- */
-/* Footer: the rules engine's version (filled in by game.js from the engine). */
+/* Footer: the rules engine's version (filled in by game.js from the engine)
+   and the telemetry notice with its opt-out (telemetry-client.js). */
 .site-footer {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
   padding: var(--sp-6) var(--gutter) var(--sp-5);
+}
+.site-footer__telemetry {
+  margin: 0;
+  max-width: 60ch;
+  text-align: center;
+  font-size: var(--fs-2xs);
+  color: var(--ink-soft);
+}
+.site-footer__telemetry label {
+  white-space: nowrap;
+  margin-left: var(--sp-2);
 }
 .site-footer__version {
   margin: 0;

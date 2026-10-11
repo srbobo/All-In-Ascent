@@ -55,6 +55,9 @@ const nodeGlobals = {
   URL: 'readonly',
   URLSearchParams: 'readonly',
   Response: 'readonly', // PartyKit onRequest (Workers + Node 18+ global)
+  Request: 'readonly',
+  crypto: 'readonly',   // Web Crypto (Workers + Node 19+ global): randomUUID
+  Buffer: 'readonly',
   AbortController: 'readonly',
   structuredClone: 'readonly',
   TextEncoder: 'readonly',
@@ -94,7 +97,7 @@ export default [
   },
   {
     // Browser classic scripts — global scope, no modules.
-    files: ['game.js', 'effects.js', 'online-mode.js', 'design/**/*.js'],
+    files: ['game.js', 'effects.js', 'online-mode.js', 'telemetry-client.js', 'design/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'script',
@@ -109,6 +112,16 @@ export default [
         varsIgnorePattern: '^(CHARACTERS|XP_TABLE|TRAINING_AREAS|ROUTES|GEAR_SHOP)$',
       }],
     },
+  },
+  {
+    // The telemetry dashboard: a browser ES module (served over http).
+    files: ['dashboard.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      globals: { ...browserGlobals, URL: 'readonly', Blob: 'readonly', Node: 'readonly' },
+    },
+    rules,
   },
   {
     // Node ES modules: engine, sim, analysis, PartyKit server, tooling.

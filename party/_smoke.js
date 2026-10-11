@@ -4,11 +4,13 @@
 
 import GameRoom from './game.js';
 
-const messages = [];
+// Count broadcasts rather than keeping them: each one carries the full game
+// state, so holding every one grows memory quadratically in a long game.
+const messages = { length: 0 };
 const fakeRoom = {
   id: 'smoke',
   env: {},
-  broadcast: (msg) => messages.push(JSON.parse(msg)),
+  broadcast: (msg) => { JSON.parse(msg); messages.length++; },
   storage: { put: async () => {} },
 };
 
@@ -47,9 +49,12 @@ await room.onMessage(JSON.stringify({ type: 'start_game' }), host);
 // "playing" the heuristic action ourselves for the human seats too —
 // otherwise the test would hang waiting for a real WebSocket message.
 import { getLegalActions, isTerminal } from '../engine/engine.js';
-import { createHeuristicAgent } from '../sim/agents/heuristic.js';
+import { createPlannerAgent } from '../sim/agents/planner.js';
 
-const humanAgent = createHeuristicAgent();
+// The human seats play like the planner bot, which always finishes a game
+// (the heuristic used by Easy bots can stall at max Level without the
+// expert Milestone), so the room reliably reaches 'completed'.
+const humanAgent = createPlannerAgent({ seed: 1 });
 let safety = 0;
 while (room.phase === 'in_progress' && safety++ < 2000) {
   // If a bot is mid-turn the engine is fine; just yield.

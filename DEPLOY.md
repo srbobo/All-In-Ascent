@@ -83,6 +83,55 @@ npm run online:deploy
 If unset, logs are stored in the DO under `log:<finishedAt>` and can be
 retrieved later via the PartyKit storage API.
 
+### Telemetry dashboard (designer analytics)
+
+Every finished game is recorded as one anonymous **match record**
+(`engine/match-record.js`): characters, human/bot seats, player count, the
+winner and final standings, Levels and milestones, gear bought, route cards
+climbed, training focus and where each climber's Time went. No usernames or
+anything a player typed. Records are stored by the `telemetry` party
+(`party/telemetry.js`, registered under `parties` in `partykit.json`) in its
+Durable Object, one room called `global`:
+
+- **Online games** are recorded by the GameRoom itself when they end.
+- **Local hot-seat games** are posted by the player's browser
+  (`telemetry-client.js`) to the production PartyKit host, or to the page's
+  own origin when it is served from `localhost`. Players can switch this off
+  with the footer checkbox ("Share my local games").
+
+The dashboard is served next to the game:
+
+```
+https://all-in-ascent.YOUR-USER.partykit.dev/dashboard.html
+```
+
+It shows win rates and a fair-share win index per character (split by 2-,
+3- and 4-player games), head-to-head match-ups, seat-order advantage, builds
+(training focus + gear), gear and route card usage (including cards nobody
+used), winning Levels, game length and milestones, with filters for period,
+player count, mode, humans vs bots and engine version. "Load file…" opens a
+JSONL export or a sim sample instead of the server's data.
+
+```bash
+# Optional: require a token to READ the data (the dashboard asks for it once).
+npx partykit env add TELEMETRY_READ_TOKEN
+# Optional: allow deleting records (e.g. test games) with a token.
+npx partykit env add TELEMETRY_ADMIN_TOKEN
+npm run online:deploy
+
+# Remove every record, or one by id:
+curl -X DELETE "https://all-in-ascent.YOUR-USER.partykit.dev/parties/telemetry/global?all=1&token=ADMIN_TOKEN"
+curl -X DELETE "https://all-in-ascent.YOUR-USER.partykit.dev/parties/telemetry/global?id=<record id>&token=ADMIN_TOKEN"
+```
+
+Bot-simulated data, for a dashboard to look at before real players arrive
+(recorded with mode `sim`, so the Mode filter separates it):
+
+```bash
+npm run telemetry:sample -- --games=200                              # → results/telemetry-sample.jsonl (Load file…)
+npm run telemetry:sample -- --games=200 --post=http://127.0.0.1:1999  # into `npm run online:dev`
+```
+
 ## 3. Deploy the frontend
 
 You have three options. Pick one:
@@ -136,7 +185,10 @@ Total worst-case at hobby scale: **~$1/month**, almost always **$0**.
   browser <--WebSocket--> PartyKit Worker (party/game.js)
    index.html?online=1        ├─ in-memory state (GameRoom DO)
    + online-mode.js           ├─ heuristic bots for empty seats
-                              └─ on game_end → POST log to webhook
+                              ├─ on game_end → POST log to webhook
+                              └─ on game_end → match record → telemetry party
+  dashboard.html  <--HTTP-->  PartyKit Worker (party/telemetry.js, room "global")
+  index.html (local play) ─── POST match record ──┘
 ```
 
 One Durable Object instance per `room` ID. All state lives in memory; bots

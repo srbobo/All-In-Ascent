@@ -30,6 +30,8 @@ import { createGame } from '../engine/state.js';
 import { getLegalActions, applyAction, isTerminal } from '../engine/engine.js';
 import { CHARACTERS } from '../engine/data.js';
 import { isWellFormedStatShift, canUseStatShift, GRIT_RULES } from '../engine/helpers.js';
+import { buildMatchRecord } from '../engine/match-record.js';
+import { TELEMETRY_ROOM } from './telemetry.js';
 import { createHeuristicAgent } from '../sim/agents/heuristic.js';
 import { createRolloutAgent } from '../sim/agents/rollout.js';
 
@@ -406,8 +408,33 @@ export default class GameRoom {
     // Broadcast final state with terminal info.
     this.broadcastState({ terminal: term });
 
-    // Ship logs.
+    // Ship logs and the dashboard's match record.
     await this.shipLogs();
+    await this.recordMatch();
+  }
+
+  async recordMatch() {
+    const telemetry = this.room.context?.parties?.telemetry;
+    if (!telemetry) return;
+    const record = buildMatchRecord(this.state, {
+      id: `online-${crypto.randomUUID()}`,
+      mode: 'online',
+      startedAt: this.startedAt,
+      finishedAt: this.finishedAt,
+      seats: this.seats.filter(Boolean).map(s => (s.isBot
+        ? { controller: 'bot', botLevel: s.botDifficulty || 'easy' }
+        : { controller: 'human' })),
+    });
+    try {
+      const res = await telemetry.get(TELEMETRY_ROOM).fetch({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(record),
+      });
+      if (!res.ok) console.error('telemetry rejected the match record', res.status, await res.text());
+    } catch (err) {
+      console.error('telemetry failed', err);
+    }
   }
 
   async shipLogs() {

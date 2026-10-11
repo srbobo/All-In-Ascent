@@ -878,6 +878,14 @@ function ownedGearWithEffect(char, effectKind) {
     .filter(g => g && g.effectKind === effectKind);
 }
 
+// The gear effectKinds describeClimbGearEffects can report on a climb. Other
+// effect cards act on training (trainingBonusBoost, trainingCapBonus,
+// freeTrainingSession), and plain stat cards are always on.
+export const CLIMB_GEAR_EFFECT_KINDS = Object.freeze([
+  'timeCostReduction', 'enduranceHalvedOnTag', 'rerollOnTag', 'treatOneDieAsValue', 'milestoneBuffDiceBonus',
+  'extraDieDiscardOne', 'negateOneNerfDie', 'failBonusXp', 'ignoreFailPenalty', 'successHealEndurance',
+]);
+
 // Every gear effect that changed a resolved climb, as structured entries for
 // the climb_resolved event (and the UIs that show it). Each entry has
 // { gear, effectKind } plus effect-specific fields:

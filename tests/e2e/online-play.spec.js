@@ -10,19 +10,28 @@ import { createGame } from '../../engine/state.js';
 import {
   collectPageErrors, seedPageRandom, uiStep, asJson, cardAction, nearlyFinishedGame, expectSummaryShows,
 } from './support.js';
+import { buildMatchRecord } from '../../engine/match-record.js';
 
 process.env.BOT_MOVE_DELAY_MS = '0';
 const { default: GameRoom } = await import('../../party/game.js');
+const { default: TelemetryRoom, TELEMETRY_ROOM } = await import('../../party/telemetry.js');
+const { createMemoryStorage } = await import('../../party/_memory-storage.js');
 
-// Start a GameRoom and route the page's PartySocket connection to it.
+// Start a GameRoom and route the page's PartySocket connection to it. The
+// room gets its own telemetry party (room.telemetryStorage holds what it
+// records), as PartyKit's room.context.parties provides in production.
 async function connectToRoom(page, roomId) {
   const conns = new Set();
+  const telemetryStorage = createMemoryStorage();
+  const telemetry = new TelemetryRoom({ id: TELEMETRY_ROOM, env: {}, storage: telemetryStorage });
   const room = new GameRoom({
     id: roomId,
     env: {},
     broadcast: (msg) => { for (const c of conns) c.send(msg); },
     storage: { put: async () => {} },
+    context: { parties: { telemetry: { get: () => ({ fetch: (init) => telemetry.onRequest(new Request(`http://x/parties/telemetry/${TELEMETRY_ROOM}`, init)) }) } } },
   });
+  room.telemetryStorage = telemetryStorage;
   let n = 0;
   await page.routeWebSocket(new RegExp(`/parties/main/${roomId}`), (ws) => {
     const conn = { id: `conn-${n++}`, send: (m) => ws.send(m), close: () => ws.close() };
@@ -84,6 +93,8 @@ test('online client plays a game against the GameRoom and bots', async ({ page }
 test('winning an online game opens the same post-game summary as local play', async ({ page }) => {
   const errors = collectPageErrors(page);
   page.on('dialog', d => d.accept());
+  let telemetryPosts = 0;
+  page.on('request', r => { if (r.url().includes('/parties/telemetry/') && r.method() === 'POST') telemetryPosts++; });
   await seedPageRandom(page, 78);
   const room = await connectToRoom(page, 'e2e-summary');
 
@@ -117,5 +128,17 @@ test('winning an online game opens the same post-game summary as local play', as
   await expect(summary.getByRole('link', { name: 'New online game ▸' })).toHaveAttribute('href', 'online.html');
   await summary.getByRole('button', { name: 'View the board' }).click();
   await expect(page.locator('#turnIndicator')).toContainText('Game over · alice wins');
+
+  // The server recorded the game for the telemetry dashboard (the browser
+  // sends nothing online): alice's seat as a human, the Easy bots as bots.
+  await expect.poll(() => room.telemetryStorage.data.size).toBe(1);
+  const { receivedAt, ...record } = [...room.telemetryStorage.data.values()][0];
+  expect(typeof receivedAt).toBe('number');
+  expect(record).toEqual(asJson(buildMatchRecord(final, {
+    id: record.id, mode: 'online', startedAt: room.startedAt, finishedAt: room.finishedAt,
+    seats: [{ controller: 'human' }, { controller: 'bot', botLevel: 'easy' }, { controller: 'bot', botLevel: 'easy' }],
+  })));
+  expect(JSON.stringify(record)).not.toContain('alice');
+  expect(telemetryPosts).toBe(0);
   expect(errors).toEqual([]);
 });

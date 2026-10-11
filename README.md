@@ -134,6 +134,7 @@ For playability in digital format:
 - `engine/` - The rules engine: `state.js` (setup), `engine.js` (legal actions, applying actions), `helpers.js` (formulas)
 - `engine/engine.browser.js` - The engine bundled for the browser (generated; do not edit)
 - `online-mode.js`, `online.html`, `party/` - Online play: browser client and PartyKit server
+- `dashboard.html`, `dashboard.js`, `telemetry-client.js`, `party/telemetry.js` - Designer telemetry: anonymous match records of finished games and the dashboard that reads them (see DEPLOY.md)
 - `sim/`, `analysis/` - Bot playtests and balance reports
 - `tests/e2e/` - Browser end-to-end tests
 

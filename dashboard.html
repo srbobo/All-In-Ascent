@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playtest Telemetry · All In Ascent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="design/tokens.css">
+<style>
+  /* The designer's telemetry dashboard. Chrome uses the Grit & Holds tokens;
+     chart colours are validated sets (dataviz palette validator, light mode,
+     on --paper): characters = reference categorical slots 1–5, stats and
+     time buckets = game-adjacent hues, polarity = blue ↔ red around a
+     neutral paper midpoint. */
+  :root {
+    --surface: var(--paper);
+    --surface-2: #fffaf0;
+    --grid: rgba(90, 60, 40, 0.16);
+    --c-char-technician: #2a78d6;
+    --c-char-sprinter: #eb6834;
+    --c-char-ironLung: #1baf7a;
+    --c-char-freeSolo: #eda100;
+    --c-char-routeReader: #e87ba4;
+    --c-stat-strength: #e8552f;
+    --c-stat-technique: #169e8e;
+    --c-stat-focus: #7a48cc;
+    --c-stat-flexibility: #6f8c12;
+    --c-time-climbing: #e8552f;
+    --c-time-training: #169e8e;
+    --c-time-milestone: #eda100;
+    --c-time-gear: #2a62cc;
+    --c-time-rest: #c4286c;
+    --c-pos: #2a78d6;
+    --c-neg: #e34948;
+    --c-mid: #efe3c6;
+    --c-bar: #2a78d6;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #efe6d2;
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  a { color: var(--cobalt-text); }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px 64px; }
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px;
+    padding: 28px 0 16px;
+  }
+  header.top h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.6rem, 3vw, 2.2rem); margin: 0; letter-spacing: -0.01em; }
+  header.top p { margin: 4px 0 0; color: var(--ink-soft); }
+  .source { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.85rem; color: var(--ink-soft); }
+  .btn {
+    font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--rule); background: var(--surface-2); color: var(--ink);
+    border-radius: 8px; padding: 6px 12px;
+  }
+  .btn:hover { background: #fff; }
+  .btn:focus-visible, select:focus-visible, [tabindex]:focus-visible, input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+  /* Filters: one row above everything they scope. */
+  .filters {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+    padding: 10px 0; background: #efe6d2; border-bottom: 1px solid var(--rule);
+  }
+  .filters label { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--ink-soft); }
+  .filters select { font: inherit; font-size: 0.85rem; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface-2); color: var(--ink); }
+  .filters .count { margin-left: auto; font-size: 0.85rem; color: var(--ink-soft); }
+  nav.sections { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0 0; font-size: 0.85rem; }
+
+  section { margin-top: 28px; }
+  section > h2 { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; margin: 0 0 4px; }
+  section > p.lede { margin: 0 0 12px; color: var(--ink-soft); max-width: 75ch; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
+  .card {
+    background: var(--surface); border-radius: 12px; padding: 16px;
+    box-shadow: 0 1px 0 rgba(90, 60, 40, 0.12), 0 0 0 1px rgba(90, 60, 40, 0.08);
+    min-width: 0;
+  }
+  .card h3 { margin: 0 0 2px; font-size: 1rem; font-weight: 700; }
+  .card .sub { margin: 0 0 12px; font-size: 0.82rem; color: var(--ink-soft); }
+  .wide { grid-column: 1 / -1; }
+
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+  .tile { background: var(--surface); border-radius: 12px; padding: 14px 16px; box-shadow: 0 0 0 1px rgba(90, 60, 40, 0.08); }
+  .tile .label { font-size: 0.8rem; color: var(--ink-soft); }
+  .tile .value { font-size: 1.7rem; font-weight: 700; line-height: 1.15; }
+  .tile.hero .value { font-size: 3rem; }
+  .tile .detail { font-size: 0.8rem; color: var(--ink-muted); }
+
+  svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+  svg.chart text { font-family: var(--font-body); font-size: 12px; fill: var(--ink-soft); }
+  svg.chart text.strong { fill: var(--ink); font-weight: 600; }
+  svg.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+  svg.chart .axis { stroke: rgba(90, 60, 40, 0.35); stroke-width: 1; }
+  svg.chart .ref { stroke: var(--ink-soft); stroke-width: 1.5; }
+  svg.chart [data-tip] { cursor: default; }
+  svg.chart [data-tip]:hover .mark, svg.chart [data-tip]:focus .mark { filter: brightness(1.12); }
+  svg.chart [data-tip]:focus { outline: none; }
+  svg.chart [data-tip]:focus .hit { stroke: var(--focus-ring); stroke-width: 2; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; font-size: 0.8rem; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .legend i.ramp { width: 72px; border-radius: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .table-scroll { overflow-x: auto; }
+  th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child, th.left, td.left { text-align: left; }
+  th { font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); }
+  th[data-sort] { cursor: pointer; user-select: none; }
+  th[data-sort]:hover { color: var(--ink); }
+  th[aria-sort="descending"]::after { content: " ↓"; }
+  th[aria-sort="ascending"]::after { content: " ↑"; }
+  td.low { color: var(--ink-muted); }
+  td .n { color: var(--ink-muted); font-size: 0.75rem; margin-left: 4px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
+  .inline-bar { display: inline-block; height: 8px; border-radius: 0 3px 3px 0; background: var(--c-bar); vertical-align: middle; margin-right: 6px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--paper-deep); font-size: 0.75rem; margin: 1px 2px 1px 0; }
+  .callouts { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); margin-bottom: 16px; }
+  .callout { background: var(--surface); border-radius: 12px; padding: 12px 14px; box-shadow: 0 0 0 1px rgba(90, 60, 40, 0.08); font-size: 0.85rem; }
+  .callout strong { display: block; font-size: 0.75rem; color: var(--ink-soft); font-weight: 600; margin-bottom: 4px; }
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .seg button { font: inherit; font-size: 0.8rem; border: 1px solid var(--rule); background: var(--surface-2); border-radius: 999px; padding: 3px 10px; cursor: pointer; color: var(--ink); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .empty { padding: 32px; text-align: center; color: var(--ink-soft); }
+  .note { font-size: 0.8rem; color: var(--ink-muted); margin: 8px 0 0; }
+  .banner { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: #fff3d6; border: 1px solid #e8c77a; font-size: 0.9rem; }
+  .banner form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .banner input { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--rule); }
+  .loading main { opacity: 0.5; transition: opacity 0.2s; }
+
+  #tooltip {
+    position: fixed; z-index: 20; pointer-events: none; display: none;
+    background: var(--ink); color: var(--paper); border-radius: 8px; padding: 8px 10px;
+    font-size: 0.8rem; line-height: 1.35; max-width: 280px; box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  }
+  #tooltip b { font-size: 0.95rem; }
+  @media (max-width: 700px) { .filters { position: static; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Playtest telemetry</h1>
+      <p>All In Ascent: every finished game, recorded anonymously.</p>
+    </div>
+    <div class="source">
+      <span id="sourceLabel" data-testid="source">Loading…</span>
+      <button class="btn" type="button" id="reloadBtn">Reload</button>
+      <label class="btn" for="fileInput">Load file…</label>
+      <input type="file" id="fileInput" accept=".jsonl,.json,.ndjson,application/json" hidden>
+      <button class="btn" type="button" id="exportBtn">Export JSONL</button>
+    </div>
+  </header>
+  <div id="banner"></div>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <label>Period
+      <select id="fSince">
+        <option value="all">All time</option>
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+    </label>
+    <label>Players
+      <select id="fPlayers">
+        <option value="multi">2–4 players</option>
+        <option value="2">2 players</option>
+        <option value="3">3 players</option>
+        <option value="4">4 players</option>
+        <option value="1">Solo</option>
+        <option value="all">All games</option>
+      </select>
+    </label>
+    <label>Mode
+      <select id="fMode">
+        <option value="all">All modes</option>
+        <option value="local">Local hot-seat</option>
+        <option value="online">Online</option>
+        <option value="sim">Bot simulations</option>
+      </select>
+    </label>
+    <label>Seats
+      <select id="fSeats">
+        <option value="all">Humans and bots</option>
+        <option value="humans">Humans only</option>
+        <option value="bots">Games with bots</option>
+      </select>
+    </label>
+    <label>Engine
+      <select id="fVersion"><option value="all">All versions</option></select>
+    </label>
+    <span class="count" id="filterCount" data-testid="filter-count"></span>
+  </div>
+  <nav class="sections" aria-label="Sections">
+    <a href="#overview">Overview</a><a href="#characters">Characters</a><a href="#matchups">Match-ups</a>
+    <a href="#builds">Builds</a><a href="#cards">Cards</a><a href="#progression">Levels &amp; length</a><a href="#recent">Recent games</a>
+  </nav>
+
+  <main id="main">
+    <div class="empty" id="emptyState">Loading games…</div>
+    <div id="report" hidden>
+      <section id="overview">
+        <h2>Overview</h2>
+        <div class="tiles" id="tiles"></div>
+        <div class="grid" style="margin-top:16px">
+          <div class="card wide"><h3>Games per day</h3><p class="sub">Finished games in the current filter.</p><div id="chartDays"></div></div>
+        </div>
+      </section>
+
+      <section id="characters">
+        <h2>Characters</h2>
+        <p class="lede">Win index compares wins with each character's fair share (1 ÷ players, summed over its games), so 2-, 3- and 4-player games can be read together: 1.00 is par.</p>
+        <div class="grid">
+          <div class="card"><h3>Win index</h3><p class="sub">Wins ÷ fair share of wins. Above 1.00 wins more than its share.</p><div id="chartWinIndex"></div></div>
+          <div class="card"><h3>Pick rate</h3><p class="sub">Share of games each character appeared in.</p><div id="chartPicks"></div></div>
+          <div class="card wide"><h3>Character results</h3><p class="sub">Win rate by player count is tinted against that count's fair share (blue above, red below). Rates on fewer than 5 games are greyed.</p><div class="table-scroll" id="tableCharacters"></div></div>
+        </div>
+      </section>
+
+      <section id="matchups">
+        <h2>Match-ups and turn order</h2>
+        <p class="lede">How often the row character finished ahead of the column character in games where both played (head-to-head in 2-player games, placement in bigger ones).</p>
+        <div class="grid">
+          <div class="card"><h3>Finished ahead</h3><p class="sub">Row vs column, % of shared games.</p><div id="chartMatchups"></div></div>
+          <div class="card"><h3>Seat order</h3><p class="sub">Win rate by seat; the tick marks the fair share.</p><div id="chartSeats"></div></div>
+        </div>
+      </section>
+
+      <section id="builds">
+        <h2>Builds</h2>
+        <p class="lede">A build is the stat a climber trained hardest plus the gear they ended with.</p>
+        <div class="grid">
+          <div class="card"><h3>Training focus</h3><p class="sub">Share of training sessions by stat.</p><div id="chartTraining"></div></div>
+          <div class="card"><h3>Where the Time went</h3><p class="sub">Share of each character's Time by activity.</p><div id="chartTime"></div></div>
+          <div class="card wide"><h3>Top builds</h3><p class="sub">Most played focus + gear combinations, with their win rate.</p><div class="seg" id="buildChars" role="group" aria-label="Character"></div><div class="table-scroll" id="tableBuilds"></div></div>
+        </div>
+      </section>
+
+      <section id="cards">
+        <h2>Cards</h2>
+        <div class="callouts" id="cardCallouts"></div>
+        <div class="grid">
+          <div class="card wide"><h3>Gear cards</h3><p class="sub">Bought by: share of seats that bought the card. Win % with / without compares those seats with everyone else. Climb effect uses: climbs the card's effect changed, per buyer (only cards whose effect acts on a climb).</p><div class="table-scroll" id="tableGear"></div></div>
+          <div class="card wide"><h3>Route cards</h3><p class="sub">Attempts on each regular route (milestone attempts excluded), with send rate.</p><div class="seg" id="routeWalls" role="group" aria-label="Wall"></div><div id="chartRoutes"></div></div>
+        </div>
+      </section>
+
+      <section id="progression">
+        <h2>Levels and game length</h2>
+        <div class="grid">
+          <div class="card"><h3>Winning Level</h3><p class="sub">The winner's Level when the game ended.</p><div id="chartWinLevel"></div></div>
+          <div class="card"><h3>Game length</h3><p class="sub">Rounds played per game.</p><div id="chartRounds"></div></div>
+          <div class="card wide"><h3>Milestones</h3><p class="sub">Attempts, success rate and the average round of each tier's sends.</p><div class="table-scroll" id="tableMilestones"></div></div>
+        </div>
+      </section>
+
+      <section id="recent">
+        <h2>Recent games</h2>
+        <div class="card"><div class="table-scroll" id="tableRecent"></div></div>
+      </section>
+    </div>
+  </main>
+</div>
+<div id="tooltip" role="status" aria-live="polite"></div>
+<noscript><p class="empty">The dashboard needs JavaScript.</p></noscript>
+<script type="module" src="dashboard.js"></script>
+</body>
+</html>
