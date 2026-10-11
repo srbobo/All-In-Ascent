@@ -24,6 +24,16 @@
 //   `node engine/build-data.js` (run by the test/playtest scripts; standalone
 //   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
 //
+// 1.0.0 (2026-10-11): Grit — experience and currency split. MAJOR.
+//   The Grit economy is the game's new core mechanic, packaged as GRIT_RULES
+//   (helpers.js): XP only raises your Level and is never spent; Grit — taken
+//   from fresh route cards by the first climber to send them, and paid for
+//   Milestone sends — buys training and gear; training is capped at 10 + 5
+//   per Level; seats start with 0 / 2 / 4 / 6 Grit; and the five climbers get
+//   trait-preserving balance changes (see 0.8.2 below and
+//   docs/CPU_PLAYTEST_AUDIT.md §10–14). Major bump — baselines from 0.x are
+//   not comparable. Games created without a rules object still play the 0.8
+//   rules until the rulebook and UI move to Grit.
 // 0.8.2 (2026-10-10): Grit economy + training-cap cards, as rules variants.
 //   The standard game is unchanged (same outcomes, same RNG streams).
 //   - state.rules.grit: experience and currency split. XP only raises your
@@ -163,5 +173,5 @@
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-export const ENGINE_VERSION = { major: 0, minor: 8, patch: 2 };
+export const ENGINE_VERSION = { major: 1, minor: 0, patch: 0 };
 export const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;

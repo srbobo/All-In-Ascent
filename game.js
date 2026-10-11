@@ -9,7 +9,7 @@
 // engine/ (loaded in the browser as engine/engine.browser.js). See the RULES
 // ENGINE BRIDGE section below and CLAUDE.md.
 // Rules version is kept in step with the Node engine (engine/version.js).
-const GAME_VERSION = '0.8.2';
+const GAME_VERSION = '1.0.0';
 if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
 
 // ===== GAME DATA =====
