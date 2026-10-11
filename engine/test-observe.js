@@ -60,7 +60,7 @@ const TIERS = ['beginner', 'intermediate', 'expert'];
           expected = climbSendProbability(me.character, route, act.area, attempted, { shift: act.shift || null }).pSend;
         } else if (act.type === 'milestone') {
           const m = s.milestoneRoutes[act.difficulty];
-          expected = climbSendProbability(me.character, m.route, m.area, attempted, { isMilestone: true }).pSend;
+          expected = climbSendProbability(me.character, m.route, m.area, attempted, { isMilestone: true, shift: act.shift || null }).pSend;
         }
         if (expected !== null && Math.abs(a.pSend - expected) > 0.0005) {
           pMismatch++;

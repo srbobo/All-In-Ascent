@@ -1,6 +1,6 @@
 {
   "name": "all-in-ascent",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Rock climbing board game with automated agent playtest pipeline + multiplayer online play (PartyKit).",
   "type": "module",
   "private": true,

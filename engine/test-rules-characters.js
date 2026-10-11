@@ -34,14 +34,18 @@ const stats = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
 // Route Reader
 // =============================================================================
 {
-  check('default Route Reader: 3 of 4 sends anywhere',
-    resolveClimbOutcome(climber('routeReader'), stats, reqs, false).success &&
-    resolveClimbOutcome(climber('routeReader'), stats, reqs, true).success);
-  const m4 = climber('routeReader', { milestonePasses: 4 });
+  // Since 1.1.0 the printed Versatility needs the 4th stat within 3.
+  check('default Route Reader: 3 of 4 sends when the 4th misses by ≤ 3, anywhere (Milestones too)',
+    resolveClimbOutcome(climber('routeReader'), stats, { ...reqs, flexibility: 23 }, false).success &&
+    resolveClimbOutcome(climber('routeReader'), stats, { ...reqs, flexibility: 23 }, true).success);
+  check('default Route Reader: missing by 6 fails', !resolveClimbOutcome(climber('routeReader'), stats, reqs).success);
+  check('nearMiss null (any miss): 3 of 4 sends even missing by 6',
+    resolveClimbOutcome(climber('routeReader', { nearMiss: null }), stats, reqs).success);
+  const m4 = climber('routeReader', { milestonePasses: 4, nearMiss: null });
   check('milestonePasses 4: regular routes still 3 of 4', resolveClimbOutcome(m4, stats, reqs, false).success);
   check('milestonePasses 4: a Milestone needs all 4', !resolveClimbOutcome(m4, stats, reqs, true).success);
 
-  const bo = climber('routeReader', { boostOnly: true });
+  const bo = climber('routeReader', { boostOnly: true, nearMiss: null });
   check('boostOnly: no Beta Boost → needs all 4', !resolveClimbOutcome(bo, stats, reqs).success);
   check('boostOnly: with Beta Boost → 3 of 4', resolveClimbOutcome({ ...bo, betaBoostActive: true }, stats, reqs).success);
 
@@ -51,7 +55,7 @@ const stats = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
     resolveClimbOutcome(nm, stats, { ...reqs, flexibility: 25 }).success);
 
   // The engine keeps the Beta Boost until the outcome is known, so boostOnly works in play.
-  const { state } = createGame({ seed: 4, characterKeys: ['routeReader'], rules: { characters: { routeReader: { ability: { boostOnly: true } } } } });
+  const { state } = createGame({ seed: 4, characterKeys: ['routeReader'], rules: { characters: { routeReader: { ability: { boostOnly: true, nearMiss: null } } } } });
   check('createGame copies ability tuning onto the climber', state.players[0].character.abilityParams.boostOnly === true);
   const c = state.players[0].character;
   const route = state.availableRoutes.bouldering[0];
@@ -72,8 +76,8 @@ const stats = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
 // =============================================================================
 {
   const route = { name: 'x', time: 4, endurance: 10, xpSuccess: 40, xpFail: 20, strength: 1, technique: 1, focus: 1, flexibility: 1, rollEffect: [] };
-  check('default Sprinter: half XP, −2 Time, +1 Focus crux die',
-    computeClimbXp(climber('sprinter'), route, true) === 20 && getEffectiveClimbTimeCost(climber('sprinter'), 4, route) === 2 &&
+  check('default Sprinter (1.1.0): 85% XP, −2 Time, +1 Focus crux die',
+    computeClimbXp(climber('sprinter'), route, true) === 34 && getEffectiveClimbTimeCost(climber('sprinter'), 4, route) === 2 &&
     buildEffectRollArray(climber('sprinter'), route).length === 1);
   const spr = climber('sprinter', { xpMultiplier: 1, focusCrux: false, timeReduction: 1 });
   check('Sprinter xpMultiplier 1: full XP', computeClimbXp(spr, route, true) === 40);
@@ -120,7 +124,8 @@ const stats = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
 
   // Route Reader: stat shift offered on Milestones only when the variant allows it.
   const legalShiftOnMilestone = (shiftOnMilestones) => {
-    const r2 = shiftOnMilestones ? { characters: { routeReader: { ability: { shiftOnMilestones: true, nearMiss: 3 } } } } : null;
+    // Printed rules (1.1.0) allow it; a variant can switch it off.
+    const r2 = shiftOnMilestones ? null : { characters: { routeReader: { ability: { shiftOnMilestones: false } } } };
     for (let seed = 1; seed <= 40; seed++) {
       const { state: s0 } = createGame({ seed, characterKeys: ['routeReader'], rules: r2 });
       const rr = s0.players[0].character;
@@ -135,22 +140,22 @@ const stats = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
     }
     return null;
   };
-  check('standard rules: no stat-shift variant on Milestones', legalShiftOnMilestone(false) === null);
+  check('shiftOnMilestones off: no stat-shift variant on Milestones', legalShiftOnMilestone(false) === null);
   const hit = legalShiftOnMilestone(true);
-  check('shiftOnMilestones: a Milestone stat-shift variant is offered', !!hit);
+  check('printed rules: a Milestone stat-shift variant is offered', !!hit);
   if (hit) {
     const { state: s1, events: ev } = applyAction(hit.s0, hit.found);
     check('shiftOnMilestones: the shift applies and uses the ability for the round',
       ev.some(e => e.type === 'ability_activated' && e.payload.ability === 'Versatility') && s1.players[0].character.abilityUsed);
   }
-  const { state: plain } = createGame({ seed: 3, characterKeys: ['routeReader'] });
+  const { state: plain } = createGame({ seed: 3, characterKeys: ['routeReader'], rules: { characters: { routeReader: { ability: { shiftOnMilestones: false } } } } });
   const pc = plain.players[0].character;
   pc.currentEndurance = 999;
   pc.equipment.push('Belay Device', 'Locking Carabiner', 'Lead Rope');
   const tierLegal = ['beginner', 'intermediate', 'expert'].find(t =>
     getLegalActions(plain).some(a => a.type === 'milestone' && a.difficulty === t));
   const why = illegalActionReason(plain, { type: 'milestone', difficulty: tierLegal, shift: { from: 'focus', to: 'strength', amount: 2 } });
-  check('standard rules: a stat shift on a legal Milestone is refused with shiftNotAllowed',
+  check('shiftOnMilestones off: a stat shift on a legal Milestone is refused with shiftNotAllowed',
     tierLegal && why && why.code === 'shiftNotAllowed', JSON.stringify({ tierLegal, why }));
 }
 

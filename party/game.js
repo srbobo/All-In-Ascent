@@ -29,7 +29,7 @@
 import { createGame } from '../engine/state.js';
 import { getLegalActions, applyAction, isTerminal } from '../engine/engine.js';
 import { CHARACTERS } from '../engine/data.js';
-import { isWellFormedStatShift, canUseStatShift } from '../engine/helpers.js';
+import { isWellFormedStatShift, canUseStatShift, GRIT_RULES } from '../engine/helpers.js';
 import { createHeuristicAgent } from '../sim/agents/heuristic.js';
 import { createRolloutAgent } from '../sim/agents/rollout.js';
 
@@ -275,9 +275,11 @@ export default class GameRoom {
     orderedSeats.forEach((s, i) => { this.seats[i] = s; });
 
     const seed = Math.floor(Math.random() * 1e9);
+    // Every game is played with the Grit rules, as in local play.
     const { state, events } = createGame({
       seed,
       characterKeys: orderedSeats.map(s => s.characterKey),
+      rules: GRIT_RULES,
     });
     this.state = state;
     this.events = events.slice();
@@ -324,12 +326,14 @@ export default class GameRoom {
       return;
     }
     let action = legal[actionIndex];
-    // Route Reader stat shift: attach a client-chosen shift to a legal regular
-    // climb. Anything malformed or not allowed right now is ignored.
+    // Route Reader stat shift: attach a client-chosen shift to a legal climb or
+    // Milestone attempt (Versatility works on both since 1.1.0). Anything
+    // malformed or not allowed right now is ignored.
     if (shift !== undefined) {
       const char = this.state.players[seatIndex].character;
       const clean = shift && { from: shift.from, to: shift.to, amount: shift.amount };
-      if (action.type !== 'climb' || !isWellFormedStatShift(clean) || !canUseStatShift(char, false)) return;
+      const isMilestone = action.type === 'milestone';
+      if ((action.type !== 'climb' && !isMilestone) || !isWellFormedStatShift(clean) || !canUseStatShift(char, isMilestone)) return;
       action = { ...action, shift: clean };
     }
     this.advance(action);

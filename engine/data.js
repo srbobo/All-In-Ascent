@@ -17,7 +17,7 @@ export const CHARACTERS = {
  growth: { strength: 1.5, technique: 4.5, focus: 2.5, flexibility: 2, endurance: 5 },
  specialAbility: {
  name: "Perfect Beta",
- description: "PASSIVE: Negate all nerf dice effects on every climb. All stat requirements reduced by 5. Add +1 time cost to every climb.",
+ description: "PASSIVE: Negate all nerf dice effects on every climb. All stat requirements reduced by 5. Milestone attempts cost +1 time.",
  used: false
  }
  },
@@ -30,7 +30,7 @@ export const CHARACTERS = {
  growth: { strength: 4, technique: 2, focus: 1.5, flexibility: 2.5, endurance: 3 },
  specialAbility: {
  name: "Flash Speed",
- description: "PASSIVE: Reduce time cost of every climb by 2 (min 1), but gain only half XP on success. Rolls an extra d6 nerf die applied to Focus on every climb.",
+ description: "PASSIVE: Reduce time cost of every climb by 2 (min 1), but climbs earn only 85% XP. Rolls an extra d6 nerf die applied to Focus on every climb.",
  used: false
  }
  },
@@ -40,7 +40,7 @@ export const CHARACTERS = {
  description: "Tackles challenges head-on with determination.",
  startingStats: { strength: 16, technique: 17, focus: 19, flexibility: 14 },
  startingEndurance: 120,
- growth: { strength: 2.5, technique: 2.5, focus: 3, flexibility: 2, endurance: 8 },
+ growth: { strength: 2, technique: 2, focus: 2.5, flexibility: 1.5, endurance: 8 },
  specialAbility: {
  name: "Relentless",
  description: "PASSIVE: On a failed climb, earn 50% more XP than the base fail XP. Also lose an extra 5 Endurance on failure.",
@@ -56,7 +56,7 @@ export const CHARACTERS = {
  growth: { strength: 1.5, technique: 4, focus: 3, flexibility: 2.5, endurance: 6 },
  specialAbility: {
  name: "Life or Die",
- description: "PASSIVE: Can access Top Rope and Lead routes without equipment. All dice roll effects are negated. Can only attempt climbs where your stats — base + training + permanent gear bonuses — meet every requirement (no luck swing allowed).",
+ description: "PASSIVE: Can access Top Rope and Lead routes without equipment. All dice roll effects are negated. Can only attempt climbs where your stats — base + training + permanent gear bonuses — meet every requirement (no luck swing allowed). Gains 2 Grit at the start of every round.",
  used: false
  }
  },
@@ -69,7 +69,7 @@ export const CHARACTERS = {
  growth: { strength: 2, technique: 3.5, focus: 4, flexibility: 1.5, endurance: 7 },
  specialAbility: {
  name: "Versatility",
- description: "Resting grants a Beta Boost (+3 all stats) for your next climb. Only 3 of 4 stats need to pass to succeed a climb. Once per round, redistribute up to 10 stat points between two attributes.",
+ description: "Resting grants a Beta Boost (+3 all stats) for your next climb. A climb succeeds if 3 of 4 stats pass and the fourth misses by no more than 3. Once per round, redistribute up to 10 stat points between two attributes for one climb (Milestones included).",
  used: false
  }
  }

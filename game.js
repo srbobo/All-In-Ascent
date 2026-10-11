@@ -9,7 +9,7 @@
 // engine/ (loaded in the browser as engine/engine.browser.js). See the RULES
 // ENGINE BRIDGE section below and CLAUDE.md.
 // Rules version is kept in step with the Node engine (engine/version.js).
-const GAME_VERSION = '1.0.0';
+const GAME_VERSION = '1.1.0';
 if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
 
 // Footer: show the rules engine's version, read from the engine bundle
@@ -32,7 +32,7 @@ const CHARACTERS = {
  growth: { strength: 1.5, technique: 4.5, focus: 2.5, flexibility: 2, endurance: 5 },
  specialAbility: {
  name: "Perfect Beta",
- description: "PASSIVE: Negate all nerf dice effects on every climb. All stat requirements reduced by 5. Add +1 time cost to every climb.",
+ description: "PASSIVE: Negate all nerf dice effects on every climb. All stat requirements reduced by 5. Milestone attempts cost +1 time.",
  used: false
  }
  },
@@ -45,7 +45,7 @@ const CHARACTERS = {
  growth: { strength: 4, technique: 2, focus: 1.5, flexibility: 2.5, endurance: 3 },
  specialAbility: {
  name: "Flash Speed",
- description: "PASSIVE: Reduce time cost of every climb by 2 (min 1), but gain only half XP on success. Rolls an extra d6 nerf die applied to Focus on every climb.",
+ description: "PASSIVE: Reduce time cost of every climb by 2 (min 1), but climbs earn only 85% XP. Rolls an extra d6 nerf die applied to Focus on every climb.",
  used: false
  }
  },
@@ -55,7 +55,7 @@ const CHARACTERS = {
  description: "Tackles challenges head-on with determination.",
  startingStats: { strength: 16, technique: 17, focus: 19, flexibility: 14 },
  startingEndurance: 120,
- growth: { strength: 2.5, technique: 2.5, focus: 3, flexibility: 2, endurance: 8 },
+ growth: { strength: 2, technique: 2, focus: 2.5, flexibility: 1.5, endurance: 8 },
  specialAbility: {
  name: "Relentless",
  description: "PASSIVE: On a failed climb, earn 50% more XP than the base fail XP. Also lose an extra 5 Endurance on failure.",
@@ -71,7 +71,7 @@ const CHARACTERS = {
  growth: { strength: 1.5, technique: 4, focus: 3, flexibility: 2.5, endurance: 6 },
  specialAbility: {
  name: "Life or Die",
- description: "PASSIVE: Can access Top Rope and Lead routes without equipment. All dice roll effects are negated. Can only attempt climbs where your stats — base + training + permanent gear bonuses — meet every requirement (no luck swing allowed).",
+ description: "PASSIVE: Can access Top Rope and Lead routes without equipment. All dice roll effects are negated. Can only attempt climbs where your stats — base + training + permanent gear bonuses — meet every requirement (no luck swing allowed). Gains 2 Grit at the start of every round.",
  used: false
  }
  },
@@ -84,7 +84,7 @@ const CHARACTERS = {
  growth: { strength: 2, technique: 3.5, focus: 4, flexibility: 1.5, endurance: 7 },
  specialAbility: {
  name: "Versatility",
- description: "Resting grants a Beta Boost (+3 all stats) for your next climb. Only 3 of 4 stats need to pass to succeed a climb. Once per round, redistribute up to 10 stat points between two attributes.",
+ description: "Resting grants a Beta Boost (+3 all stats) for your next climb. A climb succeeds if 3 of 4 stats pass and the fourth misses by no more than 3. Once per round, redistribute up to 10 stat points between two attributes for one climb (Milestones included).",
  used: false
  }
  }
@@ -386,6 +386,9 @@ function uiBlocker(wanted) {
  return wanted.type === 'buyGear' ? `Needs ${r.need} time to visit the shop` : `Needs ${r.need} time · you have ${r.have}`;
  case 'notEnoughEndurance': return `Needs ${r.need} END · you have ${r.have}`;
  case 'notEnoughXp': return `Need ${r.need} XP · you have ${r.have}`;
+ case 'notEnoughGrit': return `Need ${r.need} Grit · you have ${r.have}`;
+ case 'trainingCap': return `Capped at +${r.cap} ${r.stat} · level up to train more`;
+ case 'trainingLimit': return `Already trained ${r.limit}× this round`;
  case 'lifeOrDie': return 'Life or Die · stats must meet every requirement';
  default: return r.message;
  }
@@ -411,6 +414,7 @@ function renderMilestonePanel() {
    costs: getClimbCosts(char, milestone.route),
    milestone: difficulty,
    stats: computeClimbStats(char, milestone.route, milestone.area),
+   grit: AscentEngine.usesGrit(gameState.rules) ? AscentEngine.milestoneGritReward(gameState.rules, difficulty) : undefined,
    status: sent ? 'Sent' : null,
    tone: sent ? 'done' : null,
    extra: `<ul class="ps-projects ms-roster" aria-label="Sent by">${roster}</ul>`,
@@ -548,7 +552,8 @@ function startGame() {
  // The engine deals the milestones, walls and shop from a random seed. The
  // seed is logged so a local game can be replayed exactly.
  const seed = Math.floor(Math.random() * 2 ** 32);
- gameState = AscentEngine.createGame({ seed, characterKeys: setupCharacterKeys }).state;
+ // Every game is played with the Grit rules (engine GRIT_RULES).
+ gameState = AscentEngine.createGame({ seed, characterKeys: setupCharacterKeys, rules: AscentEngine.GRIT_RULES }).state;
 
  renderGameBoard();
  addLog(`Game started! Round 1 begins. (seed ${seed})`);
@@ -704,6 +709,15 @@ function renderPlayers() {
   const spendableXP = AscentEngine.getSpendableXp(char);
   const xpToGo = getXPToNextLevel(char);
   const beta = char.betaBoostActive ? 3 : 0;
+  // Grit rules: Grit is the currency (training + gear); XP only raises your Level.
+  const grit = AscentEngine.usesGrit(gameState.rules);
+  const cap = AscentEngine.trainingCap(gameState.rules, char);
+  const xpNums = grit
+   ? (char.level < 15 ? `${xpToGo}<small> to L${char.level + 1}</small>` : '<small>max</small>')
+   : `${spendableXP}<small> xp</small>`;
+  const xpText = grit
+   ? (char.level < 15 ? `${xpToGo} XP to level ${char.level + 1}` : 'max level')
+   : `${spendableXP} XP to spend, ${char.level < 15 ? `${xpToGo} to level ${char.level + 1}` : 'max level'}`;
 
   const stats = UI_STATS.map(s => {
    const extra = (char.trainingBonuses[s.key] || 0) + (char.gearBonuses[s.key] || 0) + beta;
@@ -751,11 +765,16 @@ function renderPlayers() {
    </div>
    <div class="ps-meter">
     <span class="label">${uiIcon('xp')}XP</span>
-    <div class="aia-meter aia-meter--xp" role="meter" aria-label="Progress to next level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(xpPct)}" aria-valuetext="${spendableXP} XP to spend, ${char.level < 15 ? `${xpToGo} to level ${char.level + 1}` : 'max level'}">
+    <div class="aia-meter aia-meter--xp" role="meter" aria-label="Progress to next level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(xpPct)}" aria-valuetext="${xpText}">
      <div class="aia-meter__fill" data-xp-bar="${n}" id="xp-bar-${n}" style="--w: ${xpPct}%;"></div>
     </div>
-    <span class="nums">${spendableXP}<small> xp</small></span>
+    <span class="nums">${xpNums}</span>
    </div>
+   ${grit ? `<div class="ps-meter ps-meter--grit">
+    <span class="label">${uiIcon('grit')}Grit</span>
+    <span class="ps-grit" data-grit="${n}" id="grit-${n}">${char.grit || 0}<span class="sr-only"> Grit to spend</span></span>
+    <span class="nums" title="Training cap per stat at this level"><small>cap </small>+${cap}<span class="sr-only"> per stat</span></span>
+   </div>` : ''}
    <div class="ps-meter">
     <span class="label">${uiIcon('time')}Time</span>
     <span class="aia-pips${t <= 1 ? ' aia-pips--warn' : ''}" aria-hidden="true">${pips}</span>
@@ -775,6 +794,7 @@ function renderPlayers() {
      ${char.betaBoostActive ? '<p class="beta-note">Beta Boost active · +3 to all stats on your next climb</p>' : ''}
      ${bonuses ? `<ul>${bonuses}</ul>` : '<p>No training or gear bonuses yet.</p>'}
      <p>Total XP ${char.xp} · ${char.level < 15 ? `${xpToGo} to level ${char.level + 1}` : 'max level'}</p>
+     ${grit ? `<p>${char.grit || 0} Grit · training capped at +${cap} per stat at level ${char.level}</p>` : ''}
     </div>
    </details>`;
   sheet.querySelector('details').addEventListener('toggle', (e) => {
@@ -901,6 +921,7 @@ function createRouteCard(route, area, idx, opts = {}) {
  area,
  costs: getClimbCosts(char, route),
  stats: computeClimbStats(char, route, area),
+ grit: AscentEngine.usesGrit(gameState.rules) ? (route.grit || 0) : undefined,
  status: alreadyAttempted ? 'Attempted' : (ownedGear.length ? '+Gear' : null),
  tone: alreadyAttempted ? 'done' : (opts.locked ? 'locked' : null),
  action: {
@@ -927,7 +948,10 @@ function renderTraining() {
   const isMine = !!occupant && occupant.playerNum === currentPlayer.playerNum;
   const reason = uiBlocker({ type: 'train', areaName: area.name });
 
+  const spec = AscentEngine.trainingSpec(gameState.rules, area, currentPlayer.character);
   const card = AIACards.training(area, {
+   bonus: spec.gain,
+   gritCost: AscentEngine.usesGrit(gameState.rules) ? AscentEngine.trainingGritCost(gameState.rules, currentPlayer.character) : undefined,
    status: isMine ? 'You' : (occupant ? `P${occupant.playerNum}` : null),
    action: { label: 'Train', disabled: !!reason, reason, onClick: () => trainAction(area) },
   });
@@ -951,17 +975,22 @@ function renderStore() {
  // Affordability badge on the area title.
  syncShopCollapseState();
 
+ const grit = AscentEngine.usesGrit(gameState.rules);
  container.innerHTML = `<div class="shop-head">
   <p class="store-xp-info">
-   <span class="aia-chip aia-chip--ok">${uiIcon('xp')}${spendableXP} XP to spend</span>
+   ${grit
+    ? `<span class="aia-chip aia-chip--ok">${uiIcon('grit')}${char.grit || 0} Grit to spend</span>`
+    : `<span class="aia-chip aia-chip--ok">${uiIcon('xp')}${spendableXP} XP to spend</span>`}
    <span class="aia-chip">${char.level < 15 ? `${xpToGo} XP to level ${char.level + 1}` : 'Max level'}</span>
   </p>
-  <p class="area-sub" style="margin:0">Gear costs XP earned this level and 1 time.</p>
+  <p class="area-sub" style="margin:0">${grit ? 'Gear costs Grit and 1 time. XP is never spent.' : 'Gear costs XP earned this level and 1 time.'}</p>
  </div>`;
 
  const gearCard = (gear) => {
   const { owned, reason } = uiGearState(gear, char);
   const card = AIACards.gear(gear, {
+   price: AscentEngine.gearPrice(gameState.rules, char, gear),
+   currency: grit ? 'grit' : 'xp',
    status: owned ? 'Owned' : null,
    tone: owned ? 'done' : null,
    action: { label: owned ? 'Owned' : 'Buy', disabled: !!reason, reason, reasonIcon: owned ? 'check' : 'lock', onClick: () => purchaseGear(gear) },
@@ -1120,12 +1149,13 @@ function chooseStatShift(route, stats, suggested) {
  });
 }
 
-// Offer the Route Reader a stat shift for this climb when one would help.
-// Resolves { shift } (possibly null) or null if the player cancelled.
-async function maybeChooseStatShift(char, route, area) {
- if (!AscentEngine.canUseStatShift(char, false)) return { shift: null };
+// Offer the Route Reader a stat shift for this climb (or Milestone attempt)
+// when one would help. Resolves { shift } (possibly null) or null if the
+// player cancelled.
+async function maybeChooseStatShift(char, route, area, isMilestone = false) {
+ if (!AscentEngine.canUseStatShift(char, isMilestone)) return { shift: null };
  const attempted = gameState.attemptedRoutes[uiCurrent().playerNum];
- const suggested = AscentEngine.bestRouteReaderShift(char, route, area, attempted);
+ const suggested = AscentEngine.bestRouteReaderShift(char, route, area, attempted, isMilestone);
  if (!suggested) return { shift: null };
  // Stats as the climb will see them, including an unspent Beta Boost (applied
  // to a copy so the real flag is untouched).
@@ -1146,8 +1176,14 @@ async function attemptClimb(route, area) {
  dispatchAction(choice.shift ? { ...wanted, shift: choice.shift } : wanted);
 }
 
-function attemptMilestoneRoute(difficulty) {
- dispatchAction({ type: 'milestone', difficulty });
+async function attemptMilestoneRoute(difficulty) {
+ const wanted = { type: 'milestone', difficulty };
+ if (!isLegalNow(wanted)) return dispatchAction(wanted);
+ // Versatility's stat shift also works on Milestones.
+ const m = gameState.milestoneRoutes[difficulty];
+ const choice = await maybeChooseStatShift(uiCurrent().character, m.route, m.area, true);
+ if (!choice) return;
+ dispatchAction(choice.shift ? { ...wanted, shift: choice.shift } : wanted);
 }
 
 function trainAction(area) {
@@ -1235,12 +1271,13 @@ function logEvent(before, e) {
  addLog(`Relentless: +50% XP for failing${p.failPenalty > 0 ? `, -${p.failPenalty} extra Endurance` : ''}`);
  }
  const area = AREA_LABELS[p.area] || p.area;
+ const gritTxt = p.gritGained ? ` and ${p.gritGained} Grit` : '';
  if (p.isMilestone) {
  addLog(p.success
- ? ` Player ${p.playerNum} completed the ${p.difficulty.toUpperCase()} milestone: ${p.routeName} (${area})!`
+ ? ` Player ${p.playerNum} completed the ${p.difficulty.toUpperCase()} milestone: ${p.routeName} (${area})!${p.gritGained ? ` +${p.gritGained} Grit.` : ''}`
  : `Player ${p.playerNum} attempted ${p.difficulty} milestone "${p.routeName}" (${area}) but failed. Gained ${p.xpGained} XP.`);
  } else {
- addLog(`Player ${p.playerNum} ${p.success ? 'completed' : 'failed'} ${p.routeName} (${p.grade}) - ${p.xpGained} XP gained`);
+ addLog(`Player ${p.playerNum} ${p.success ? 'completed' : 'failed'} ${p.routeName} (${p.grade}) - ${p.xpGained} XP${gritTxt} gained`);
  }
  break;
  }
@@ -1259,7 +1296,9 @@ function logEvent(before, e) {
  case 'gear_purchased': {
  const char = gameState.players.find(pl => pl.playerNum === p.playerNum).character;
  const discount = p.nominalCost - p.cost;
- addLog(`Player ${p.playerNum} purchased ${p.gearName} for ${p.cost} XP${discount > 0 ? ` (-${discount} discount)` : ''}${p.timeCost === 0 ? ' (free visit)' : ''} (now ${getXPToNextLevel(char)} XP to Level ${char.level + 1})`);
+ addLog(p.currency === 'grit'
+ ? `Player ${p.playerNum} purchased ${p.gearName} for ${p.cost} Grit${p.timeCost === 0 ? ' (free visit)' : ''} (${char.grit || 0} Grit left)`
+ : `Player ${p.playerNum} purchased ${p.gearName} for ${p.cost} XP${discount > 0 ? ` (-${discount} discount)` : ''}${p.timeCost === 0 ? ' (free visit)' : ''} (now ${getXPToNextLevel(char)} XP to Level ${char.level + 1})`);
  break;
  }
  case 'level_up': {
@@ -1307,12 +1346,15 @@ function actionEffects(before, events) {
  fx.floatNumber(enduranceBar, formatEnduranceDelta(p.resourcesDelta.endurance.delta), 'endurance-loss');
  }
  if (xpBar && p.xpGained > 0) setTimeout(() => fx.floatNumber(xpBar, `+${p.xpGained} XP`, 'xp'), 220);
+ const gritEl = document.getElementById(`grit-${p.playerNum}`);
+ if (gritEl && p.gritGained > 0) setTimeout(() => fx.floatNumber(gritEl, `+${p.gritGained} Grit`, 'stat'), 340);
  if (p.isMilestone && p.success && panel) {
  setTimeout(() => fx.floatNumber(panel, `MILESTONE ${p.difficulty.toUpperCase()}!`, 'stat'), 480);
  }
+ const gritDelta = p.gritGained ? ` · +${p.gritGained} Grit` : '';
  fx.recordTurnAction(p.isMilestone
- ? { kind: p.success ? 'milestone✓' : 'milestone✗', desc: `${p.difficulty} — ${p.routeName}`, delta: `${p.xpGained > 0 ? '+' : ''}${p.xpGained} XP` }
- : { kind: p.success ? 'climb✓' : 'climb✗', desc: `${p.routeName} (${p.grade})`, delta: `${p.xpGained > 0 ? '+' : ''}${p.xpGained} XP` });
+ ? { kind: p.success ? 'milestone✓' : 'milestone✗', desc: `${p.difficulty} — ${p.routeName}`, delta: `${p.xpGained > 0 ? '+' : ''}${p.xpGained} XP${gritDelta}` }
+ : { kind: p.success ? 'climb✓' : 'climb✗', desc: `${p.routeName} (${p.grade})`, delta: `${p.xpGained > 0 ? '+' : ''}${p.xpGained} XP${gritDelta}` });
  break;
  }
  case 'train_action': {
@@ -1338,7 +1380,7 @@ function actionEffects(before, events) {
  });
  break;
  case 'gear_purchased':
- fx.recordTurnAction({ kind: 'gear', desc: `Bought ${p.gearName}`, delta: `−${p.cost} XP` });
+ fx.recordTurnAction({ kind: 'gear', desc: `Bought ${p.gearName}`, delta: `−${p.cost} ${p.currency === 'grit' ? 'Grit' : 'XP'}` });
  break;
  }
  });
@@ -1357,12 +1399,17 @@ function turnEffect(e) {
 function gearPurchaseEffects(events, srcGhost) {
  const bought = events.find(e => e.type === 'gear_purchased');
  if (!bought || !window.Effects) return;
- const { playerNum, gearName, cost } = bought.payload;
+ const { playerNum, gearName, cost, currency } = bought.payload;
  const destInv = document.getElementById(`inventory-${playerNum}`);
  const srcStub = srcGhost ? { getBoundingClientRect: () => ({ left: srcGhost.left - 60, top: srcGhost.top - 16, width: 120, height: 32, right: 0, bottom: 0 }) } : null;
  if (srcStub && destInv) window.Effects.flyToInventory(srcStub, destInv, gearName);
+ if (currency === 'grit') {
+ const gritEl = document.getElementById(`grit-${playerNum}`);
+ if (gritEl) window.Effects.floatNumber(gritEl, `−${cost} Grit`, 'stat');
+ } else {
  const xpBar = window.Effects.locateXpBar(playerNum);
  if (xpBar) window.Effects.floatNumber(xpBar, `−${cost} XP`, 'xp');
+ }
  if (!AscentEngine.ACCESS_CARDS.includes(gearName)) {
  const rotating = Array.from(document.querySelectorAll('.gear-card:not(.access-gear-card)'));
  rotating.forEach((c, i) => setTimeout(() => window.Effects.cardFlip(c), i * 60));
@@ -1410,13 +1457,13 @@ function showClimbResultFromEvents(before, events) {
  });
  const versatility = events.some(e => e.type === 'ability_activated' && e.payload.ability === 'Versatility');
  showClimbResult(route, [...rolled.dice, ...rolled.discardedDice], rolled.dice, c.effectiveStats, c.requirements,
- diceEffects, c.success, c.xpGained, versatility ? 'Versatility' : null, c.gearEffects.map(formatGearEffect));
+ diceEffects, c.success, c.xpGained, versatility ? 'Versatility' : null, c.gearEffects.map(formatGearEffect), c.gritGained || 0);
 }
 
 // `rolls` lists every die rolled; the first diceUsed.length are the ones
 // applied (any extras, e.g. a Power Tap Belt discard, are shown dimmed).
 // `gearNotes` describes each gear effect that changed this climb.
-function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, activatedAbility, gearNotes = []) {
+function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, activatedAbility, gearNotes = [], gritGained = 0) {
  const modal = document.getElementById('climbModal');
  const title = document.getElementById('modalTitle');
  const body = document.getElementById('modalBody');
@@ -1458,7 +1505,7 @@ function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffec
  body.innerHTML = `
  <div class="result-box ${success ? 'result-success' : 'result-failure'}">
   <p class="result-text">${uiIcon(success ? 'check' : 'cross')}${success ? 'Sent it!' : 'Fell off'}</p>
-  <p class="result-details">+${xpGained} XP</p>
+  <p class="result-details">+${xpGained} XP${gritGained ? ` · +${gritGained} Grit` : ''}</p>
  </div>
 
  <section class="result-section" aria-labelledby="res-dice">

@@ -444,6 +444,11 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: var(--lh-snug); 
 .aia-cost--xp .aia-icon        { color: var(--cobalt-text); }
 .aia-cost__fail { font-family: var(--font-mono); font-size: var(--t-meta); color: var(--ink-muted); font-weight: 700; }
 .aia-cost--stat { margin-left: auto; }
+/* Grit: on a route card (taken by the first climber to send it), a Milestone's
+   reward, or a training session's cost. A taken card shows 0, struck through. */
+.aia-cost--grit .aia-icon      { color: var(--grit-text); }
+.aia-cost--grit.is-claimed b   { text-decoration: line-through; color: var(--ink-muted); }
+.aia-card__price--grit .aia-icon { color: var(--c-grit); }
 .aia-cost--stat .aia-icon { color: var(--ink-soft); }
 
 /* Rules text box (gear, climbers, training) */

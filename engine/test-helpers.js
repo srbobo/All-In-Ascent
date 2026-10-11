@@ -178,9 +178,10 @@ check('bouldering unlimited (10)', getSectionCapacity('bouldering', 1) === 10);
 check('Sprinter time cost: 4 → 2', getEffectiveClimbTimeCost(sprCharBase(), 4) === 2);
 check('Sprinter time cost floors at 1 (2 → 1, not 0)',
   getEffectiveClimbTimeCost(sprCharBase(), 2) === 1);
-check('Technician time cost: 4 → 5', getEffectiveClimbTimeCost(techCharBase(), 4) === 5);
+check('Technician time cost: regular climb 4 → 4, Milestone 4 → 5 (1.1.0)',
+  getEffectiveClimbTimeCost(techCharBase(), 4) === 4 && getEffectiveClimbTimeCost(techCharBase(), 4, null, true) === 5);
 check('Other chars unchanged time cost', getEffectiveClimbTimeCost(ironCharBase(), 4) === 4);
-check('Sprinter XP multiplier 0.5', getXpMultiplier(sprCharBase()) === 0.5);
+check('Sprinter XP multiplier 0.85 (1.1.0)', getXpMultiplier(sprCharBase()) === 0.85);
 check('Others XP multiplier 1.0', getXpMultiplier(techCharBase()) === 1.0);
 check('Gear purchase free with Gear Bag', (() => {
   const c = techCharBase(); c.equipment = ['Gear Bag'];
@@ -285,26 +286,28 @@ check('Non-Locking Carabiner does not discount other gear', (() => {
 // =============================================================================
 {
   const reqs = { strength: 20, technique: 20, focus: 20, flexibility: 20 };
-  const stats = { strength: 25, technique: 25, focus: 25, flexibility: 10 }; // fails flex
+  const stats = { strength: 25, technique: 25, focus: 25, flexibility: 17 }; // flex misses by 3
   const a = resolveClimbOutcome(techCharBase(), stats, reqs);
   check('Technician fails if any stat short', a.success === false && a.passCount === 3);
   const b = resolveClimbOutcome(routeReaderBase(), stats, reqs);
-  check('Route Reader succeeds with 3/4 passing',
+  check('Route Reader succeeds with 3/4 passing (4th misses by 3)',
     b.success === true && b.passCount === 3);
+  const c = resolveClimbOutcome(routeReaderBase(), { ...stats, flexibility: 16 }, reqs);
+  check('Route Reader fails when the 4th stat misses by 4 (1.1.0)', c.success === false && c.passCount === 3);
 }
 
 // =============================================================================
-// XP COMPUTATION (Sprinter 0.5x, Iron Lung +50% on fail)
+// XP COMPUTATION (Sprinter 0.85x, Iron Lung +50% on fail)
 // =============================================================================
 {
   const r = boulderRoute(); // xpSuccess=32, xpFail=12
   check('Technician success XP = 32', computeClimbXp(techCharBase(), r, true) === 32);
-  check('Sprinter success XP = 16 (0.5x)', computeClimbXp(sprCharBase(), r, true) === 16);
+  check('Sprinter success XP = 27 (0.85x of 32, floored)', computeClimbXp(sprCharBase(), r, true) === 27);
   check('Technician fail XP = 12', computeClimbXp(techCharBase(), r, false) === 12);
   check('Iron Lung fail XP = 18 (12 + 50%)',
     computeClimbXp(ironCharBase(), r, false) === 18);
-  check('Sprinter fail XP = 6 (0.5x of 12)',
-    computeClimbXp(sprCharBase(), r, false) === 6);
+  check('Sprinter fail XP = 10 (0.85x of 12, floored)',
+    computeClimbXp(sprCharBase(), r, false) === 10);
 }
 check('Iron Lung extra fail endurance = 5', getFailureEnduranceExtra(ironCharBase()) === 5);
 check('Other chars no extra fail endurance', getFailureEnduranceExtra(techCharBase()) === 0);

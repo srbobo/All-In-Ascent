@@ -13,7 +13,7 @@
 import { createGame } from './state.js';
 import { getLegalActions, applyAction, illegalActionReason } from './engine.js';
 import {
-  gradeBand, routeGritValue, gearPrice, trainingCap, trainingGritCost, GRIT_RULES,
+  gradeBand, routeGritValue, gearPrice, trainingCap, trainingGritCost, GRIT_RULES, abilityParam,
 } from './helpers.js';
 import { GEAR_SHOP, ROUTES } from './data.js';
 
@@ -204,9 +204,9 @@ const allDealt = (state) => [...state.availableRoutes.bouldering, ...state.avail
     s2.round === 2 && s2.players[0].character.grit === 0 && s2.players[1].character.grit === 4);
   const { state: four } = createGame({ seed: 9, characterKeys: ['ironLung', 'technician', 'sprinter', 'routeReader'], rules: GRIT_RULES });
   check('GRIT_RULES: 4 seats start with 0 / 2 / 4 / 6 Grit', four.players.map(p => p.character.grit).join() === '0,2,4,6');
-  check('GRIT_RULES: character tuning applied (RR near-miss, Tech Milestone-only Time, Sprinter 85% XP, IL growth)',
-    four.players[3].character.abilityParams.nearMiss === 3 && four.players[1].character.abilityParams.extraTimeOn === 'milestone' &&
-    four.players[2].character.abilityParams.xpMultiplier === 0.85 && four.players[0].character.growth.strength === 2);
+  check('climber balance is printed (1.1.0): RR near-miss 3, Tech Milestone-only Time, Sprinter 85% XP, IL growth 2',
+    abilityParam(four.players[3].character, 'nearMiss') === 3 && abilityParam(four.players[1].character, 'extraTimeOn') === 'milestone' &&
+    abilityParam(four.players[2].character, 'xpMultiplier') === 0.85 && four.players[0].character.growth.strength === 2);
 
   // These checks isolate per-character settings, so seat Grit is switched off.
   const NO_SEATS = { ...GRIT_RULES, grit: { ...GRIT_RULES.grit, seatStart: [] } };

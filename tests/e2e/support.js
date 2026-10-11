@@ -3,6 +3,7 @@
 import { expect } from '@playwright/test';
 import { createGame } from '../../engine/state.js';
 import { applyAction, getLegalActions } from '../../engine/engine.js';
+import { GRIT_RULES } from '../../engine/helpers.js';
 import { createHeuristicAgent } from '../../sim/agents/heuristic.js';
 
 // Make the page's Math.random a seeded PRNG (mulberry32) so a run — the local
@@ -111,7 +112,7 @@ export async function playRandomly(page, steps) {
 // else touched the state), the result equals the browser's state.
 export function replayInEngine(browserState) {
   const characterKeys = browserState.players.map(p => p.character.key);
-  let { state } = createGame({ seed: browserState.seed, characterKeys });
+  let { state } = createGame({ seed: browserState.seed, characterKeys, rules: browserState.rules || null });
   for (const e of browserState.events.filter(ev => ev.type === 'action_chosen')) {
     ({ state } = applyAction(state, e.payload.action));
   }
@@ -124,12 +125,13 @@ export const asJson = (x) => JSON.parse(JSON.stringify(x));
 // A complete game played by the heuristic CPU, stopped one action before the
 // end: { before, last, final } — the state before the winning milestone send,
 // that action, and the finished state. With `winner`, tries seeds from `seed`
-// up until that playerNum wins. Tests load `before` into the page and send the
-// last milestone through the UI to reach the post-game summary.
-export async function nearlyFinishedGame({ seed, characterKeys, winner = null, tries = 30 }) {
+// up until that playerNum wins. Played with the Grit rules, like every local
+// and online game. Tests load `before` into the page and send the last
+// milestone through the UI to reach the post-game summary.
+export async function nearlyFinishedGame({ seed, characterKeys, winner = null, tries = 30, rules = GRIT_RULES }) {
   const agent = createHeuristicAgent();
   for (let s = seed; s < seed + tries; s++) {
-    let { state } = createGame({ seed: s, characterKeys });
+    let { state } = createGame({ seed: s, characterKeys, rules });
     let before = state;
     let last = null;
     for (let i = 0; i < 4000 && !state.gameEnded; i++) {

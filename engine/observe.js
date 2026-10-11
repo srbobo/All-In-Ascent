@@ -160,10 +160,10 @@ function describeAbility(c) {
 function abilityRules(key) {
   switch (key) {
     case 'ironLung': return 'Fall: +50% XP and -5 extra Endurance (Mental Anchor removes the Endurance loss).';
-    case 'technician': return 'Every requirement -5; red Crux dice ignored; every climb +1 Time.';
-    case 'sprinter': return 'Every climb -2 Time (min 1); sends earn half XP; +1 red Crux die on Focus every climb.';
-    case 'routeReader': return 'Send with 3 of 4 stats; Rest grants +3 all stats on the next climb; once per round move up to 10 points between stats on a regular climb.';
-    case 'freeSolo': return 'No Lead access cards needed; all dice ignored, never falls; may only start a climb whose requirements base+training+permanent gear already meet.';
+    case 'technician': return 'Every requirement -5; red Crux dice ignored; Milestone attempts +1 Time.';
+    case 'sprinter': return 'Every climb -2 Time (min 1); climbs earn 85% XP; +1 red Crux die on Focus every climb.';
+    case 'routeReader': return 'Send with 3 of 4 stats if the 4th misses by 3 or less; Rest grants +3 all stats on the next climb; once per round move up to 10 points between stats for one climb (Milestones included).';
+    case 'freeSolo': return 'No Lead access cards needed; all dice ignored, never falls; may only start a climb whose requirements base+training+permanent gear already meet; gains 2 Grit every round (Grit rules).';
     default: return '';
   }
 }

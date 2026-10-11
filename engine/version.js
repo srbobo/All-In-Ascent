@@ -24,6 +24,18 @@
 //   `node engine/build-data.js` (run by the test/playtest scripts; standalone
 //   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
 //
+// 1.1.0 (2026-10-11): Grit is how the game is played.
+//   - Local and online play create every game with GRIT_RULES; the UI shows
+//     Grit on route cards, Milestone rewards, training costs, gear prices and
+//     each climber's tracker, and XP only as level progress.
+//   - The trait-preserving balance changes are now the printed abilities and
+//     character data, under any rules: Sprinter climbs earn 85% XP (was 50%);
+//     Technician's +1 Time applies to Milestone attempts only; Route Reader's
+//     Versatility needs the 4th stat within 3 and its stat shift also works on
+//     Milestones; Iron Lung's growth is 2 / 2 / 2.5 / 1.5 (was 2.5 / 2.5 / 3 / 2).
+//     GRIT_RULES keeps only the economy (card Grit 2/3/4, training cap
+//     10 + 5/Level, seat Grit 0/2/4/6, Free Solo +2 Grit a round).
+//   Minor bump — printed abilities changed; baselines from 1.0.x are not comparable.
 // 1.0.0 (2026-10-11): Grit — experience and currency split. MAJOR.
 //   The Grit economy is the game's new core mechanic, packaged as GRIT_RULES
 //   (helpers.js): XP only raises your Level and is never spent; Grit — taken
@@ -173,5 +185,5 @@
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-export const ENGINE_VERSION = { major: 1, minor: 0, patch: 0 };
+export const ENGINE_VERSION = { major: 1, minor: 1, patch: 0 };
 export const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;
