@@ -24,6 +24,29 @@
 //   `node engine/build-data.js` (run by the test/playtest scripts; standalone
 //   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
 //
+// 0.8.2 (2026-10-10): Grit economy + training-cap cards, as rules variants.
+//   The standard game is unchanged (same outcomes, same RNG streams).
+//   - state.rules.grit: experience and currency split. XP only raises your
+//     Level and is never spent; Grit buys training sessions and gear.
+//     Route cards carry 1–3 Grit by grade band when dealt (setup and every
+//     Setter reset); the first climber to SEND a route takes it. Milestone
+//     sends pay 2 / 3 / 4. Optional start Grit and per-round allowance.
+//   - Two variant-only cards, dealt only in training-cap games: Hangboard
+//     Program (+5 training cap in every stat) and Training Partner (once per
+//     round, a training session costs no Grit).
+//   - Refusal reason code notEnoughGrit; climb_resolved reports gritGained.
+//   - GRIT_RULES (helpers.js) is the adopted preset: cards 2 / 3 / 4 Grit,
+//     training cap 10 + 5 per Level, seats start with 0 / 2 / 4 / 6 Grit,
+//     and trait-preserving character balance (Route Reader near-miss ≤ 3 +
+//     stat shift on Milestones; Technician +1 Time on Milestones only;
+//     Sprinter 85% XP; Iron Lung stat growth −0.5; Free Solo +2 Grit a round).
+//   - Per-character rules hooks: rules.characters[key] = { gritStart,
+//     gritPerRound, trainCapMultiplier, uncapped, freeTraining, ability
+//     (DEFAULT_ABILITY numbers), body (starting stats / Endurance / growth) }.
+//     The climber keeps its Beta Boost until a climb's outcome is decided, and
+//     the suggested stat shift follows the climber's send rule (passRule) —
+//     no change under the standard rules.
+//   Patch — variants only.
 // 0.8.1 (2026-10-10): One engine for local and online play.
 //   - Power Spotting's success heal stops at max endurance but never lowers
 //     endurance: a successful climb used to cap any surplus from rest-bonus
@@ -140,5 +163,5 @@
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-export const ENGINE_VERSION = { major: 0, minor: 8, patch: 1 };
+export const ENGINE_VERSION = { major: 0, minor: 8, patch: 2 };
 export const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;

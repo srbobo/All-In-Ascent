@@ -251,13 +251,48 @@ export function computeEffectiveStats(char, route, area, attemptedRoutesForPlaye
 export function computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift = null) {
   let stats = computeEffectiveStats(char, route, area, attemptedRoutesForPlayer);
   if (char.betaBoostActive) {
+    const b = abilityParam(char, 'betaBoost') ?? 3;
     stats = {
-      strength: stats.strength + 3, technique: stats.technique + 3,
-      focus: stats.focus + 3, flexibility: stats.flexibility + 3,
+      strength: stats.strength + b, technique: stats.technique + b,
+      focus: stats.focus + b, flexibility: stats.flexibility + b,
     };
   }
   if (shift) stats = applyStatShiftToStats(stats, shift);
   return stats;
+}
+
+// =============================================================================
+// CHARACTER ABILITY PARAMETERS (balance experiments)
+// =============================================================================
+// Each ability's numbers, as printed. A rules variant can tune them per
+// character with rules.characters[key].ability, which createGame copies onto
+// the climber as char.abilityParams. Absent, abilities play exactly as printed.
+//   routeReader.milestonePasses  stats a Milestone needs (3 = Versatility applies)
+//   routeReader.boostOnly        3-of-4 only while Beta Boost is active
+//   routeReader.nearMiss         the 4th stat may miss by at most this (null = any)
+//   routeReader.shiftOnMilestones  Versatility's stat shift may be used on Milestones
+//   technician.extraTimeOn       where Perfect Beta's +1 Time applies: 'all' | 'milestone' | 'regular'
+export const DEFAULT_ABILITY = Object.freeze({
+  sprinter: { timeReduction: 2, xpMultiplier: 0.5, focusCrux: true },
+  technician: { reqReduction: 5, extraTime: 1, extraTimeOn: 'all' },
+  ironLung: { failXpBonus: 0.5, failEndurance: 5 },
+  routeReader: { betaBoost: 3, milestonePasses: 3, boostOnly: false, nearMiss: null, shiftOnMilestones: false },
+});
+
+export function abilityParam(char, name) {
+  const own = char && char.abilityParams;
+  if (own && own[name] !== undefined) return own[name];
+  return (DEFAULT_ABILITY[char && char.key] || {})[name];
+}
+
+// How many stats a climb needs, and how far a Route Reader's 4th may miss.
+export function passRule(char, isMilestone = false) {
+  if (char.key !== 'routeReader') return { needed: 4, nearMiss: Infinity };
+  const all4 = (isMilestone && abilityParam(char, 'milestonePasses') === 4) ||
+    (abilityParam(char, 'boostOnly') && !char.betaBoostActive);
+  if (all4) return { needed: 4, nearMiss: Infinity };
+  const nm = abilityParam(char, 'nearMiss');
+  return { needed: 3, nearMiss: nm === null || nm === undefined ? Infinity : nm };
 }
 
 // =============================================================================
@@ -268,10 +303,15 @@ export function computeClimbStats(char, route, area, attemptedRoutesForPlayer, s
 // Sprinter's "Flash Speed": -2 (min 1). Technician's "Perfect Beta": +1.
 // Engine v0.3.0 also applies gear effectKind 'timeCostReduction' for tagged routes
 // (Trick Foot Manual: Toe/Heel Hook climbs cost 1 less time).
-export function getEffectiveClimbTimeCost(char, baseTime, route = null) {
+export function getEffectiveClimbTimeCost(char, baseTime, route = null, isMilestone = false) {
   let t = baseTime;
-  if (char.key === 'sprinter') t = Math.max(1, t - 2);
-  if (char.key === 'technician') t += 1;
+  if (char.key === 'sprinter') t = Math.max(1, t - abilityParam(char, 'timeReduction'));
+  if (char.key === 'technician') {
+    const on = abilityParam(char, 'extraTimeOn');
+    if (on === 'all' || (on === 'milestone' && isMilestone) || (on === 'regular' && !isMilestone)) {
+      t += abilityParam(char, 'extraTime');
+    }
+  }
   // Tag-targeted time-cost reduction gear
   if (route && route.tag) {
     for (const gearName of char.equipment || []) {
@@ -302,7 +342,7 @@ export function getEffectiveClimbEnduranceCost(char, route, baseEndurance) {
 // XP multiplier applied to base success/fail XP before Iron Lung's bonus.
 // Sprinter's "Flash Speed": 0.5. Everyone else: 1.0.
 export function getXpMultiplier(char) {
-  return char.key === 'sprinter' ? 0.5 : 1.0;
+  return char.key === 'sprinter' ? abilityParam(char, 'xpMultiplier') : 1.0;
 }
 
 // Time cost for a gear-shop purchase: Gear Bag makes shopping free.
@@ -340,7 +380,7 @@ export function getSpendableXp(char) {
 // Returns a fresh array — does not mutate the route.
 export function buildEffectRollArray(char, route) {
   const effects = (route.rollEffect || []).map(e => ({ ...e }));
-  if (char.key === 'sprinter') {
+  if (char.key === 'sprinter' && abilityParam(char, 'focusCrux')) {
     effects.push({ stat: 'focus', modifier: 1, source: 'sprinter_flash_speed' });
   }
   return effects;
@@ -457,7 +497,7 @@ function makeDiceContext(effects, char, route, isMilestone, stats) {
   // stat-blind choices leave it alone (it counts for nothing).
   const mentorDefault = mentor ? (live.find(i => mods[i] === 1) ?? null) : null;
   return {
-    char, route, effects, stats, n, mods, live, mentor, mentorDefault,
+    char, route, effects, stats, n, mods, live, mentor, mentorDefault, isMilestone,
     // Dice a stat-blind choice may pick: live, and not the one Mentor negates.
     pickable: stats ? live : live.filter(i => i !== mentorDefault),
     reroll: find('rerollOnTag', true) || null,
@@ -474,13 +514,14 @@ function makeDiceContext(effects, char, route, isMilestone, stats) {
 // worst stat, or the 3rd-best for a Route Reader). Higher is better.
 function scoreDice(ctx, dice, mentorIndex) {
   const { requirements } = applyDiceToRequirements(ctx.char, ctx.route, ctx.effects, dice, { mentorIndex });
-  return scoreRequirements(ctx.char, ctx.stats, requirements);
+  return scoreRequirements(ctx.char, ctx.stats, requirements, ctx.isMilestone);
 }
 
-function scoreRequirements(char, stats, requirements) {
+// Same send rule as resolveClimbOutcome (passRule), as a score.
+function scoreRequirements(char, stats, requirements, isMilestone = false) {
   const margins = STAT_KEYS.map(k => stats[k] - requirements[k]).sort((a, b) => b - a);
-  const needed = char.key === 'routeReader' ? 3 : 4;
-  const deciding = margins[needed - 1];
+  const { needed, nearMiss } = passRule(char, isMilestone);
+  const deciding = needed === 4 ? margins[3] : Math.min(margins[2], margins[3] + nearMiss);
   return [deciding >= 0 ? 1 : 0, deciding, margins[0] + margins[1] + margins[2] + margins[3]];
 }
 
@@ -612,7 +653,8 @@ export function climbSendProbability(char, route, area, attemptedRoutesForPlayer
   // stats and the route — and bots ask about the same climbs every turn.
   const memoKey = `${char.key}|${char.equipment.join(',')}|${stats.strength},${stats.technique},${stats.focus},${stats.flexibility}|` +
     `${isMilestone ? 1 : 0}|${route.strength},${route.technique},${route.focus},${route.flexibility}|${route.tag || ''}|` +
-    `${(route.rollEffect || []).map(e => `${e.stat}${e.modifier}`).join(',')}`;
+    `${(route.rollEffect || []).map(e => `${e.stat}${e.modifier}`).join(',')}|` +
+    `${char.betaBoostActive ? 1 : 0}|${char.abilityParams ? JSON.stringify(char.abilityParams) : ''}`;
   const hit = SEND_MEMO.get(memoKey);
   if (hit) return { ...hit, stats };
   const result = exactSendProbability(char, route, isMilestone, stats);
@@ -638,7 +680,7 @@ function exactSendProbability(char, route, isMilestone, stats) {
       (draw) => {
         const res = finishClimbDice(rolls.slice(), draw, effects, char, route, isMilestone, stats);
         const { requirements } = applyDiceToRequirements(char, route, effects, res.dice, { mentorIndex: res.mentorIndex });
-        return scoreRequirements(char, stats, requirements);
+        return scoreRequirements(char, stats, requirements, isMilestone);
       },
       (score, weight) => {
         pSend += (score[0] * weight) / combos;
@@ -736,8 +778,9 @@ export function applyDiceToRequirements(char, route, effectRollArray, diceRolls,
 
   // Technician's blanket -5 to all requirements, floored at 0.
   if (char.key === 'technician') {
+    const cut = abilityParam(char, 'reqReduction');
     for (const k of Object.keys(requirements)) {
-      requirements[k] = Math.max(0, requirements[k] - 5);
+      requirements[k] = Math.max(0, requirements[k] - cut);
     }
   }
   return { requirements, appliedModifiers };
@@ -751,7 +794,7 @@ export function applyDiceToRequirements(char, route, effectRollArray, diceRolls,
 // Route Reader's "Versatility" passive: succeeds if 3 of 4 stats pass.
 // All other characters: must pass all 4.
 // Returns { success, perStatPass }.
-export function resolveClimbOutcome(char, effectiveStats, requirements) {
+export function resolveClimbOutcome(char, effectiveStats, requirements, isMilestone = false) {
   const perStatPass = {
     strength:    effectiveStats.strength    >= requirements.strength,
     technique:   effectiveStats.technique   >= requirements.technique,
@@ -759,8 +802,13 @@ export function resolveClimbOutcome(char, effectiveStats, requirements) {
     flexibility: effectiveStats.flexibility >= requirements.flexibility,
   };
   const passCount = Object.values(perStatPass).filter(Boolean).length;
-  const needed = char.key === 'routeReader' ? 3 : 4;
-  return { success: passCount >= needed, perStatPass, passCount };
+  const { needed, nearMiss } = passRule(char, isMilestone);
+  let success = passCount >= needed;
+  // A Route Reader's one failing stat may have to be a near miss (variant).
+  if (success && passCount < 4 && Number.isFinite(nearMiss)) {
+    success = STAT_KEYS.every(k => effectiveStats[k] - requirements[k] >= -nearMiss);
+  }
+  return { success, perStatPass, passCount };
 }
 
 // Compute XP for a climb result.
@@ -776,7 +824,7 @@ export function computeClimbXp(char, route, success) {
   const base = success ? route.xpSuccess : route.xpFail;
   let xp = base * getXpMultiplier(char);
   if (!success && char.key === 'ironLung') {
-    xp += Math.floor(xp * 0.5);
+    xp += Math.floor(xp * abilityParam(char, 'failXpBonus'));
   }
   // Confidence Building: failed climbs get +N bonus XP
   if (!success) {
@@ -796,7 +844,7 @@ export function getFailureEnduranceExtra(char) {
     const gear = GEAR_SHOP.find(g => g.name === gearName);
     if (gear && gear.effectKind === 'ignoreFailPenalty') return 0;
   }
-  return char.key === 'ironLung' ? 5 : 0;
+  return char.key === 'ironLung' ? abilityParam(char, 'failEndurance') : 0;
 }
 
 // Engine v0.3.0 — Power Spotting heals endurance after every successful climb.
@@ -837,12 +885,12 @@ function ownedGearWithEffect(char, effectKind) {
 // `diceTrace` is the trace from rollClimbDice; `appliedModifiers` comes from
 // applyDiceToRequirements.
 export function describeClimbGearEffects({
-  char, route, effectRollArray, diceTrace, appliedModifiers, success, timeCost, enduranceCost, healed,
+  char, route, effectRollArray, diceTrace, appliedModifiers, success, timeCost, enduranceCost, healed, isMilestone = false,
 }) {
   const out = [];
   const names = (kind) => ownedGearWithEffect(char, kind).map(g => g.name).join(', ');
 
-  const charOnlyTime = getEffectiveClimbTimeCost(char, route.time);
+  const charOnlyTime = getEffectiveClimbTimeCost(char, route.time, null, isMilestone);
   if (timeCost < charOnlyTime) {
     out.push({ gear: names('timeCostReduction'), effectKind: 'timeCostReduction', from: charOnlyTime, to: timeCost });
   }
@@ -867,7 +915,7 @@ export function describeClimbGearEffects({
     }
     if (char.key === 'ironLung') {
       for (const g of ownedGearWithEffect(char, 'ignoreFailPenalty')) {
-        out.push({ gear: g.name, effectKind: 'ignoreFailPenalty', endurance: 5 });
+        out.push({ gear: g.name, effectKind: 'ignoreFailPenalty', endurance: abilityParam(char, 'failEndurance') });
       }
     }
   } else if (healed > 0) {
@@ -900,6 +948,33 @@ export function getTrainingBonusBoost(char) {
 //   trainCapBase,        cap on the TRAINING bonus per stat: base + perLevel ×
 //   trainCapPerLevel     (Level − 1). Omit trainCapBase for no cap.
 //   trainPerRound        max sessions per climber per round (standard: no limit)
+// Grit economy (`rules.grit`, an object; off when absent). Experience and
+// currency are separate: XP only raises your Level and is never spent; Grit
+// buys training and gear.
+//   routeGrit          Grit placed on a route card when it is dealt, by grade
+//                      band [easy, mid, hard] (default [1, 2, 3]). The first
+//                      climber to SEND the route takes it.
+//   milestoneGrit      Grit for sending each milestone (per climber)
+//                      (default { beginner: 2, intermediate: 3, expert: 4 }).
+//   trainCost          Grit per training session (default 1).
+//   gearPriceDivisor   gear price in Grit = max(1, round(XP cost / divisor))
+//                      unless the card prints a gritCost (default 25).
+//   start              Grit each climber starts with (default 0).
+//   seatStart          extra starting Grit by seat, e.g. [0, 1, 2, 3] —
+//                      compensates later seats for acting after seat 1.
+//   perRound           Grit each climber gains at the start of every round
+//                      after the first (default 0) — a floor so nobody is
+//                      locked out of training when no route is in reach.
+// Per-character overrides (`rules.characters[key]`):
+//   gritStart          this climber's starting Grit (instead of grit.start)
+//   trainCapMultiplier × this climber's training cap (default 1)
+//   uncapped           true: no training cap for this climber
+//   body               { startingStats, startingEndurance, growth } (each partial):
+//                      this climber's numbers (applied by createGame)
+//   gritPerRound       this climber's per-round Grit (instead of grit.perRound)
+//   freeTraining       true: this climber's training sessions cost no Grit
+// Cards marked `variantOnly: 'trainingCap'` exist only in games with a training
+// cap (trainCapBase set): they are never dealt in the standard game.
 
 // Time, Endurance and stat gain of one session at `area` for `char`.
 export function trainingSpec(rules, area, char) {
@@ -915,15 +990,158 @@ export function trainingSpec(rules, area, char) {
 export function trainingCap(rules, char) {
   const r = rules || {};
   if (r.trainCapBase === undefined || r.trainCapBase === null) return Infinity;
-  return r.trainCapBase + (r.trainCapPerLevel ?? 0) * (char.level - 1);
+  const own = (r.characters && r.characters[char.key]) || {};
+  if (own.uncapped) return Infinity;
+  // Hangboard Program (trainingCapBonus) raises the cap.
+  let bonus = 0;
+  for (const n of char.equipment || []) {
+    const g = GEAR_SHOP.find(x => x.name === n);
+    if (g && g.effectKind === 'trainingCapBonus') bonus += g.value || 0;
+  }
+  return (r.trainCapBase + (r.trainCapPerLevel ?? 0) * (char.level - 1)) * (own.trainCapMultiplier ?? 1) + bonus;
 }
 
-// May `char` train `stat` once more under the variant's cap / per-round limit?
-// (Time, Endurance and station occupancy are checked by the caller.)
+// May `char` train `stat` once more under the variant's cap / per-round limit
+// / Grit cost? (Time, Endurance and station occupancy are checked by the caller.)
 export function trainingAllowed(rules, char, stat, gain) {
   const r = rules || {};
   if (r.trainPerRound !== undefined && (char.trainedThisRound || 0) >= r.trainPerRound) return false;
+  if ((char.grit || 0) < trainingGritCost(rules, char)) return false;
   return char.trainingBonuses[stat] + gain <= trainingCap(rules, char);
+}
+
+// ----- Grit economy -----
+
+const DEFAULT_ROUTE_GRIT = [1, 2, 3];
+const DEFAULT_MILESTONE_GRIT = { beginner: 2, intermediate: 3, expert: 4 };
+
+// The adopted Grit rules (2026-10-11, docs/CPU_PLAYTEST_AUDIT.md §11–13):
+//   - route cards carry 2 / 3 / 4 Grit by grade band; first send takes it;
+//   - training cap 10 + 5 per Level above 1;
+//   - no per-round allowance, but later seats start with 0 / 2 / 4 / 6 Grit
+//     (seat 1 otherwise wins ~61% of 2-player games);
+//   - trait-preserving character balance (package B3):
+//       Route Reader: Versatility's 4th stat may miss by at most 3, and the
+//         stat shift also works on Milestones;
+//       Technician: Perfect Beta's +1 Time applies on Milestones only;
+//       Sprinter: sends earn 85% XP (was 50%);
+//       Iron Lung: Relentless as printed; stat growth −0.5 per Level in each stat;
+//       Free Solo: +2 Grit every round (it can only send routes it already
+//         beats, so without an income it soft-locks).
+export const GRIT_RULES = Object.freeze({
+  grit: { start: 0, perRound: 0, routeGrit: [2, 3, 4], seatStart: [0, 2, 4, 6] },
+  trainCapBase: 10,
+  trainCapPerLevel: 5,
+  characters: {
+    routeReader: { ability: { nearMiss: 3, shiftOnMilestones: true } },
+    technician: { ability: { extraTimeOn: 'milestone' } },
+    sprinter: { ability: { xpMultiplier: 0.85 } },
+    ironLung: { body: { growth: { strength: 2, technique: 2, focus: 2.5, flexibility: 1.5 } } },
+    freeSolo: { gritPerRound: 2 },
+  },
+});
+
+// Grit a climber gains at the start of each round after the first.
+export function perRoundGrit(rules, key) {
+  const own = rules.characters && rules.characters[key];
+  return (own && own.gritPerRound !== undefined) ? own.gritPerRound : (rules.grit.perRound ?? 0);
+}
+
+// Starting Grit for a climber under `rules` (seat is 0-based).
+export function startingGrit(rules, key, seat = 0) {
+  const own = rules.characters && rules.characters[key];
+  const base = (own && own.gritStart !== undefined) ? own.gritStart : (rules.grit.start ?? 0);
+  return base + ((rules.grit.seatStart && rules.grit.seatStart[seat]) || 0);
+}
+
+export function usesGrit(rules) {
+  return !!(rules && rules.grit);
+}
+
+// Grade band of a route: 0 easy (V0–V2, 5.6–5.9), 1 mid (V3–V7, 5.10–5.11),
+// 2 hard (V8+, 5.12+).
+export function gradeBand(route) {
+  const g = String(route.grade || '');
+  if (g.startsWith('V')) {
+    const v = Number(g.slice(1));
+    return v <= 2 ? 0 : v <= 7 ? 1 : 2;
+  }
+  const m = g.match(/^5\.(\d+)/);
+  const yds = m ? Number(m[1]) : 0;
+  return yds <= 9 ? 0 : yds <= 11 ? 1 : 2;
+}
+
+// Grit a freshly dealt route card carries.
+export function routeGritValue(rules, route) {
+  const table = (rules.grit && rules.grit.routeGrit) || DEFAULT_ROUTE_GRIT;
+  return table[gradeBand(route)] ?? 0;
+}
+
+// Copies of `routes` with their Grit placed, when the Grit economy is on;
+// otherwise `routes` unchanged. Used whenever route cards are dealt.
+export function dealRouteGrit(rules, routes) {
+  if (!usesGrit(rules)) return routes;
+  return routes.map(r => ({ ...r, grit: routeGritValue(rules, r) }));
+}
+
+export function milestoneGritReward(rules, tier) {
+  if (!usesGrit(rules)) return 0;
+  const table = rules.grit.milestoneGrit || DEFAULT_MILESTONE_GRIT;
+  return table[tier] || 0;
+}
+
+// Grit the next training session costs `char` (0 without the economy, or
+// when Training Partner's free session is still unused this round).
+export function trainingGritCost(rules, char) {
+  if (!usesGrit(rules)) return 0;
+  if (rules.characters && rules.characters[char.key] && rules.characters[char.key].freeTraining) return 0;
+  if (ownsEffect(char, 'freeTrainingSession') && !char.freeSessionUsed) return 0;
+  return rules.grit.trainCost ?? 1;
+}
+
+// Price of `gear` for `char`: Grit in the Grit economy, else XP.
+export function gearPrice(rules, char, gear) {
+  if (!usesGrit(rules)) return getEffectiveGearCost(char, gear);
+  if (typeof gear.gritCost === 'number') return gear.gritCost;
+  const div = rules.grit.gearPriceDivisor || 25;
+  return Math.max(1, Math.round(gear.cost / div));
+}
+
+// What `char` can spend on gear: Grit, or XP earned since the Level began.
+export function gearFunds(rules, char) {
+  return usesGrit(rules) ? (char.grit || 0) : getSpendableXp(char);
+}
+
+// Pay for gear (mutates char). In the Grit economy XP is never spent.
+export function payForGear(rules, char, cost) {
+  if (usesGrit(rules)) char.grit = (char.grit || 0) - cost;
+  else char.xp -= cost;
+}
+
+// Is `gear` part of this game's deck? (variantOnly cards need their variant.)
+export function gearInGame(rules, gear) {
+  if (!gear.variantOnly) return true;
+  if (gear.variantOnly === 'trainingCap') return !!(rules && rules.trainCapBase !== undefined && rules.trainCapBase !== null);
+  return false;
+}
+
+// Grit a climb earns `char`, applied in place: a regular send takes the
+// Grit on the route card (and empties the card); a milestone send pays its
+// tier's reward. Falls earn nothing. `route` is the card in play (bots pass a
+// copy). Returns the Grit gained.
+export function claimClimbGrit(rules, char, route, { isMilestone, success, tier }) {
+  if (!usesGrit(rules) || !success) return 0;
+  const gained = isMilestone ? milestoneGritReward(rules, tier) : (route.grit || 0);
+  if (!isMilestone) route.grit = 0;
+  char.grit = (char.grit || 0) + gained;
+  return gained;
+}
+
+function ownsEffect(char, kind) {
+  return (char.equipment || []).some(n => {
+    const g = GEAR_SHOP.find(x => x.name === n);
+    return g && g.effectKind === kind;
+  });
 }
 
 // =============================================================================
@@ -997,7 +1215,7 @@ export function isWellFormedStatShift(shift) {
 
 // May this character use a stat shift right now on this kind of climb?
 export function canUseStatShift(char, isMilestone) {
-  return char.key === 'routeReader' && !char.abilityUsed && !isMilestone;
+  return char.key === 'routeReader' && !char.abilityUsed && (!isMilestone || abilityParam(char, 'shiftOnMilestones'));
 }
 
 // Return a copy of `stats` with the shift applied.
@@ -1011,13 +1229,19 @@ export function applyStatShiftToStats(stats, shift) {
 // (stat − base requirement). We maximise that margin, then prefer the smallest
 // amount that achieves it. Only offered when the margin is under 6 (one die's
 // swing). Read-only: does not consume the ability.
-export function bestRouteReaderShift(char, route, area, attemptedRoutesForPlayer) {
+export function bestRouteReaderShift(char, route, area, attemptedRoutesForPlayer, isMilestone = false) {
   if (char.key !== 'routeReader') return null;
   let stats = computeEffectiveStats(char, route, area, attemptedRoutesForPlayer);
   if (char.betaBoostActive) {
-    stats = Object.fromEntries(SHIFT_STATS.map(k => [k, stats[k] + 3]));
+    const b = abilityParam(char, 'betaBoost') ?? 3;
+    stats = Object.fromEntries(SHIFT_STATS.map(k => [k, stats[k] + b]));
   }
-  const deciding = (st) => SHIFT_STATS.map(k => st[k] - route[k]).sort((a, b) => b - a)[2];
+  // The margin that settles the climb under this climber's send rule (passRule).
+  const { needed, nearMiss } = passRule(char, isMilestone);
+  const deciding = (st) => {
+    const m = SHIFT_STATS.map(k => st[k] - route[k]).sort((a, b) => b - a);
+    return needed === 4 ? m[3] : Math.min(m[2], m[3] + nearMiss);
+  };
   const baseline = deciding(stats);
   // A single die swings a requirement by at most 6. With a bigger margin the
   // climb is already safe, so don't offer (or waste) the once-per-round shift.
@@ -1086,7 +1310,14 @@ export function applyLevelUpIfNeeded(char) {
   if (!nextRow) return { leveledUp: false };
   if (char.xp < nextRow.cumulative) return { leveledUp: false };
 
-  const tmpl = CHARACTERS[char.key];
+  // The climber's own body numbers (a rules variant may have adjusted them at
+  // setup — rules.characters[key].body), else the character template's.
+  const base = CHARACTERS[char.key];
+  const tmpl = {
+    startingStats: char.startingStats || base.startingStats,
+    startingEndurance: char.startingEndurance ?? base.startingEndurance,
+    growth: char.growth || base.growth,
+  };
   const oldStats = { ...char.stats };
   const oldMaxEndurance = char.maxEndurance;
   char.level += 1;

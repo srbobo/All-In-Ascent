@@ -20,6 +20,7 @@ import { ROUTES, GEAR_SHOP, CHARACTERS } from './data.js';
 import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';
 import { ENGINE_VERSION_STRING } from './version.js';
+import { dealRouteGrit, gearInGame, startingGrit, usesGrit } from './helpers.js';
 
 // Gear items that are NEVER in the random 3-slot shop rotation. They are
 // always available for purchase from a separate "access card" section,
@@ -90,6 +91,18 @@ export function createGame({ seed, characterKeys, rules = null }) {
 
   // Build players.
   const players = characterKeys.map((key, i) => makePlayer(i + 1, key));
+  // Grit economy: every climber starts with rules.grit.start Grit.
+  if (usesGrit(rules)) players.forEach((p, i) => { p.character.grit = startingGrit(rules, p.character.key, i); });
+  // Rules-variant ability tuning (rules.characters[key].ability), copied onto
+  // the climber so every helper sees it (abilityParam in helpers.js), and body
+  // tuning (rules.characters[key].body: startingStats / startingEndurance /
+  // growth, each partial), applied to the climber's own copy of its numbers.
+  for (const p of players) {
+    const own = rules && rules.characters && rules.characters[p.character.key];
+    if (!own) continue;
+    if (own.ability) p.character.abilityParams = { ...own.ability };
+    if (own.body) applyBody(p.character, own.body);
+  }
 
   // Top Rope belayer stations: N − 1 belayers for N players, minimum 1 (solo
   // Auto-Belay). Fixed from round 1 — no time-based unlock ramp.
@@ -102,14 +115,15 @@ export function createGame({ seed, characterKeys, rules = null }) {
   // Draw the opening rotation. Bouldering and Lead keep a flat list of 5;
   // Top Rope is split into belayerCount stations of 2 routes each.
   // Milestone routes are excluded from every wall's deck.
+  // Grit-economy rules place Grit on every card as it is dealt.
   const availableRoutes = {
-    bouldering: rng.pickN(regularRoutePool(milestones, 'bouldering'), 5),
-    topRope: drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope')),
-    leadClimbing: rng.pickN(regularRoutePool(milestones, 'leadClimbing'), 5),
+    bouldering: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'bouldering'), 5)),
+    topRope: dealRouteGrit(rules, drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope'))),
+    leadClimbing: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'leadClimbing'), 5)),
   };
 
   // Draw 3 non-access-card items for the shop rotation.
-  const availableGear = initializeGearShop(rng);
+  const availableGear = initializeGearShop(rng, rules);
 
   // Seed per-player attempt tracking.
   const attemptedRoutes = {};
@@ -193,6 +207,16 @@ export function createGame({ seed, characterKeys, rules = null }) {
 // Build a player object in its initial state. Matches the shape produced by
 // selectCharacter in game.js:732-748 with one exception: we deep-clone the
 // character template up front so no mutation leaks back to CHARACTERS.
+// Adjust a fresh (Level 1) climber's starting stats, Endurance and growth.
+function applyBody(c, body) {
+  if (body.startingStats) c.startingStats = { ...c.startingStats, ...body.startingStats };
+  if (body.growth) c.growth = { ...c.growth, ...body.growth };
+  if (body.startingEndurance !== undefined) c.startingEndurance = body.startingEndurance;
+  c.stats = { ...c.startingStats };
+  c.maxEndurance = c.startingEndurance;
+  c.currentEndurance = c.startingEndurance;
+}
+
 function makePlayer(playerNum, characterKey) {
   const tmpl = CHARACTERS[characterKey];
   // Deep-clone so the per-player `specialAbility.used` flag (and any
@@ -322,8 +346,9 @@ function pickMilestoneRoutes(rng) {
 
 // Initialize the 3-slot random gear shop. Access cards are handled
 // separately (they're always available for purchase, not rotated in).
-function initializeGearShop(rng) {
-  const nonAccessGear = GEAR_SHOP.filter(g => !ACCESS_CARDS.includes(g.name));
+function initializeGearShop(rng, rules = null) {
+  // Variant-only cards are dealt only when their rules variant is in play.
+  const nonAccessGear = GEAR_SHOP.filter(g => !ACCESS_CARDS.includes(g.name) && gearInGame(rules, g));
   return rng.pickN(nonAccessGear, 3);
 }
 
