@@ -7,7 +7,9 @@
 import { test, expect } from '@playwright/test';
 import { applyAction } from '../../engine/engine.js';
 import { createGame } from '../../engine/state.js';
-import { collectPageErrors, seedPageRandom, uiStep, asJson } from './support.js';
+import {
+  collectPageErrors, seedPageRandom, uiStep, asJson, cardAction, nearlyFinishedGame, expectSummaryShows,
+} from './support.js';
 
 process.env.BOT_MOVE_DELAY_MS = '0';
 const { default: GameRoom } = await import('../../party/game.js');
@@ -76,5 +78,44 @@ test('online client plays a game against the GameRoom and bots', async ({ page }
   let { state } = createGame({ seed: room.state.seed, characterKeys: keys, rules: room.state.rules });
   for (const e of room.state.events.filter(ev => ev.type === 'action_chosen')) ({ state } = applyAction(state, e.payload.action));
   expect(asJson(state)).toEqual(asJson(room.state));
+  expect(errors).toEqual([]);
+});
+
+test('winning an online game opens the same post-game summary as local play', async ({ page }) => {
+  const errors = collectPageErrors(page);
+  page.on('dialog', d => d.accept());
+  await seedPageRandom(page, 78);
+  const room = await connectToRoom(page, 'e2e-summary');
+
+  await page.goto('/index.html?online=1&host=localhost:1999&room=e2e-summary&user=alice&password=pw');
+  await expect(page.locator('#onlineLobby')).toContainText('Pick your character');
+  await page.locator('.ol-char-card', { hasText: 'The Iron Lung' }).click();
+  for (let i = 0; i < 2; i++) {
+    await page.selectOption('.ol-bot-difficulty', 'easy');
+    await page.locator('button', { hasText: 'Add Bot' }).click();
+  }
+  await page.locator('#ol-controls button', { hasText: 'Start Game' }).click();
+  await expect(page.locator('#gameBoard')).toBeVisible();
+  await expect.poll(() => room.state.currentPlayerIndex === 0 && !room.botRunning).toBe(true);
+
+  // Put the room one milestone send from alice (seat 1) winning a real CPU game.
+  const characterKeys = room.state.players.map(p => p.character.key);
+  const { before, last, final } = await nearlyFinishedGame({ seed: 1, characterKeys, winner: 1 });
+  room.state = before;
+  room.broadcastState();
+  await expect.poll(async () => JSON.stringify(await page.evaluate(() => getGameState())))
+    .toBe(JSON.stringify(asJson(before)));
+
+  await cardAction(page, '#milestonePanel', before.milestoneRoutes[last.difficulty].route.name).click();
+  await expect.poll(() => room.phase).toBe('completed');
+  expect(asJson(room.state)).toEqual(asJson(final));
+
+  const names = Object.fromEntries(room.seats.filter(Boolean).map((seat, i) => [i + 1, seat.username]));
+  await expectSummaryShows(page, room.state, names);
+  const summary = page.locator('#victoryModal [data-testid="game-summary"]');
+  await expect(summary.locator('.final-standings li[data-player="1"]')).toContainText('alice (you)');
+  await expect(summary.getByRole('link', { name: 'New online game ▸' })).toHaveAttribute('href', 'online.html');
+  await summary.getByRole('button', { name: 'View the board' }).click();
+  await expect(page.locator('#turnIndicator')).toContainText('Game over · alice wins');
   expect(errors).toEqual([]);
 });

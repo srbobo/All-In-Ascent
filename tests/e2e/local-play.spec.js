@@ -12,6 +12,7 @@ import { ENGINE_VERSION_STRING } from '../../engine/version.js';
 import { GRIT_RULES, gearPrice } from '../../engine/helpers.js';
 import {
   seedPageRandom, collectPageErrors, collectDialogs, startLocalGame, playRandomly, replayInEngine, asJson, cardAction,
+  nearlyFinishedGame, expectSummaryShows,
 } from './support.js';
 
 const indexFileUrl = new URL('../../index.html', import.meta.url).href;
@@ -172,6 +173,50 @@ test('the card gallery (cards.html) loads game data and Grit values', async ({ p
   const errors = collectPageErrors(page);
   await page.goto('/cards.html');
   await expect(page.locator('.aia-card').first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('winning the game through the UI opens the post-game summary', async ({ page }) => {
+  const errors = collectPageErrors(page);
+  collectDialogs(page);
+  // A real CPU game, one milestone send from the end.
+  const { before, last, final } = await nearlyFinishedGame({ seed: 4, characterKeys: ['technician', 'ironLung', 'sprinter'] });
+  expect(last.type).toBe('milestone');
+  await page.goto('/index.html');
+  await startLocalGame(page, ['The Technician', 'The Iron Lung', 'The Sprinter']);
+  await page.evaluate((s) => { setGameState(s); renderGameBoard(); }, asJson(before));
+
+  // Send the last milestone through its card, then close the climb result.
+  await cardAction(page, '#milestonePanel', before.milestoneRoutes[last.difficulty].route.name).click();
+  await page.locator('#climbModal .action-buttons button').click();
+
+  const names = Object.fromEntries(final.players.map(p => [p.playerNum, `Player ${p.playerNum}`]));
+  await expectSummaryShows(page, final, names);
+  const summary = page.locator('#victoryModal [data-testid="game-summary"]');
+  await expect(summary.getByRole('button', { name: 'Play again ▸' })).toBeVisible();
+
+  // The chart switches between Level and XP and reads out a point on hover.
+  await expect(summary.locator('#summaryChart svg')).toHaveAttribute('aria-label', /^Level/);
+  await summary.locator('#summaryMetric label', { hasText: 'XP' }).click();
+  await expect(summary.locator('#summaryChart svg')).toHaveAttribute('aria-label', /^XP/);
+  await summary.locator('#summaryChart .sc-hit').hover();
+  await expect(summary.locator('.sc-tip')).toBeVisible();
+  await expect(summary.locator('.sc-tip')).toContainText('Round');
+  // The table view of the chart has one row per round.
+  await summary.locator('.summary-details > summary').click();
+  await expect(summary.locator('.summary-details tbody tr')).toHaveCount(final.round);
+
+  // Close it to look at the board; the HUD brings it back.
+  await summary.getByRole('button', { name: 'View the board' }).click();
+  await expect(page.locator('#victoryModal')).not.toHaveClass(/show/);
+  await expect(page.locator('#turnIndicator')).toContainText(`Game over · Player ${final.winner} wins`);
+  await page.locator('#turnIndicator').getByRole('button', { name: 'Game summary ▸' }).click();
+  await expect(summary).toBeVisible();
+
+  // The UI finished the game exactly as the engine does, and it replays.
+  const browserState = await page.evaluate(() => getGameState());
+  expect(browserState).toEqual(asJson(final));
+  expect(asJson(replayInEngine(browserState))).toEqual(browserState);
   expect(errors).toEqual([]);
 });
 

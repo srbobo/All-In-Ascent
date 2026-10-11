@@ -659,6 +659,17 @@ function renderSectionStatusPills() {
 }
 
 function updateTurnIndicator() {
+ if (gameState.gameEnded) {
+  // After the game: who won, and a way back to the post-game summary.
+  const w = gameState.winner;
+  document.getElementById('turnIndicator').innerHTML = `
+  ${w ? `<span class="hold hold--label hold--${uiPlayerColor(w)} ti-token" aria-hidden="true">P${w}</span>` : ''}
+  <div class="ti-text">
+   <div class="ti-who">Game over${w ? ` · ${uiEsc(summaryOptions.names?.[w] || `Player ${w}`)} wins` : ''}</div>
+  </div>
+  <button class="btn btn--marigold btn--sm" type="button" onclick="showGameSummary()">Game summary ▸</button>`;
+  return;
+ }
  const currentPlayer = uiCurrent();
  const char = currentPlayer.character;
  const n = currentPlayer.playerNum;
@@ -1233,10 +1244,7 @@ function finishPresentation() {
  renderGameBoard();
  if (p.afterRender) requestAnimationFrame(p.afterRender);
  const end = p.turnEvents.find(e => e.type === 'game_end');
- if (end) {
- const winner = gameState.players.find(pl => pl.playerNum === end.payload.winner);
- setTimeout(() => showVictoryScreen(winner), 500);
- }
+ if (end) setTimeout(() => showGameSummary(gameState, {}), 500);
 }
 
 function playerName(state, playerNum) {
@@ -1523,37 +1531,300 @@ function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffec
  modal.classList.add('show');
 }
 
-function showVictoryScreen(winner) {
- const modal = document.getElementById('victoryModal');
- const modalBody = document.getElementById('victoryModalBody');
- const c = winner.character;
- const color = uiPlayerColor(winner.playerNum);
+// ===== POST-GAME SUMMARY =====
+// The end-of-game screen for local AND online play. Every number comes from
+// the engine (AscentEngine.summarizeGame, which reads the game's event log);
+// this section only lays them out. Online play calls showGameSummary with the
+// players' usernames (online-mode.js), so both modes show the same screen.
 
- const standings = gameState.players.map(player => {
-  const count = Object.values(player.character.milestonesCompleted).filter(Boolean).length;
-  return `<li><span><strong>Player ${player.playerNum}</strong> · ${uiEsc(player.character.name)}</span><span>${count}/3 projects · Level ${player.character.level} · ${player.character.xp} XP</span></li>`;
+const SUMMARY_TIER_LETTER = { beginner: 'B', intermediate: 'I', expert: 'E' };
+const SUMMARY_TIER_LABEL = { beginner: 'Beginner', intermediate: 'Intermediate', expert: 'Expert' };
+// Board-section colours (design/tokens.css --area-*), in SUMMARY_AREAS order.
+const SUMMARY_AREA_STYLE = {
+ bouldering: { label: 'Bouldering', fill: 'var(--area-bouldering)', on: 'var(--on-coral)' },
+ topRope: { label: 'Top Rope', fill: 'var(--area-toprope)', on: 'var(--on-teal)' },
+ leadClimbing: { label: 'Lead Climbing', fill: 'var(--area-lead)', on: 'var(--on-raspberry)' },
+ milestone: { label: 'Milestones', fill: 'var(--area-milestone)', on: 'var(--on-marigold)' },
+ training: { label: 'Training', fill: 'var(--area-training)', on: 'var(--on-wood)' },
+ gearShop: { label: 'Gear Shop', fill: 'var(--area-gear)', on: 'var(--on-cobalt)' },
+ rest: { label: 'Rest', fill: 'var(--ink-muted)', on: 'var(--chalk)' },
+};
+// Options of the open summary (names etc.), so it can be reopened from the HUD.
+let summaryOptions = {};
+
+// `opts.names`: { playerNum: display name } (online usernames; local play
+// shows "Player N"). `opts.you`: the viewer's playerNum, if any.
+// `opts.online`: the "play again" button leads back to online.html.
+function showGameSummary(state = gameState, opts = summaryOptions) {
+ summaryOptions = opts || {};
+ // The HUD's "Game over · X wins" line uses the same names.
+ if (state === gameState && document.getElementById('turnIndicator')) updateTurnIndicator();
+ const sum = AscentEngine.summarizeGame(state);
+ const byNum = Object.fromEntries(sum.players.map(p => [p.playerNum, p]));
+ const who = (n) => summaryOptions.names?.[n] || `Player ${n}`;
+ const winner = sum.winner ? byNum[sum.winner] : null;
+ const cur = sum.currency === 'grit' ? 'Grit' : 'XP';
+ const chip = (n) => `<span class="aia-chip summary-chip" style="background: var(--${uiPlayerColor(n)}); color: var(--on-${uiPlayerColor(n)});">P${n}</span>`;
+ const youTag = (n) => (summaryOptions.you === n ? ' <span class="summary-you">(you)</span>' : '');
+
+ const banner = winner ? `
+  <div class="victory-banner" style="background: var(--${uiPlayerColor(winner.playerNum)}); color: var(--on-${uiPlayerColor(winner.playerNum)});">
+   <p class="who">${uiEsc(who(winner.playerNum))} · ${uiEsc(winner.characterName)}</p>
+   <p>Sent all three milestone projects in round ${sum.rounds}.</p>
+  </div>` : '';
+
+ const standings = sum.standings.map((n, i) => {
+  const p = byNum[n];
+  const tiers = ['beginner', 'intermediate', 'expert'].map(t => {
+   const m = p.milestones.find(x => x.tier === t);
+   return `<span class="summary-tier${m ? ' done' : ''}" title="${SUMMARY_TIER_LABEL[t]} milestone${m ? ` sent in round ${m.round}` : ' not sent'}">${SUMMARY_TIER_LETTER[t]}<span class="sr-only"> ${SUMMARY_TIER_LABEL[t]} ${m ? `sent in round ${m.round}` : 'not sent'}</span></span>`;
+  }).join('');
+  return `<li data-player="${n}"><span class="summary-rank">${i + 1}</span>${chip(n)}<span class="summary-name"><strong>${uiEsc(who(n))}</strong>${youTag(n)} · ${uiEsc(p.characterName)}</span><span class="summary-tiers">${tiers}</span><span class="summary-meta">Level ${p.final.level} · ${p.final.xp} XP</span></li>`;
  }).join('');
 
- modalBody.innerHTML = `
- <div class="victory">
-  <p class="eyebrow">Game over</p>
-  <h2 id="victoryTitle">Top out!</h2>
-  <div class="victory-banner" style="background: var(--${color}); color: var(--on-${color});">
-   <p class="who">Player ${winner.playerNum} · ${uiEsc(c.name)}</p>
-   <p>Sent all three milestone projects.</p>
+ const modal = document.getElementById('victoryModal');
+ document.getElementById('victoryModalBody').innerHTML = `
+ <div class="victory summary" data-testid="game-summary">
+  <p class="eyebrow">Game over · ${sum.rounds} round${sum.rounds === 1 ? '' : 's'}</p>
+  <h2 id="victoryTitle">${winner ? 'Top out!' : 'Game over'}</h2>
+  ${banner}
+  <section class="summary-section" aria-labelledby="sumStandings">
+   <h3 id="sumStandings">Final standings</h3>
+   <ol class="final-standings">${standings}</ol>
+  </section>
+  <section class="summary-section" aria-labelledby="sumClimb">
+   <div class="summary-section-head">
+    <h3 id="sumClimb">The climb</h3>
+    <fieldset class="size-toggle" id="summaryMetric">
+     <legend class="sr-only">Chart shows</legend>
+     <label><input type="radio" name="summaryMetric" value="level" checked><span>Level</span></label>
+     <label><input type="radio" name="summaryMetric" value="xp"><span>XP</span></label>
+    </fieldset>
+   </div>
+   <p class="summary-note">Each line is a climber's progress through the game; lettered markers show when they sent the Beginner, Intermediate and Expert milestones.</p>
+   ${summaryLegend(sum, who)}
+   <div class="summary-chart" id="summaryChart"></div>
+   ${summaryProgressTable(sum, who)}
+  </section>
+  <section class="summary-section" aria-labelledby="sumTime">
+   <h3 id="sumTime">Where the time went</h3>
+   <p class="summary-note">Share of each climber's Time spent in each part of the gym.</p>
+   ${summaryTimeBars(sum, who, chip)}
+  </section>
+  <section class="summary-section" aria-labelledby="sumStats">
+   <h3 id="sumStats">Game statistics</h3>
+   ${summaryStatsTable(sum, who, chip, cur)}
+  </section>
+  <div class="action-buttons summary-actions">
+   <button class="btn btn--ghost" type="button" onclick="closeGameSummary()">View the board</button>
+   ${summaryOptions.online
+  ? '<a class="btn btn--lime" data-autofocus href="online.html">New online game ▸</a>'
+  : '<button class="btn btn--lime" type="button" data-autofocus onclick="location.reload()">Play again ▸</button>'}
   </div>
-  <div class="final-stats">
-   <div><span>Level</span><strong>${c.level}</strong></div>
-   <div><span>Total XP</span><strong>${c.xp}</strong></div>
-   ${UI_STATS.map(s => `<div><span>${s.name}</span><strong>${c.stats[s.key]}</strong></div>`).join('')}
-   <div><span>Endurance</span><strong>${c.maxEndurance}</strong></div>
-  </div>
-  <h3>Final standings</h3>
-  <ol class="final-standings">${standings}</ol>
-  <button class="btn btn--lime" type="button" data-autofocus onclick="location.reload()">Play again ▸</button>
  </div>
  `;
+ const draw = () => {
+  const metric = modal.querySelector('#summaryMetric input:checked')?.value || 'level';
+  renderSummaryChart(document.getElementById('summaryChart'), sum, metric, who);
+ };
+ modal.querySelectorAll('#summaryMetric input').forEach(i => i.addEventListener('change', draw));
  modal.classList.add('show');
+ draw();
+ if (window.ResizeObserver) {
+  let width = 0;
+  new ResizeObserver(([entry]) => {
+   if (Math.abs(entry.contentRect.width - width) < 1) return;
+   width = entry.contentRect.width;
+   draw();
+  }).observe(document.getElementById('summaryChart'));
+ }
+}
+
+function closeGameSummary() {
+ document.getElementById('victoryModal').classList.remove('show');
+}
+
+function summaryLegend(sum, who) {
+ return `<ul class="summary-legend" aria-label="Climbers">${sum.players.map(p =>
+  `<li><span class="summary-swatch" style="background: var(--${uiPlayerColor(p.playerNum)});"></span>P${p.playerNum} · ${uiEsc(who(p.playerNum))}</li>`).join('')}
+  ${['beginner', 'intermediate', 'expert'].map(t => `<li><span class="summary-marker-key">${SUMMARY_TIER_LETTER[t]}</span>${SUMMARY_TIER_LABEL[t]} milestone</li>`).join('')}</ul>`;
+}
+
+// A player's progression point in effect at `step`.
+function summaryPointAt(p, step) {
+ let pt = p.progression[0];
+ for (const q of p.progression) { if (q.step <= step) pt = q; else break; }
+ return pt;
+}
+
+// Level (or XP) at the end of every round, as a table: the chart's text view.
+function summaryProgressTable(sum, who) {
+ const ends = sum.roundStarts.map((r, i) => ({
+  round: r.round,
+  step: i + 1 < sum.roundStarts.length ? sum.roundStarts[i + 1].step : sum.totalSteps,
+ }));
+ const rows = ends.map(r => `<tr><th scope="row">${r.round}</th>${sum.players.map(p => {
+  const pt = summaryPointAt(p, r.step);
+  const sent = p.milestones.filter(m => m.round === r.round).map(m => SUMMARY_TIER_LABEL[m.tier]).join(', ');
+  return `<td>Lv ${pt.level} · ${pt.xp} XP${sent ? ` · <strong>${sent} sent</strong>` : ''}</td>`;
+ }).join('')}</tr>`).join('');
+ return `<details class="summary-details"><summary>Show the climb as a table</summary>
+  <div class="summary-table-wrap"><table class="stat-table summary-table">
+   <thead><tr><th scope="col">End of round</th>${sum.players.map(p => `<th scope="col">P${p.playerNum} · ${uiEsc(who(p.playerNum))}</th>`).join('')}</tr></thead>
+   <tbody>${rows}</tbody></table></div></details>`;
+}
+
+// Step-line chart of Level (or XP) by action, with round ticks, milestone
+// markers and a hover read-out. Pure SVG, drawn at the host's own width so
+// text stays legible on a phone; redrawn when the metric or the width changes.
+function renderSummaryChart(host, sum, metric, who) {
+ if (!host) return;
+ const W = Math.max(280, Math.round(host.clientWidth) || 720);
+ const H = W < 480 ? 240 : 300, L = 48, R = 16, T = 16, B = 40;
+ const steps = Math.max(1, sum.totalSteps);
+ const val = (pt) => (metric === 'xp' ? pt.xp : pt.level);
+ const maxVal = Math.max(metric === 'xp' ? 100 : 2, ...sum.players.flatMap(p => p.progression.map(val)));
+ const yStep = metric === 'xp' ? summaryNiceStep(maxVal / 5) : Math.max(1, Math.ceil(maxVal / 8));
+ const yMin = metric === 'xp' ? 0 : 1;
+ const yMax = yMin + Math.ceil((maxVal - yMin) / yStep) * yStep;
+ const x = (s) => L + (s / steps) * (W - L - R);
+ const y = (v) => T + (1 - (v - yMin) / Math.max(1, yMax - yMin)) * (H - T - B);
+ // Level lines overlap a lot (everyone starts at Level 1): nudge each
+ // climber's line a hair apart so all of them stay visible.
+ const n = sum.players.length;
+ const nudge = (i) => (metric === 'level' ? (i - (n - 1) / 2) * 3 : 0);
+
+ let grid = '';
+ for (let v = yMin; v <= yMax; v += yStep) {
+  grid += `<line class="sc-grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="sc-tick" x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+ }
+ const every = Math.max(1, Math.ceil(sum.roundStarts.length / (W < 480 ? 6 : 10)));
+ sum.roundStarts.forEach((r, i) => {
+  if (i % every !== 0) return;
+  grid += `<line class="sc-round" x1="${x(r.step)}" x2="${x(r.step)}" y1="${T}" y2="${H - B}"/><text class="sc-tick" x="${x(r.step)}" y="${H - B + 16}" text-anchor="middle">${r.round}</text>`;
+ });
+ grid += `<text class="sc-axis" x="${(L + W - R) / 2}" y="${H - 4}" text-anchor="middle">Round</text>`;
+ grid += `<text class="sc-axis" x="12" y="${(T + H - B) / 2}" text-anchor="middle" transform="rotate(-90 12 ${(T + H - B) / 2})">${metric === 'xp' ? 'XP' : 'Level'}</text>`;
+
+ const lines = sum.players.map((p, i) => {
+  const dy = nudge(i);
+  let d = '';
+  p.progression.forEach((pt, k) => {
+   const px = x(pt.step), py = y(val(pt)) + dy;
+   d += k === 0 ? `M${px},${py}` : `H${px}V${py}`;
+  });
+  d += `H${x(steps)}`;
+  return `<path class="sc-line" d="${d}" style="stroke: var(--${uiPlayerColor(p.playerNum)});"/>`;
+ }).join('');
+
+ const markers = sum.players.map((p, i) => p.milestones.map(m => {
+  const pt = summaryPointAt(p, m.step);
+  const cx = x(m.step), cy = y(val(pt)) + nudge(i);
+  const color = uiPlayerColor(p.playerNum);
+  return `<g class="sc-marker"><title>P${p.playerNum} ${uiEsc(who(p.playerNum))}: ${SUMMARY_TIER_LABEL[m.tier]} milestone (${uiEsc(m.routeName)}, ${uiEsc(m.grade)}) in round ${m.round}</title>
+   <circle cx="${cx}" cy="${cy}" r="10" style="fill: var(--${color});"/>
+   <text x="${cx}" y="${cy + 4}" text-anchor="middle" style="fill: var(--on-${color});">${SUMMARY_TIER_LETTER[m.tier]}</text></g>`;
+ }).join('')).join('');
+
+ host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${metric === 'xp' ? 'XP' : 'Level'} of each climber over the game, with milestone sends marked. The same data is in the table below.">
+  ${grid}${lines}${markers}
+  <line class="sc-cross" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/>
+  <rect class="sc-hit" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}"/>
+ </svg><div class="sc-tip" hidden></div>`;
+
+ const svg = host.querySelector('svg');
+ const cross = host.querySelector('.sc-cross');
+ const tip = host.querySelector('.sc-tip');
+ const hit = host.querySelector('.sc-hit');
+ hit.addEventListener('pointermove', (ev) => {
+  const box = svg.getBoundingClientRect();
+  const sx = ((ev.clientX - box.left) / box.width) * W;
+  const s = Math.round(Math.max(0, Math.min(steps, ((sx - L) / (W - L - R)) * steps)));
+  const round = sum.roundStarts.filter(r => r.step <= s).pop()?.round || 1;
+  cross.setAttribute('x1', x(s));
+  cross.setAttribute('x2', x(s));
+  cross.setAttribute('visibility', 'visible');
+  tip.innerHTML = `<strong>Round ${round}</strong>${sum.players.map(p => {
+   const pt = summaryPointAt(p, s);
+   const sent = p.milestones.filter(m => m.step <= s).length;
+   return `<div><span class="summary-swatch" style="background: var(--${uiPlayerColor(p.playerNum)});"></span>P${p.playerNum} · Lv ${pt.level} · ${pt.xp} XP · ${sent}/3</div>`;
+  }).join('')}`;
+  tip.hidden = false;
+  const left = ((x(s) / W) * box.width);
+  tip.style.left = `${Math.min(left + 12, box.width - tip.offsetWidth - 4)}px`;
+  if (left + 12 + tip.offsetWidth > box.width) tip.style.left = `${Math.max(4, left - tip.offsetWidth - 12)}px`;
+ });
+ hit.addEventListener('pointerleave', () => {
+  cross.setAttribute('visibility', 'hidden');
+  tip.hidden = true;
+ });
+}
+
+// 1, 2, 5 × 10^k at or above `raw`.
+function summaryNiceStep(raw) {
+ const pow = Math.pow(10, Math.floor(Math.log10(Math.max(1, raw))));
+ return [1, 2, 5, 10].map(m => m * pow).find(v => v >= raw);
+}
+
+// One 100% stacked bar per climber: Time spent in each part of the gym.
+function summaryTimeBars(sum, who, chip) {
+ const rows = sum.players.map(p => {
+  const total = AscentEngine.SUMMARY_AREAS.reduce((t, a) => t + p.timeByArea[a], 0) || 1;
+  const segs = AscentEngine.SUMMARY_AREAS.filter(a => p.timeByArea[a] > 0).map(a => {
+   const pct = (p.timeByArea[a] / total) * 100;
+   const st = SUMMARY_AREA_STYLE[a];
+   const text = `${st.label}: ${p.timeByArea[a]} Time (${Math.round(pct)}%)`;
+   return `<span class="summary-seg" style="flex-grow: ${p.timeByArea[a]}; background: ${st.fill}; color: ${st.on};" title="${text}"><span class="sr-only">${text}</span>${pct >= 12 ? `<span aria-hidden="true">${Math.round(pct)}%</span>` : ''}</span>`;
+  }).join('');
+  return `<div class="summary-bar-row">${chip(p.playerNum)}<span class="summary-bar-name">${uiEsc(who(p.playerNum))}</span><div class="summary-bar">${segs}</div></div>`;
+ }).join('');
+ const legend = AscentEngine.SUMMARY_AREAS.map(a =>
+  `<li><span class="summary-swatch" style="background: ${SUMMARY_AREA_STYLE[a].fill};"></span>${SUMMARY_AREA_STYLE[a].label}</li>`).join('');
+ return `<div class="summary-bars">${rows}</div><ul class="summary-legend" aria-label="Gym areas">${legend}</ul>`;
+}
+
+// Board-game-arena style table: one row per statistic, one column per climber.
+// The highest number in a row is bold, except in rows where more is not better.
+function summaryStatsTable(sum, who, chip, cur) {
+ const P = sum.players;
+ const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
+ const statShort = Object.fromEntries(UI_STATS.map(s => [s.key, s.short]));
+ const rows = [
+  ['Turns taken', p => p.turns],
+  ['Actions taken', p => p.actions],
+  ['Routes attempted', p => p.climbs.attempts],
+  ['Routes sent', p => p.climbs.sends, p => `${p.climbs.sends} (${pct(p.climbs.sends, p.climbs.attempts)})`],
+  ['Falls', p => p.climbs.falls, null, false],
+  ...['bouldering', 'topRope', 'leadClimbing'].map(a => [`${AREA_LABELS[a]} sends`, p => p.climbs.byArea[a].sends,
+   p => `${p.climbs.byArea[a].sends} / ${p.climbs.byArea[a].attempts}`]),
+  ['Milestone attempts', p => p.milestoneAttempts.beginner + p.milestoneAttempts.intermediate + p.milestoneAttempts.expert],
+  ['Milestones sent', p => p.milestones.length,
+   p => (p.milestones.length ? p.milestones.map(m => `${SUMMARY_TIER_LABEL[m.tier]} · round ${m.round}`).join('<br>') : '—')],
+  ['Hardest send', null, p => (p.hardestSend ? `${uiEsc(p.hardestSend.routeName)} (${uiEsc(p.hardestSend.grade)})` : '—')],
+  ['Training sessions', p => p.trainingSessions,
+   p => `${p.trainingSessions}${p.trainingSessions ? `<br><span class="summary-sub">${UI_STATS.filter(s => p.training[s.key].sessions)
+    .map(s => `${statShort[s.key]} ${p.training[s.key].sessions}`).join(' · ')}</span>` : ''}`],
+  ['Rests', p => p.rests],
+  ['Gear bought', p => p.gear.length,
+   p => `${p.gear.length}${p.gear.length ? `<br><span class="summary-sub">${p.gear.map(g => uiEsc(g.name)).join(', ')}</span>` : ''}`],
+  [`${cur} spent on gear`, p => (cur === 'Grit' ? p.spentOnGear.grit : p.spentOnGear.xp)],
+  ['XP earned', p => p.xpEarned],
+  ...(cur === 'Grit' ? [['Grit earned', p => p.gritEarned]] : []),
+  ['Final Level', p => p.final.level],
+  ['Favourite area', null, p => (p.favouriteArea ? SUMMARY_AREA_STYLE[p.favouriteArea].label : '—')],
+  ['Time left unused', p => p.timeUnused, null, false],
+ ];
+ const body = rows.map(([label, num, show, mark = true]) => {
+  const nums = num ? P.map(num) : [];
+  const best = mark && nums.length > 1 ? Math.max(...nums) : null;
+  return `<tr><th scope="row">${label}</th>${P.map((p, i) => {
+   const lead = best !== null && best > 0 && nums[i] === best && nums.filter(v => v === best).length < P.length;
+   return `<td${lead ? ' class="summary-lead"' : ''}>${show ? show(p) : nums[i]}${lead ? '<span class="sr-only"> (most)</span>' : ''}</td>`;
+  }).join('')}</tr>`;
+ }).join('');
+ return `<div class="summary-table-wrap"><table class="stat-table summary-table summary-stats">
+  <thead><tr><th scope="col"><span class="sr-only">Statistic</span></th>${P.map(p => `<th scope="col">${chip(p.playerNum)} ${uiEsc(who(p.playerNum))}<span class="summary-sub">${uiEsc(p.characterName)}</span></th>`).join('')}</tr></thead>
+  <tbody>${body}</tbody></table></div>`;
 }
 
 function getXPToNextLevel(char) {
@@ -1654,6 +1925,8 @@ window.startGame = startGame;
 window.closeModal = closeModal;
 window.closeClimbModal = closeClimbModal;
 window.closeLevelUpModal = closeLevelUpModal;
+window.showGameSummary = showGameSummary;
+window.closeGameSummary = closeGameSummary;
 window.restAction = restAction;
 window.attemptMilestoneRoute = attemptMilestoneRoute;
 window.toggleLogPanel = toggleLogPanel;

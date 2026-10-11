@@ -15,6 +15,7 @@ import vm from 'node:vm';
 import * as engineModule from './engine.js';
 import * as stateModule from './state.js';
 import * as helpersModule from './helpers.js';
+import * as statsModule from './stats.js';
 import { createRng } from './rng.js';
 import { CHARACTERS, ROUTES, GEAR_SHOP } from './data.js';
 
@@ -41,7 +42,7 @@ const browser = ctx.window.AscentEngine;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 check('engine.browser.js exposes window.AscentEngine', !!browser);
-for (const [name, mod] of [['engine.js', engineModule], ['state.js', stateModule], ['helpers.js', helpersModule]]) {
+for (const [name, mod] of [['engine.js', engineModule], ['state.js', stateModule], ['helpers.js', helpersModule], ['stats.js', statsModule]]) {
   const missing = Object.keys(mod).filter(k => !(k in browser));
   check(`bundle exposes every ${name} export`, missing.length === 0, `missing: ${missing.join(', ')}`);
 }
@@ -53,6 +54,7 @@ const CHAR_KEYS = Object.keys(CHARACTERS);
 let games = 0;
 let steps = 0;
 let firstDiff = '';
+let summaryDiff = '';
 for (let g = 0; g < 24; g++) {
   const pick = createRng(1000 + g);
   const count = 1 + (g % 4);
@@ -81,8 +83,11 @@ for (let g = 0; g < 24; g++) {
     b = rb.state;
   }
   if (firstDiff) break;
+  // The post-game summary local play shows is the one online play shows.
+  if (!summaryDiff && !same(statsModule.summarizeGame(a), browser.summarizeGame(b))) summaryDiff = `game ${g}: summarizeGame`;
   games++;
 }
+check('bundle summarizes every game identically to the engine', !summaryDiff, summaryDiff);
 check(`bundle plays identically to the engine (${games} games, ${steps} actions)`, !firstDiff && games === 24, firstDiff);
 
 // ---------------------------------------------------------------------------
