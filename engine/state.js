@@ -16,11 +16,12 @@
 //   object serializes cleanly to JSON. Keys look like "bouldering:Crux Problem"
 //   and values are true. This matches the Set-based semantics from game.js.
 
-import { ROUTES, GEAR_SHOP, CHARACTERS } from './data.js';
+import { ROUTES } from './data.js';
 import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';
 import { ENGINE_VERSION_STRING } from './version.js';
 import { dealRouteGrit, gearInGame, startingGrit, usesGrit } from './helpers.js';
+import { compileContentPack, hasCustomContent, characterTemplate, routesForArea, gearPool, effectSum } from './content.js';
 
 // Gear items that are NEVER in the random 3-slot shop rotation. They are
 // always available for purchase from a separate "access card" section,
@@ -41,16 +42,17 @@ export function belayerCountFor(playerCount) {
   return Math.max(1, playerCount - 1);
 }
 
-// The routes of `area` that may be dealt to the wall: the area's deck minus
-// this game's milestone routes. Milestone cards sit on the milestone board for
-// the whole game, so they never also appear as a regular route.
-export function regularRoutePool(milestoneRoutes, area) {
+// The routes of `area` that may be dealt to the wall: the area's deck (plus
+// the game's custom routes, `content`) minus this game's milestone routes.
+// Milestone cards sit on the milestone board for the whole game, so they
+// never also appear as a regular route.
+export function regularRoutePool(milestoneRoutes, area, content = null) {
   const milestoneNames = new Set(
     Object.values(milestoneRoutes || {})
       .filter(m => m && m.area === area)
       .map(m => m.route.name),
   );
-  return ROUTES[area].filter(r => !milestoneNames.has(r.name));
+  return routesForArea(content, area).filter(r => !milestoneNames.has(r.name));
 }
 
 // Draw the Top Rope rotation as N belayer stations of ROUTES_PER_BELAYER routes
@@ -69,7 +71,11 @@ export function drawTopRopeStations(rng, belayerCount, pool = ROUTES.topRope) {
 
 // `rules` (optional): balance-experiment overrides, stored on the state as
 // state.rules — see trainingSpec in helpers.js. Omit for the standard rules.
-export function createGame({ seed, characterKeys, rules = null }) {
+// `content` (optional): a Project Mode content pack (content.js) — custom
+// climbers, route cards and gear cards added to the printed deck for this
+// game. It must compile; the normalized pack is stored as state.content so a
+// replay from the state's seed, characters and content reproduces the game.
+export function createGame({ seed, characterKeys, rules = null, content = null }) {
   // Validate inputs up front — these are the pipeline's guarantees,
   // so a bad input is a programming bug, not runtime noise.
   if (!Array.isArray(characterKeys) || characterKeys.length < 1 || characterKeys.length > 4) {
@@ -79,8 +85,16 @@ export function createGame({ seed, characterKeys, rules = null }) {
     // Per playtest design decision (2026-04-21): no duplicate characters in a game.
     throw new Error('duplicate character keys are not allowed');
   }
+  let pack = null;
+  if (content && hasCustomContent(content)) {
+    const compiled = compileContentPack(content);
+    if (!compiled.ok) {
+      throw new Error(`content pack does not compile: ${compiled.errors.map(e => `${e.path}: ${e.message}`).join('; ')}`);
+    }
+    pack = compiled.value;
+  }
   for (const key of characterKeys) {
-    if (!CHARACTERS[key]) throw new Error(`unknown character key: ${key}`);
+    if (!characterTemplate(pack, key)) throw new Error(`unknown character key: ${key}`);
   }
   if (typeof seed !== 'number' || !Number.isFinite(seed)) {
     throw new Error('seed must be a finite number');
@@ -90,9 +104,14 @@ export function createGame({ seed, characterKeys, rules = null }) {
   const emitter = makeEmitter(0);
 
   // Build players.
-  const players = characterKeys.map((key, i) => makePlayer(i + 1, key));
-  // Grit economy: every climber starts with rules.grit.start Grit.
-  if (usesGrit(rules)) players.forEach((p, i) => { p.character.grit = startingGrit(rules, p.character.key, i); });
+  const players = characterKeys.map((key, i) => makePlayer(i + 1, key, pack));
+  // Grit economy: every climber starts with rules.grit.start Grit (plus a
+  // custom climber's "starting Grit" rules).
+  if (usesGrit(rules)) {
+    players.forEach((p, i) => {
+      p.character.grit = startingGrit(rules, p.character.key, i) + effectSum(p.character, 'gritStart', { scope: 'setup' });
+    });
+  }
   // Rules-variant ability tuning (rules.characters[key].ability), copied onto
   // the climber so every helper sees it (abilityParam in helpers.js), and body
   // tuning (rules.characters[key].body: startingStats / startingEndurance /
@@ -110,20 +129,20 @@ export function createGame({ seed, characterKeys, rules = null }) {
 
   // Pick milestone routes FIRST (matches game.js:773 ordering — milestones
   // are selected before the per-area route rotation is drawn).
-  const milestones = pickMilestoneRoutes(rng);
+  const milestones = pickMilestoneRoutes(rng, pack);
 
   // Draw the opening rotation. Bouldering and Lead keep a flat list of 5;
   // Top Rope is split into belayerCount stations of 2 routes each.
   // Milestone routes are excluded from every wall's deck.
   // Grit-economy rules place Grit on every card as it is dealt.
   const availableRoutes = {
-    bouldering: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'bouldering'), 5)),
-    topRope: dealRouteGrit(rules, drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope'))),
-    leadClimbing: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'leadClimbing'), 5)),
+    bouldering: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'bouldering', pack), 5)),
+    topRope: dealRouteGrit(rules, drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope', pack))),
+    leadClimbing: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'leadClimbing', pack), 5)),
   };
 
   // Draw 3 non-access-card items for the shop rotation.
-  const availableGear = initializeGearShop(rng, rules);
+  const availableGear = initializeGearShop(rng, rules, pack);
 
   // Seed per-player attempt tracking.
   const attemptedRoutes = {};
@@ -151,6 +170,8 @@ export function createGame({ seed, characterKeys, rules = null }) {
     belayerCount,
     attemptedRoutes,
     ...(rules ? { rules: { ...rules } } : {}),
+    // Project Mode: the compiled content pack this game is played with.
+    ...(pack ? { content: pack } : {}),
     gameEnded: false,
     winner: null,
     pendingLevelUp: null,
@@ -176,7 +197,9 @@ export function createGame({ seed, characterKeys, rules = null }) {
       startingStats: { ...p.character.stats },
       startingEndurance: p.character.maxEndurance,
       specialAbility: p.character.specialAbility.name,
+      ...(p.character.custom ? { custom: true } : {}),
     })),
+    ...(pack ? { customContent: { characters: Object.keys(pack.characters), routes: Object.values(pack.routes).flat().map(r => r.name), gear: pack.gear.map(g => g.name) } } : {}),
     milestoneRoutes: serializeMilestones(milestones),
     // Top Rope belayer-station count for this game (players − 1).
     belayerCount,
@@ -217,11 +240,18 @@ function applyBody(c, body) {
   c.currentEndurance = c.startingEndurance;
 }
 
-function makePlayer(playerNum, characterKey) {
-  const tmpl = CHARACTERS[characterKey];
+function makePlayer(playerNum, characterKey, content = null) {
+  const tmpl = characterTemplate(content, characterKey);
   // Deep-clone so the per-player `specialAbility.used` flag (and any
   // future per-player mutation) doesn't bleed into the shared template.
   const charBase = JSON.parse(JSON.stringify(tmpl));
+  // A custom climber's rules act through content.js activeRules; the
+  // template's `rules` list moves to `customRules` so it can't be mistaken for
+  // the game's rules variant.
+  if (charBase.custom) {
+    charBase.customRules = charBase.rules;
+    delete charBase.rules;
+  }
   return {
     playerNum,
     character: {
@@ -266,14 +296,15 @@ function makePlayer(playerNum, characterKey) {
 // beginner, one intermediate, one expert — solving the "3-expert / 3-beginner
 // bad draw" problem that plagued v0.3.x.
 //
-// Grade-to-bucket mapping mirrors game.js:523-545 exactly.
-function pickMilestoneRoutes(rng) {
+// Grade-to-bucket mapping mirrors game.js:523-545 exactly. Custom routes
+// (`content`) are candidates like any printed card.
+function pickMilestoneRoutes(rng, content = null) {
   const beginner = [];
   const intermediate = [];
   const expert = [];
 
   for (const area of Object.keys(ROUTES)) {
-    for (const route of ROUTES[area]) {
+    for (const route of routesForArea(content, area)) {
       const { grade } = route;
       // Bouldering V-grade buckets.
       if (['V0', 'V1', 'V2'].includes(grade)) {
@@ -346,9 +377,10 @@ function pickMilestoneRoutes(rng) {
 
 // Initialize the 3-slot random gear shop. Access cards are handled
 // separately (they're always available for purchase, not rotated in).
-function initializeGearShop(rng, rules = null) {
+function initializeGearShop(rng, rules = null, content = null) {
   // Variant-only cards are dealt only when their rules variant is in play.
-  const nonAccessGear = GEAR_SHOP.filter(g => !ACCESS_CARDS.includes(g.name) && gearInGame(rules, g));
+  // Custom gear (`content`) joins the rotation deck.
+  const nonAccessGear = gearPool(content).filter(g => !ACCESS_CARDS.includes(g.name) && gearInGame(rules, g));
   return rng.pickN(nonAccessGear, 3);
 }
 

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review Queue · All In Ascent</title>
+<meta name="description" content="Project Mode submissions awaiting the designer's review.">
+<meta name="theme-color" content="#2a1d12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="design/tokens.css">
+<link rel="stylesheet" href="design/surfaces.css">
+<link rel="stylesheet" href="design/components.css">
+<link rel="stylesheet" href="design/board.css">
+<link rel="stylesheet" href="design/project.css">
+</head>
+<body class="project-page">
+<a class="skip-link" href="#main">Skip to the queue</a>
+
+<header class="site-header wall wall--night">
+  <div class="brand">
+    <h1>Review <em>queue.</em></h1>
+    <p class="eyebrow subtitle">All In Ascent · Project Mode submissions</p>
+  </div>
+  <nav class="site-nav" aria-label="Designer tools">
+    <a class="btn btn--ghost btn--sm" href="dashboard.html">Telemetry dashboard</a>
+    <a class="btn btn--ghost btn--sm" href="project.html">Workshop</a>
+    <a class="btn btn--ghost btn--sm" href="index.html">The game</a>
+  </nav>
+</header>
+
+<main id="main" tabindex="-1" class="pm-main">
+  <p class="rv-toolbar paper">
+    <span id="sourceLabel" data-testid="source">Loading…</span>
+    <button class="btn btn--ghost btn--sm" type="button" id="reloadBtn">Reload</button>
+    <label>Kind <select id="fKind"><option value="all">All</option><option value="character">Climbers</option><option value="route">Routes</option><option value="gear">Gear</option></select></label>
+    <label>Status <select id="fStatus"><option value="all">All</option><option value="new" selected>New</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></label>
+    <button class="btn btn--ghost btn--sm" type="button" id="exportBtn">Export JSON</button>
+    <span class="count" id="count" data-testid="count"></span>
+  </p>
+  <div id="banner"></div>
+  <div class="rv-grid" id="queue" aria-live="polite"></div>
+  <p class="rv-empty paper" id="empty" hidden>Nothing in the queue.</p>
+</main>
+
+<footer class="site-footer">
+  <p class="site-footer__version">Rules engine <span id="engineVersion" data-testid="engine-version">v—</span></p>
+  <p>Approve, reject or delete needs the admin token (asked for once, kept in this browser).</p>
+</footer>
+
+<script src="game.js"></script>
+<script src="design/icons.js"></script>
+<script src="design/card-art.js"></script>
+<script src="design/cards.js"></script>
+<script src="design/a11y.js"></script>
+<script src="flags.js"></script>
+<script src="telemetry-client.js"></script>
+<script src="project-store.js"></script>
+<script src="engine/engine.browser.js"></script>
+<script src="review.js"></script>
+</body>
+</html>

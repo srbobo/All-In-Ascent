@@ -107,12 +107,17 @@ export async function playRandomly(page, steps) {
   return log;
 }
 
-// Replay a game's action log through the Node engine from its seed and
-// characters. If the browser applied exactly the engine's rules (and nothing
-// else touched the state), the result equals the browser's state.
+// Replay a game's action log through the Node engine from its seed,
+// characters and content pack. If the browser applied exactly the engine's
+// rules (and nothing else touched the state), the result equals the
+// browser's state.
 export function replayInEngine(browserState) {
   const characterKeys = browserState.players.map(p => p.character.key);
-  let { state } = createGame({ seed: browserState.seed, characterKeys, rules: browserState.rules || null });
+  let { state } = createGame({
+    seed: browserState.seed, characterKeys, rules: browserState.rules || null,
+    // Project Mode: the content pack the game was created with.
+    content: browserState.content || null,
+  });
   for (const e of browserState.events.filter(ev => ev.type === 'action_chosen')) {
     ({ state } = applyAction(state, e.payload.action));
   }

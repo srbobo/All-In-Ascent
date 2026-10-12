@@ -124,6 +124,35 @@ curl -X DELETE "https://all-in-ascent.YOUR-USER.partykit.dev/parties/telemetry/g
 curl -X DELETE "https://all-in-ascent.YOUR-USER.partykit.dev/parties/telemetry/global?id=<record id>&token=ADMIN_TOKEN"
 ```
 
+### Project Mode review queue
+
+Cards built in Project Mode (`project.html`, behind the `projectMode` feature
+flag — see README) can be submitted for review. Each submission (the card's
+definition, the author's handle and note, nothing else) is stored by the
+`submissions` party (`party/submissions.js`, registered under `parties` in
+`partykit.json`) in one room called `global`, and listed with a card preview
+on the review queue served next to the game:
+
+```
+https://all-in-ascent.YOUR-USER.partykit.dev/review.html
+```
+
+Approving, rejecting or deleting a submission needs an admin token; reading
+the queue can be protected too:
+
+```bash
+# Optional: require a token to READ the queue (review.html asks for it once).
+npx partykit env add SUBMISSIONS_READ_TOKEN
+# Needed to approve / reject / delete (review.html asks for it once).
+npx partykit env add SUBMISSIONS_ADMIN_TOKEN
+npm run online:deploy
+
+# By hand:
+curl "https://all-in-ascent.YOUR-USER.partykit.dev/parties/submissions/global?list=1&token=READ_TOKEN"
+curl -X PATCH "https://all-in-ascent.YOUR-USER.partykit.dev/parties/submissions/global?id=<id>&status=approved&token=ADMIN_TOKEN"
+curl -X DELETE "https://all-in-ascent.YOUR-USER.partykit.dev/parties/submissions/global?id=<id>&token=ADMIN_TOKEN"
+```
+
 Bot-simulated data, for a dashboard to look at before real players arrive
 (recorded with mode `sim`, so the Mode filter separates it):
 

@@ -1,0 +1,126 @@
+/* ==========================================================================
+   ALL IN ASCENT — GRIT & HOLDS v2 · PROJECT MODE (project.html, review.html)
+   ==========================================================================
+   The workshop where players build climbers, routes and gear, and the
+   designer's review queue. Builds on tokens/components/board; everything
+   here is layout and form chrome for those two pages only.
+   ========================================================================== */
+
+.pm-main { max-width: 92rem; margin: 0 auto; padding: var(--sp-5) var(--gutter) var(--sp-7); display: grid; gap: var(--sp-5); }
+.pm-flag { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4); margin: 0; font-size: var(--fs-sm); }
+.pm-flag label { display: inline-flex; align-items: center; gap: 0.5em; cursor: pointer; }
+.pm-flag input { accent-color: var(--ink); width: 1.1em; height: 1.1em; }
+.pm-flag.is-off b { color: var(--bad-text); }
+
+.pm-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+@media (min-width: 64rem) { .pm-layout { grid-template-columns: 20rem minmax(0, 1fr); } }
+.pm-workshop, .pm-editor, .pm-empty { padding: var(--sp-5); box-shadow: var(--shadow-panel); }
+.pm-workshop .display-title, .pm-editor .display-title, .pm-empty .display-title { margin: var(--sp-1) 0 var(--sp-3); font-size: var(--fs-xl); }
+.pm-help, .pm-note { color: var(--ink-soft); font-size: var(--fs-sm); margin: 0 0 var(--sp-3); }
+.pm-new { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.pm-list { list-style: none; margin: 0 0 var(--sp-4); padding: 0; display: grid; gap: var(--sp-2); }
+.pm-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-2); padding: var(--sp-2); border-radius: var(--r-md, 10px); background: var(--paper-deep); }
+.pm-list li.is-editing { outline: 2px solid var(--ink); }
+.pm-list .pm-item__name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-list .pm-item__meta { display: block; font-size: var(--fs-2xs); color: var(--ink-muted); font-family: var(--font-mono); letter-spacing: 0.04em; }
+.pm-list .pm-item__meta.is-bad { color: var(--bad-text); }
+.pm-list button { min-height: 36px; padding: 0.3em 0.8em; font-size: var(--fs-xs); }
+.pm-list:empty::after { content: 'Nothing here yet — start a card above.'; color: var(--ink-muted); font-size: var(--fs-sm); }
+.pm-tools { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.pm-import { cursor: pointer; }
+
+.pm-editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); }
+@media (min-width: 80rem) { .pm-editor { grid-template-columns: minmax(0, 1fr) 19rem; } }
+.pm-editor__side { display: grid; gap: var(--sp-3); align-content: start; position: sticky; top: var(--sp-3); }
+.pm-preview .aia-card { width: 100%; max-width: 19rem; margin: 0 auto; }
+.pm-status { font-size: var(--fs-sm); padding: var(--sp-3); border-radius: var(--r-md, 10px); background: var(--paper-deep); }
+.pm-status.is-ok { background: color-mix(in srgb, var(--ok) 25%, var(--paper)); }
+.pm-status.is-bad { background: color-mix(in srgb, var(--bad) 14%, var(--paper)); }
+.pm-status ul { margin: var(--sp-2) 0 0; padding-left: 1.2em; }
+.pm-status li { margin: 0.2em 0; }
+.pm-status code { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--ink-muted); }
+.pm-actions { display: grid; gap: var(--sp-2); }
+.pm-actions .btn { width: 100%; }
+
+/* ----- fields ----- */
+.pm-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4); }
+.pm-fields--wide { grid-template-columns: minmax(0, 1fr); }
+.pm-field { display: grid; gap: 0.3em; font-size: var(--fs-sm); font-weight: 600; }
+.pm-field > span small { font-weight: 400; color: var(--ink-muted); }
+.pm-field input, .pm-field select, .pm-field textarea {
+  min-height: 40px; padding: 0.4em 0.6em; border-radius: 8px; border: 2px solid var(--rule);
+  background: var(--paper); color: var(--ink); font-weight: 500; width: 100%;
+}
+.pm-field textarea { min-height: 5rem; resize: vertical; }
+.pm-field input:focus-visible, .pm-field select:focus-visible, .pm-field textarea:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.pm-field--span { grid-column: 1 / -1; }
+.pm-group { margin: var(--sp-4) 0 var(--sp-3); }
+.pm-group > h3 { font-family: var(--font-display); font-size: var(--fs-md); font-weight: 800; margin: 0 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-2); }
+.pm-group > h3 small { font-weight: 500; color: var(--ink-muted); font-size: var(--fs-xs); }
+.pm-checks { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); }
+.pm-checks label { display: inline-flex; align-items: center; gap: 0.4em; font-size: var(--fs-sm); font-weight: 600; }
+.pm-checks input { accent-color: var(--ink); width: 1.05em; height: 1.05em; }
+.pm-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: var(--sp-2) var(--sp-3); }
+.pm-stat-grid .pm-field { font-size: var(--fs-xs); }
+.pm-stat-grid .pm-field > span { display: inline-flex; align-items: center; gap: 0.35em; }
+.pm-stat-grid .aia-icon { width: 1.1em; height: 1.1em; }
+
+/* ----- dice rows ----- */
+.pm-dice { display: grid; gap: var(--sp-2); }
+.pm-die { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.pm-die select { min-height: 36px; padding: 0.3em 0.5em; border-radius: 8px; border: 2px solid var(--rule); background: var(--paper); }
+
+/* ----- rules ----- */
+.pm-rules { display: grid; gap: var(--sp-3); }
+.pm-rule { border: 2px solid var(--rule); border-radius: var(--r-md, 12px); padding: var(--sp-3); background: var(--paper); }
+.pm-rule__head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.pm-rule__head b { font-family: var(--font-display); font-size: var(--fs-sm); letter-spacing: 0.04em; text-transform: uppercase; }
+.pm-rule__head .pm-rule__tools { margin-left: auto; display: flex; gap: 4px; }
+.pm-mini { min-height: 32px; min-width: 32px; padding: 0 0.55em; font-size: var(--fs-xs); border-radius: 8px; border: 2px solid var(--ink); background: var(--paper); font-weight: 700; cursor: pointer; }
+.pm-mini:hover { background: var(--ink); color: var(--chalk); }
+.pm-mini:disabled { opacity: 0.35; cursor: default; }
+.pm-mini:disabled:hover { background: var(--paper); color: inherit; }
+.pm-rule__row { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: var(--sp-2); align-items: start; margin: var(--sp-2) 0; }
+.pm-rule__label { font-family: var(--font-display); font-weight: 800; font-size: var(--fs-sm); padding-top: 0.45em; }
+.pm-rule__label--then { color: var(--cobalt-text); }
+.pm-elements { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.pm-element {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.35em;
+  padding: 0.3em 0.4em 0.3em 0.6em; border-radius: var(--r-pill); background: var(--paper-deep);
+  box-shadow: inset 0 0 0 2px var(--rule); font-size: var(--fs-xs); font-weight: 600;
+}
+.pm-element--when { background: color-mix(in srgb, var(--marigold) 22%, var(--paper)); }
+.pm-element--then { background: color-mix(in srgb, var(--cobalt) 14%, var(--paper)); }
+.pm-element.is-bad { box-shadow: inset 0 0 0 2px var(--bad); }
+.pm-element select, .pm-element input { min-height: 30px; padding: 0.15em 0.4em; border-radius: 8px; border: 2px solid var(--rule); background: var(--paper); font-size: var(--fs-xs); font-weight: 600; }
+.pm-element input[type="number"] { width: 4.5em; }
+.pm-element .pm-mini { min-height: 26px; min-width: 26px; border-width: 0; background: transparent; }
+.pm-element .pm-mini:hover { background: var(--ink); color: var(--chalk); }
+.pm-add { display: inline-flex; align-items: center; gap: 0.3em; font-size: var(--fs-xs); font-weight: 700; }
+.pm-add select { min-height: 32px; padding: 0.2em 0.5em; border-radius: var(--r-pill); border: 2px dashed var(--ink); background: var(--paper); font-weight: 700; font-size: var(--fs-xs); cursor: pointer; }
+.pm-rule__text { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--ink-soft); font-style: italic; }
+.pm-rule__text.is-bad { color: var(--bad-text); font-style: normal; }
+.pm-empty ol { padding-left: 1.3em; color: var(--ink-soft); display: grid; gap: var(--sp-2); }
+
+/* ----- review queue ----- */
+.rv-toolbar { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: center; padding: var(--sp-3) var(--sp-4); margin: 0; font-size: var(--fs-sm); }
+.rv-toolbar .count { margin-left: auto; color: var(--ink-soft); }
+.rv-toolbar select { min-height: 36px; padding: 0.2em 0.5em; border-radius: 8px; border: 2px solid var(--rule); background: var(--paper); }
+.rv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); gap: var(--sp-4); }
+.rv-item { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3); box-shadow: var(--shadow-panel); }
+.rv-item .aia-card { width: 100%; }
+.rv-item h3 { font-family: var(--font-display); font-size: var(--fs-md); margin: 0 0 var(--sp-1); }
+.rv-item dl { margin: 0 0 var(--sp-2); font-size: var(--fs-xs); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.15em 0.6em; }
+.rv-item dt { color: var(--ink-muted); }
+.rv-item dd { margin: 0; overflow-wrap: anywhere; }
+.rv-item .rv-rules { font-size: var(--fs-xs); color: var(--ink-soft); margin: 0 0 var(--sp-2); }
+.rv-item .rv-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.rv-item .rv-actions .btn { min-height: 34px; padding: 0.3em 0.7em; font-size: var(--fs-2xs); }
+.rv-status { font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.08em; text-transform: uppercase; }
+.rv-status--new { color: var(--cobalt-text); }
+.rv-status--approved { color: var(--lime-text); }
+.rv-status--rejected { color: var(--bad-text); }
+.rv-empty { padding: var(--sp-5); color: var(--ink-soft); }
+.pm-warn { color: var(--bad-text); font-weight: 600; }
+.project-mode-note { font-size: var(--fs-sm); color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 0.4em; align-items: center; }
+.character-card--custom .aia-card__kind::after { content: 'Project'; margin-left: 0.5em; font-family: var(--font-mono); font-size: 0.7em; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.8; }

@@ -37,6 +37,7 @@ import {
 import { createRng } from './rng.js';
 import { makeEmitter } from './telemetry.js';
 import { ACCESS_CARDS, drawTopRopeStations, regularRoutePool } from './state.js';
+import { findGear, gearPool, effectSum, describeAppliedClimbRules } from './content.js';
 import {
   checkAreaAccess, canEnterSection, getPlayersInSection,
   canClimbTopRopeRoute, pickFreeBelayerStation,
@@ -48,7 +49,7 @@ import {
   describeClimbGearEffects,
   freeSoloCanAttempt, trainingSpec, trainingAllowed, trainingCap,
   usesGrit, trainingGritCost, gearFunds, gearPrice, payForGear, claimClimbGrit,
-  dealRouteGrit, gearInGame, perRoundGrit, abilityParam,
+  dealRouteGrit, gearInGame, perRoundGrit, betaBoostAmount, roundStartTime,
   computeRestRecovery, applyLevelUpIfNeeded,
   bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, MAX_STAT_SHIFT,
 } from './helpers.js';
@@ -100,12 +101,12 @@ export function getLegalActions(state) {
       // Top Rope: the route's belayer station must be free for this player
       // (a station held by another player blocks both of its routes).
       if (area === 'topRope' && !canClimbTopRopeRoute(state, player.playerNum, route)) continue;
-      const timeCost = getEffectiveClimbTimeCost(char, route.time, route);
-      const enduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance);
+      const timeCost = getEffectiveClimbTimeCost(char, route.time, route, false, area);
+      const enduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance, area, false);
       if (char.timeRemaining < timeCost) continue;
       if (char.currentEndurance < enduranceCost) continue;
       // Free Solo "Life or Die" — must meet all base requirements.
-      if (!freeSoloCanAttempt(char, route)) continue;
+      if (!freeSoloCanAttempt(char, route, area, false)) continue;
       actions.push({ type: 'climb', area, routeName: route.name });
       // Route Reader "Versatility": also offer this climb with the most useful
       // once-per-round stat shift, when one helps. (applyAction accepts any
@@ -133,11 +134,11 @@ export function getLegalActions(state) {
       const sec = canEnterSection(m.area, player.playerNum, state);
       if (!sec.canEnter) continue;
     }
-    const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route, true);
-    const enduranceCost = getEffectiveClimbEnduranceCost(char, m.route, m.route.endurance);
+    const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route, true, m.area);
+    const enduranceCost = getEffectiveClimbEnduranceCost(char, m.route, m.route.endurance, m.area, true);
     if (char.timeRemaining < timeCost) continue;
     if (char.currentEndurance < enduranceCost) continue;
-    if (!freeSoloCanAttempt(char, m.route)) continue;
+    if (!freeSoloCanAttempt(char, m.route, m.area, true)) continue;
     actions.push({ type: 'milestone', difficulty, area: m.area, routeName: m.route.name });
     // Rules variant: Versatility's stat shift on a Milestone — offered as a
     // variant of the attempt, like regular climbs.
@@ -245,9 +246,9 @@ export function illegalActionReason(state, wanted) {
     if (sec.canEnter) return null;
     return reason('sectionFull', `You can't climb here right now: ${sec.reason}.`, { occupants: occupantsOf(area) });
   };
-  const costGate = (route, isMilestone = false) => {
-    const t = getEffectiveClimbTimeCost(char, route.time, route, isMilestone);
-    const e = getEffectiveClimbEnduranceCost(char, route, route.endurance);
+  const costGate = (route, isMilestone, area) => {
+    const t = getEffectiveClimbTimeCost(char, route.time, route, isMilestone, area);
+    const e = getEffectiveClimbEnduranceCost(char, route, route.endurance, area, isMilestone);
     if (char.timeRemaining < t) return notEnough('notEnoughTime', 'time', t, char.timeRemaining);
     if (char.currentEndurance < e) return notEnough('notEnoughEndurance', 'endurance', e, char.currentEndurance);
     return null;
@@ -272,7 +273,7 @@ export function illegalActionReason(state, wanted) {
         const full = sectionGate(wanted.area);
         if (full) return full;
       }
-      return costGate(route) || (!freeSoloCanAttempt(char, route) ? lifeOrDie() : null)
+      return costGate(route, false, wanted.area) || (!freeSoloCanAttempt(char, route, wanted.area, false) ? lifeOrDie() : null)
         || reason('unavailable', 'That climb is not available right now.');
     }
     case 'milestone': {
@@ -291,7 +292,7 @@ export function illegalActionReason(state, wanted) {
         const full = sectionGate(m.area);
         if (full) return full;
       }
-      return costGate(m.route, true) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie() : null)
+      return costGate(m.route, true, m.area) || (!freeSoloCanAttempt(char, m.route, m.area, true) ? lifeOrDie() : null)
         || reason('unavailable', 'That milestone is not available right now.');
     }
     case 'train': {
@@ -322,7 +323,7 @@ export function illegalActionReason(state, wanted) {
     case 'rest':
       return reason('notEnoughTime', 'Not enough time to rest.', { need: 1, have: char.timeRemaining });
     case 'buyGear': {
-      const gear = GEAR_SHOP.find(g => g.name === wanted.gearName);
+      const gear = findGear(state, wanted.gearName);
       if (!gear) return reason('noSuchGear', 'There is no such gear.');
       if (char.equipment.includes(gear.name)) return reason('alreadyOwned', `You already own ${gear.name}.`);
       const inShop = state.availableGear.some(g => g.name === gear.name) || ACCESS_CARDS.includes(gear.name);
@@ -500,15 +501,18 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     state_attemptedRoutesMark(s, player.playerNum, area, route.name);
   }
 
+  // The climb, for custom rules (content.js): which route, wall and kind.
+  const climb = { route, area, isMilestone };
+
   // 3. Deduct time (character + gear modified).
-  const timeCost = getEffectiveClimbTimeCost(char, route.time, route, isMilestone);
+  const timeCost = getEffectiveClimbTimeCost(char, route.time, route, isMilestone, area);
   const timeBefore = char.timeRemaining;
   char.timeRemaining -= timeCost;
 
   // 4. Deduct endurance — base cost may be reduced by gear (Body Tension Belt).
   // Iron Lung's failure penalty is added later, after success/fail is known.
   const enduranceBefore = char.currentEndurance;
-  const baseEnduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance);
+  const baseEnduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance, area, isMilestone);
   char.currentEndurance -= baseEnduranceCost;
 
   // 5-6. Effective stats for this climb: base + training + gear + per-route
@@ -517,7 +521,7 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   //      real climbs can't drift apart. Consuming the flags happens below.
   //      (Route attempted-marks don't feed gear bonuses in v0.7+ data, but use
   //      the pre-climb marks so a preview and the climb see identical input.)
-  const effectiveStats = computeClimbStats(char, route, area, attemptedBefore, shift);
+  const effectiveStats = computeClimbStats(char, route, area, attemptedBefore, shift, isMilestone);
   // The Beta Boost is spent by this climb; the flag is cleared once the outcome
   // is known, because a rules variant can make Versatility depend on it.
   const boostSpent = !!char.betaBoostActive;
@@ -526,7 +530,7 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
       playerNum: player.playerNum,
       character: char.key,
       ability: 'Beta Boost',
-      effect: `+${abilityParam(char, 'betaBoost') ?? 3} all stats for this climb`,
+      effect: `+${betaBoostAmount(char)} all stats for this climb`,
     });
   }
 
@@ -544,10 +548,10 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   // 7. Build and roll dice (Sprinter gets +1 nerf die; v0.3.0 gear may
   //    re-roll, add an extra die, replace dice, or shift dice on milestones).
   //    Gear choices ("your choice") are made against effectiveStats.
-  const effectArray = buildEffectRollArray(char, route);
+  const effectArray = buildEffectRollArray(char, route, area, isMilestone);
   const diceTrace = [];
-  const { dice, mentorIndex } = resolveClimbDice(() => rng.rollDie(6), effectArray, char, route, isMilestone, effectiveStats, diceTrace);
-  const { requirements, appliedModifiers } = applyDiceToRequirements(char, route, effectArray, dice, { mentorIndex });
+  const { dice, mentorIndex } = resolveClimbDice(() => rng.rollDie(6), effectArray, char, route, isMilestone, effectiveStats, diceTrace, area);
+  const { requirements, appliedModifiers } = applyDiceToRequirements(char, route, effectArray, dice, { mentorIndex, area, isMilestone });
 
   emitter.emit('dice_rolled', {
     playerNum: player.playerNum,
@@ -562,9 +566,9 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   });
 
   // 8. Resolve outcome.
-  const outcome = resolveClimbOutcome(char, effectiveStats, requirements, isMilestone);
+  const outcome = resolveClimbOutcome(char, effectiveStats, requirements, isMilestone, climb);
   if (boostSpent) char.betaBoostActive = false;
-  const xpGained = computeClimbXp(char, route, outcome.success);
+  const xpGained = computeClimbXp(char, route, outcome.success, climb);
   char.xp += xpGained;
   // Grit economy: a regular send takes the Grit on the card; a milestone
   // send pays its tier's reward.
@@ -573,16 +577,18 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   // 9. Iron Lung failure penalty (Mental Anchor gear bypasses).
   let failPenalty = 0;
   if (!outcome.success) {
-    failPenalty = getFailureEnduranceExtra(char);
+    failPenalty = getFailureEnduranceExtra(char, climb);
     char.currentEndurance -= failPenalty;
   }
   // 9b. Power Spotting: successful climbs heal endurance, up to maxEndurance.
   let healed = 0;
   if (outcome.success) {
     const beforeHeal = char.currentEndurance;
-    char.currentEndurance = applySuccessHeal(char.currentEndurance, char.maxEndurance, getSuccessEnduranceHeal(char));
+    char.currentEndurance = applySuccessHeal(char.currentEndurance, char.maxEndurance, getSuccessEnduranceHeal(char, climb));
     healed = char.currentEndurance - beforeHeal;
   }
+  // Custom rules (the climber's and its custom gear's) that applied to this climb.
+  const customRules = describeAppliedClimbRules(char, { scope: 'climb', route, area, isMilestone });
   // Floor endurance at 0. Going negative is nonsensical for downstream checks.
   if (char.currentEndurance < 0) char.currentEndurance = 0;
 
@@ -603,8 +609,10 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     // Every gear effect that changed this climb (see describeClimbGearEffects).
     gearEffects: describeClimbGearEffects({
       char, route, effectRollArray: effectArray, diceTrace, appliedModifiers,
-      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed, isMilestone,
+      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed, isMilestone, area,
     }),
+    // Project Mode: every custom rule that applied, worded ({ source, ruleId, text }).
+    ...(customRules.length ? { customRules } : {}),
     resourcesDelta: {
       time: { before: timeBefore, after: char.timeRemaining, delta: -timeCost },
       endurance: { before: enduranceBefore, after: char.currentEndurance, delta: char.currentEndurance - enduranceBefore },
@@ -697,12 +705,20 @@ function handleRest(s, rng, action, emitter) {
   const { newEndurance, delta, restBonusApplied } = computeRestRecovery(char);
   char.currentEndurance = newEndurance;
 
-  // Route Reader's "Versatility" activates Beta Boost on rest. Other
+  // Route Reader's "Versatility" activates Beta Boost on rest, as does a
+  // custom "Beta Boost on rest" rule (for the amount the rules grant). Other
   // characters ignore this flag.
   let betaActivated = false;
   if (char.key === 'routeReader') {
     char.betaBoostActive = true;
     betaActivated = true;
+  } else {
+    const boost = effectSum(char, 'betaBoostOnRest', { scope: 'rest' });
+    if (boost > 0) {
+      char.betaBoostActive = true;
+      char.betaBoostAmount = boost;
+      betaActivated = true;
+    }
   }
 
   emitter.emit('rest_action', {
@@ -721,7 +737,7 @@ function handleRest(s, rng, action, emitter) {
 function handleBuyGear(s, rng, action, emitter) {
   const player = s.players[s.currentPlayerIndex];
   const char = player.character;
-  const gear = GEAR_SHOP.find(g => g.name === action.gearName);
+  const gear = findGear(s, action.gearName);
   if (!gear) throw new Error(`buyGear: no gear "${action.gearName}"`);
 
   // XP, or Grit under the Grit-economy rules (XP is then never spent).
@@ -738,6 +754,16 @@ function handleBuyGear(s, rng, action, emitter) {
   // Permanent stat & endurance effects from the purchased item.
   // Matches game.js:2299-2391 branch-by-branch.
   const gearApplied = {};
+  // A custom card's rules now act for this climber (content.js activeRules);
+  // its permanent max-Endurance rules apply at once, like Locking Carabiner.
+  if (gear.custom) {
+    char.gearRules = [...(char.gearRules || []), { gear: gear.name, hash: gear.rulesHash, rules: gear.rules }];
+    const maxEnd = effectSum({ gearRules: [{ gear: gear.name, rules: gear.rules }] }, 'maxEndurance', { scope: 'setup' });
+    if (maxEnd) {
+      char.maxEndurance += maxEnd;
+      gearApplied.maxEndurance = maxEnd;
+    }
+  }
   if (gear.statEffect === 'endurance') {
     char.maxEndurance += gear.value;
     gearApplied.maxEndurance = gear.value;
@@ -798,7 +824,7 @@ function replaceGearInRotation(s, rng, purchasedName) {
     ...ownedByAny,
     ...ACCESS_CARDS,
   ]);
-  const pool = GEAR_SHOP.filter(g => !unavailable.has(g.name) && gearInGame(s.rules, g));
+  const pool = gearPool(s.content).filter(g => !unavailable.has(g.name) && gearInGame(s.rules, g));
 
   if (pool.length === 0) {
     s.availableGear.splice(idx, 1);
@@ -916,14 +942,14 @@ function endRound(s, rng, emitter) {
   //   2 → refresh bouldering,    advance to 0
   let cleared;
   if (s.routeClearingPosition === 0) {
-    s.availableRoutes.leadClimbing = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing'), 5));
+    s.availableRoutes.leadClimbing = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing', s.content), 5));
     cleared = 'leadClimbing';
   } else if (s.routeClearingPosition === 1) {
     // Refresh all belayer stations together (2×belayerCount routes).
-    s.availableRoutes.topRope = dealRouteGrit(s.rules, drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope')));
+    s.availableRoutes.topRope = dealRouteGrit(s.rules, drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope', s.content)));
     cleared = 'topRope';
   } else {
-    s.availableRoutes.bouldering = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering'), 5));
+    s.availableRoutes.bouldering = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering', s.content), 5));
     cleared = 'bouldering';
   }
   s.routeClearingPosition = (s.routeClearingPosition + 1) % 3;
@@ -934,13 +960,13 @@ function endRound(s, rng, emitter) {
   // player back to the Lobby automatically (RuleModifications 2026-06-27).
   for (const p of s.players) {
     const c = p.character;
-    const approachBonus = c.equipment.includes('Approach Shoes') ? 1 : 0;
-    c.timeRemaining = 10 + approachBonus;
+    // 10 Time, plus Approach Shoes and custom "Time each round" rules.
+    c.timeRemaining = roundStartTime(c);
     c.abilityUsed = false;
     c.trainedThisRound = 0;
     c.freeSessionUsed = false;
-    // Grit economy: the per-round allowance.
-    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key);
+    // Grit economy: the per-round allowance, plus custom "Grit each round" rules.
+    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key) + effectSum(c, 'gritPerRound', { scope: 'round' });
     c.location = 'lobby';
     c.belayerStation = null;
   }

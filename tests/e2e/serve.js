@@ -4,7 +4,9 @@
 //
 // It also hosts the real telemetry party (party/telemetry.js, in-memory
 // storage) at /parties/telemetry/<room>, as `partykit dev` would, so local
-// games record their match records here and the dashboard can read them.
+// games record their match records here and the dashboard can read them —
+// and the Project Mode review queue (party/submissions.js) at
+// /parties/submissions/<room>.
 //
 //   node tests/e2e/serve.js [port]
 
@@ -13,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import TelemetryRoom from '../../party/telemetry.js';
+import SubmissionsRoom from '../../party/submissions.js';
 import { createMemoryStorage } from '../../party/_memory-storage.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -22,29 +25,30 @@ const TYPES = {
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
 };
 
-const telemetryStorage = createMemoryStorage();
-const telemetryRooms = new Map();
-function telemetryRoom(id) {
-  if (!telemetryRooms.has(id)) {
-    telemetryRooms.set(id, new TelemetryRoom({ id, env: { TELEMETRY_ADMIN_TOKEN: 'e2e-admin' }, storage: telemetryStorage }));
-  }
-  return telemetryRooms.get(id);
+const PARTIES = {
+  telemetry: { Room: TelemetryRoom, env: { TELEMETRY_ADMIN_TOKEN: 'e2e-admin' }, storage: createMemoryStorage(), rooms: new Map() },
+  submissions: { Room: SubmissionsRoom, env: { SUBMISSIONS_ADMIN_TOKEN: 'e2e-admin' }, storage: createMemoryStorage(), rooms: new Map() },
+};
+function partyRoom(party, id) {
+  const p = PARTIES[party];
+  if (!p.rooms.has(id)) p.rooms.set(id, new p.Room({ id, env: p.env, storage: p.storage }));
+  return p.rooms.get(id);
 }
 
-async function serveTelemetry(req, res, roomId) {
+async function serveParty(req, res, party, roomId) {
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(chunks);
   const request = new Request(`http://localhost${req.url}`, { method: req.method, headers: req.headers, body });
-  const response = await telemetryRoom(roomId).onRequest(request);
+  const response = await partyRoom(party, roomId).onRequest(request);
   res.writeHead(response.status, Object.fromEntries(response.headers));
   res.end(Buffer.from(await response.arrayBuffer()));
 }
 
 http.createServer((req, res) => {
-  const party = req.url.match(/^\/parties\/telemetry\/([^/?]+)/);
+  const party = req.url.match(/^\/parties\/(telemetry|submissions)\/([^/?]+)/);
   if (party) {
-    serveTelemetry(req, res, decodeURIComponent(party[1])).catch(err => { res.writeHead(500); res.end(String(err)); });
+    serveParty(req, res, party[1], decodeURIComponent(party[2])).catch(err => { res.writeHead(500); res.end(String(err)); });
     return;
   }
   let rel = decodeURIComponent(req.url.split('?')[0]);

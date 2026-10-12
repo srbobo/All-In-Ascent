@@ -18,18 +18,25 @@
   const PRODUCTION_PARTYKIT_HOST = 'all-in-ascent.srbobo.partykit.dev';
   const STORAGE_KEY = 'all-in-ascent.telemetry';
   const PATH = '/parties/telemetry/global';
+  // Project Mode submissions (party/submissions.js) live on the same host.
+  const SUBMISSIONS_PATH = '/parties/submissions/global';
 
-  function endpoint() {
+  // The URL of `path` on the PartyKit host this page talks to (see above).
+  function endpointFor(path) {
     const override = new URLSearchParams(window.location.search).get('telemetry');
     if (override === 'off') return null;
     if (override) {
       const host = override.trim();
       const local = /^(127\.0\.0\.1|localhost|0\.0\.0\.0)(:|$)/.test(host);
-      return `${local ? 'http' : 'https'}://${host}${PATH}`;
+      return `${local ? 'http' : 'https'}://${host}${path}`;
     }
     const h = window.location.hostname;
-    if (h === '127.0.0.1' || h === 'localhost' || h === '0.0.0.0') return window.location.origin + PATH;
-    return `https://${PRODUCTION_PARTYKIT_HOST}${PATH}`;
+    if (h === '127.0.0.1' || h === 'localhost' || h === '0.0.0.0') return window.location.origin + path;
+    return `https://${PRODUCTION_PARTYKIT_HOST}${path}`;
+  }
+
+  function endpoint() {
+    return endpointFor(PATH);
   }
 
   function enabled() {
@@ -60,6 +67,21 @@
     }
   }
 
+  // Send a Project Mode card for the designer's review (not covered by the
+  // match-record opt-out: the player asks for it). Resolves to
+  // { ok, id, error } and never throws.
+  async function sendSubmission(submission) {
+    const url = endpointFor(SUBMISSIONS_PATH);
+    if (!url) return { ok: false, error: 'submissions are off on this page' };
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(submission) });
+      const body = await res.json().catch(() => ({}));
+      return res.ok ? { ok: true, id: body.id } : { ok: false, error: body.error || `HTTP ${res.status}` };
+    } catch (e) {
+      return { ok: false, error: e && e.message ? e.message : 'network error' };
+    }
+  }
+
   // Footer opt-out checkbox (index.html #telemetryOptIn).
   function bindToggle() {
     const box = document.getElementById('telemetryOptIn');
@@ -70,5 +92,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindToggle);
   else bindToggle();
 
-  window.AscentTelemetry = { endpoint, enabled, setEnabled, newId, sendMatch };
+  window.AscentTelemetry = { endpoint, endpointFor, enabled, setEnabled, newId, sendMatch, sendSubmission, SUBMISSIONS_PATH };
 })();

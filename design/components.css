@@ -35,6 +35,8 @@ body {
 img, svg { display: block; max-width: 100%; }
 .aia-icon { display: inline-block; width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.2em; }
 button, input, select { font: inherit; color: inherit; }
+/* The hidden attribute wins over every display class (flex/grid buttons, panels). */
+[hidden] { display: none !important; }
 a { color: var(--cobalt-text); text-underline-offset: 0.18em; }
 h1, h2, h3, h4 { font-family: var(--font-display); line-height: var(--lh-snug); letter-spacing: -0.01em; }
 

@@ -2,7 +2,8 @@
   "name": "all-in-ascent",
   "main": "party/game.js",
   "parties": {
-    "telemetry": "party/telemetry.js"
+    "telemetry": "party/telemetry.js",
+    "submissions": "party/submissions.js"
   },
   "compatibilityDate": "2024-11-01",
   "vars": {

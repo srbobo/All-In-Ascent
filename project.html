@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Mode · All In Ascent</title>
+<meta name="description" content="Project Mode: build your own climbers, route cards and gear for All In Ascent, play them locally and submit them for review.">
+<meta name="theme-color" content="#2a1d12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="design/tokens.css">
+<link rel="stylesheet" href="design/surfaces.css">
+<link rel="stylesheet" href="design/components.css">
+<link rel="stylesheet" href="design/board.css">
+<link rel="stylesheet" href="design/project.css">
+</head>
+<body class="project-page">
+<a class="skip-link" href="#main">Skip to the workshop</a>
+
+<header class="site-header wall wall--night">
+  <div class="brand">
+    <h1>Project <em>Mode.</em></h1>
+    <p class="eyebrow subtitle">All In Ascent · Build your own climbers, routes and gear</p>
+  </div>
+  <nav class="site-nav" aria-label="Game resources">
+    <a class="btn btn--ghost btn--sm" href="index.html">◂ Back to the game</a>
+    <a class="btn btn--ghost btn--sm" href="cards.html" target="_blank" rel="noopener">The deck<span class="sr-only"> (opens in a new tab)</span></a>
+    <a class="btn btn--ghost btn--sm" href="RULEBOOK.html" target="_blank" rel="noopener">Rulebook<span class="sr-only"> (opens in a new tab)</span></a>
+  </nav>
+  <div class="hero-tape-row" aria-hidden="true">
+    <span class="tape tape--coral">Climbers</span>
+    <span class="tape tape--teal">Route cards</span>
+    <span class="tape tape--violet">Gear cards</span>
+    <span class="tape tape--marigold">Rules that compile</span>
+  </div>
+</header>
+
+<main id="main" tabindex="-1" class="pm-main">
+  <p class="pm-flag paper" id="flagNote">
+    <label><input type="checkbox" id="flagToggle"> <b>Project Mode is on for this browser.</b></label>
+    <span id="flagHelp">Cards in your workshop that compile join every local game you start from the setup screen.</span>
+  </p>
+
+  <div class="pm-layout">
+    <aside class="pm-workshop paper" aria-labelledby="workshopTitle">
+      <p class="eyebrow">Your workshop</p>
+      <h2 class="display-title" id="workshopTitle">Cards you <em>made.</em></h2>
+      <p class="pm-help">They live in this browser. Pick one to edit it, or start a new card.</p>
+      <div class="pm-new" role="group" aria-label="New card">
+        <button class="btn btn--coral btn--sm" type="button" data-new="character">+ Climber</button>
+        <button class="btn btn--teal btn--sm" type="button" data-new="route">+ Route</button>
+        <button class="btn btn--violet btn--sm" type="button" data-new="gear">+ Gear</button>
+      </div>
+      <ul class="pm-list" id="workshopList" aria-label="Workshop cards"></ul>
+      <div class="pm-tools">
+        <a class="btn btn--lime btn--sm" id="playLink" href="index.html?projectMode=on">Play with these cards ▸</a>
+        <button class="btn btn--ghost btn--sm" type="button" id="exportBtn">Export JSON</button>
+        <label class="btn btn--ghost btn--sm pm-import">Import JSON<input type="file" id="importInput" accept=".json,application/json" hidden></label>
+      </div>
+    </aside>
+
+    <section class="pm-editor paper" id="editor" aria-labelledby="editorTitle" hidden>
+      <div class="pm-editor__form">
+        <p class="eyebrow" id="editorKind">Climber</p>
+        <h2 class="display-title" id="editorTitle">New <em>climber.</em></h2>
+        <form id="editorForm" autocomplete="off" onsubmit="return false;"></form>
+      </div>
+      <div class="pm-editor__side">
+        <div class="pm-preview" id="preview" aria-live="polite" aria-label="Card preview"></div>
+        <div class="pm-status" id="compileStatus" role="status" aria-live="polite"></div>
+        <div class="pm-actions">
+          <button class="btn btn--lime" type="button" id="saveBtn">Save to workshop</button>
+          <button class="btn btn--marigold" type="button" id="submitBtn">Submit for review ▸</button>
+          <button class="btn btn--ghost" type="button" id="deleteBtn">Delete</button>
+        </div>
+        <p class="pm-note" id="editorNote"></p>
+      </div>
+    </section>
+
+    <section class="pm-empty paper" id="emptyEditor">
+      <p class="eyebrow">How it works</p>
+      <h2 class="display-title">Rules are built from <em>elements.</em></h2>
+      <ol>
+        <li>Start a card and set its numbers: a climber's stats and growth, a route's requirements and dice, a gear card's price.</li>
+        <li>Give climbers and gear <b>rules</b>: pick conditions (<i>on Overhang routes</i>, <i>when the route needs under 30 Strength</i>, <i>at Level 3 or more</i>…) and effects (<i>+5 Strength</i>, <i>the climb costs −1 Time</i>, <i>roll an extra buff die</i>…). Add, remove and reorder them freely.</li>
+        <li>The card <b>compiles</b> against the rules engine as you type. A card that compiles plays in your local games exactly as its text says.</li>
+        <li>Happy with it? <b>Submit it for review</b> and the designer sees it in the review queue.</li>
+      </ol>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <p class="site-footer__version">Rules engine <span id="engineVersion" data-testid="engine-version">v—</span></p>
+  <p>Submitted cards are sent with the name and note you give and nothing else.</p>
+</footer>
+
+<div class="modal" id="submitModal" role="dialog" aria-modal="true" aria-labelledby="submitTitle" data-close-button="submitCancel">
+  <div class="modal-content">
+    <h2 class="modal-header" id="submitTitle">Submit for review</h2>
+    <div class="pm-fields">
+      <label class="pm-field"><span>Your name or handle <small>(optional)</small></span><input type="text" id="submitAuthor" maxlength="40"></label>
+      <label class="pm-field"><span>A note for the designer <small>(optional)</small></span><textarea id="submitNote" maxlength="500" rows="4"></textarea></label>
+    </div>
+    <p class="pm-note" id="submitResult" role="status" aria-live="polite"></p>
+    <div class="action-buttons">
+      <button class="btn btn--ghost" type="button" id="submitCancel">Cancel</button>
+      <button class="btn btn--marigold" type="button" id="submitSend">Send ▸</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+<script src="design/icons.js"></script>
+<script src="design/card-art.js"></script>
+<script src="design/cards.js"></script>
+<script src="design/a11y.js"></script>
+<script src="flags.js"></script>
+<script src="telemetry-client.js"></script>
+<script src="project-store.js"></script>
+<script src="engine/engine.browser.js"></script>
+<script src="project.js"></script>
+</body>
+</html>

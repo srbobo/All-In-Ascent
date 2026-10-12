@@ -27,6 +27,7 @@
     <a class="btn btn--ghost btn--sm" href="RULEBOOK.html" target="_blank" rel="noopener">Rulebook<span class="sr-only"> (opens in a new tab)</span></a>
     <a class="btn btn--ghost btn--sm" href="cards.html" target="_blank" rel="noopener">The deck<span class="sr-only"> (opens in a new tab)</span></a>
     <a class="btn btn--ghost btn--sm" href="online.html">Play online</a>
+    <a class="btn btn--ghost btn--sm" href="project.html" data-flag="projectMode" hidden>Project Mode</a>
   </nav>
   <div class="hero-tape-row" aria-hidden="true">
     <span class="tape tape--coral">Bouldering</span>
@@ -61,6 +62,7 @@
     <div id="characterSelection" class="setup-step paper" style="display: none;" aria-labelledby="pickTitle">
       <p class="eyebrow">Step 2 of 2</p>
       <h2 class="display-title" id="pickTitle">Pick your <em>climber.</em></h2>
+      <p class="project-mode-note" id="projectModeNote" data-testid="project-mode-note" hidden></p>
       <p class="pick-status" id="pickStatus" aria-live="polite"></p>
       <ul class="pick-roster" id="pickRoster" aria-label="Chosen climbers"></ul>
       <div class="character-select card-grid--climbers" id="characterSelect"></div>
@@ -199,7 +201,9 @@
 <script src="design/card-art.js"></script>
 <script src="design/cards.js"></script>
 <script src="design/a11y.js"></script>
+<script src="flags.js"></script>
 <script src="telemetry-client.js"></script>
+<script src="project-store.js"></script>
 <script src="online-mode.js"></script>
 <script src="effects.js"></script>
 <script src="game.js"></script>

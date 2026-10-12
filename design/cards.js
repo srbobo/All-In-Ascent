@@ -176,7 +176,7 @@
           </div>
           ${o.extra || ''}
           <footer class="aia-card__foot">
-            <span>${esc(o.setCode || setCodeFor(r, area))}</span>
+            <span>${esc(o.setCode || (r.custom ? 'AIA · PROJECT' : setCodeFor(r, area)))}</span>
             <span>${moves ? esc(moves) : esc(EDITION())}</span>
           </footer>
         </div>
@@ -223,7 +223,7 @@
           </div>
           ${prereq || access ? `<p class="aia-card__prereq">${icon('info')}<span>${esc([prereq, access].filter(Boolean).join(' · '))}</span></p>` : ''}
           <footer class="aia-card__foot">
-            <span>${esc(o.setCode || setCodeForGear(g))}</span>
+            <span>${esc(o.setCode || (g.custom ? 'AIA · PROJECT' : setCodeForGear(g)))}</span>
             <span>${esc(EDITION())}</span>
           </footer>
         </div>
@@ -241,9 +241,11 @@
   // ========================================================================
   // CLIMBER CARD
   // ========================================================================
+  // A custom climber (Project Mode) wears one of the printed portraits
+  // (c.portrait) and its chosen accent colour (c.accent).
   function climber(key, c, o = {}) {
     const id = `aia-card-${++uid}`;
-    const accent = Art().climberAccent(key);
+    const accent = c.accent || Art().climberAccent(key);
     const ab = c.specialAbility || {};
     const abText = String(ab.description || '').replace(/^PASSIVE:\s*/i, '');
     const passive = /^PASSIVE:/i.test(ab.description || '');
@@ -257,7 +259,7 @@
           </header>
           <h3 class="aia-card__name" id="${id}-name">${esc(c.name)}</h3>
           <div class="aia-card__art">
-            ${Art().climber(key)}
+            ${Art().climber(c.portrait || key)}
             ${reasonMarkup(id, o.action)}
             <span class="aia-card__endurance" title="Starting endurance">${icon('endurance')}<b>${c.startingEndurance ?? c.maxEndurance}</b><span class="sr-only"> starting endurance</span></span>
           </div>
@@ -268,7 +270,7 @@
             <p class="aia-rules__flavor">${esc(c.description)}</p>
           </div>
           <footer class="aia-card__foot">
-            <span>${esc(o.setCode || setCodeForClimber(key))}</span>
+            <span>${esc(o.setCode || (c.custom ? 'AIA · PROJECT' : setCodeForClimber(key)))}</span>
             <span>${esc(EDITION())}</span>
           </footer>
         </div>
