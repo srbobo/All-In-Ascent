@@ -146,7 +146,7 @@ function describePlayer(state, seat, { full }) {
 }
 
 function describeAbility(c) {
-  const a = { name: CHARACTERS[c.key].specialAbility.name, rules: abilityRules(c.key) };
+  const a = { name: (CHARACTERS[c.key] || c).specialAbility.name, rules: c.custom ? c.specialAbility.description : abilityRules(c.key) };
   if (c.key === 'routeReader') {
     a.betaBoostActive = !!c.betaBoostActive;
     a.statShiftAvailable = canUseStatShift(c, false);
@@ -185,8 +185,8 @@ function describeMilestone(state, seat, tier, plans = true) {
     tag: r.tag || null,
     requirements: pickStats(r),
     dice: describeDice(r),
-    time: getEffectiveClimbTimeCost(c, r.time, r, true),
-    endurance: getEffectiveClimbEnduranceCost(c, r, r.endurance),
+    time: getEffectiveClimbTimeCost(c, r.time, r, true, m.area),
+    endurance: getEffectiveClimbEnduranceCost(c, r, r.endurance, m.area, true),
     done: !!c.milestonesCompleted[tier],
   };
   if (out.done) return out;
@@ -340,15 +340,16 @@ function describeAction(state, seat, a, i, effects = true) {
 
 function climbNumbers(c, route, area, attempted, { isMilestone, shift }) {
   const { pSend } = climbSendProbability(c, route, area, attempted, { isMilestone, shift });
-  const xpSend = computeClimbXp(c, route, true);
-  const xpFall = computeClimbXp(c, route, false);
+  const climb = { route, area, isMilestone };
+  const xpSend = computeClimbXp(c, route, true, climb);
+  const xpFall = computeClimbXp(c, route, false, climb);
   return {
-    time: getEffectiveClimbTimeCost(c, route.time, route, isMilestone),
-    endurance: getEffectiveClimbEnduranceCost(c, route, route.endurance),
+    time: getEffectiveClimbTimeCost(c, route.time, route, isMilestone, area),
+    endurance: getEffectiveClimbEnduranceCost(c, route, route.endurance, area, isMilestone),
     pSend: round3(pSend),
     xp: { send: xpSend, fall: xpFall, expected: round3(pSend * xpSend + (1 - pSend) * xpFall) },
-    fallExtraEndurance: getFailureEnduranceExtra(c),
-    sendHeal: getSuccessEnduranceHeal(c),
+    fallExtraEndurance: getFailureEnduranceExtra(c, climb),
+    sendHeal: getSuccessEnduranceHeal(c, climb),
   };
 }
 

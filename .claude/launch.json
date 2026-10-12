@@ -31,6 +31,15 @@
         "8012"
       ],
       "port": 8012
+    },
+    {
+      "name": "e2e-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tests/e2e/serve.js",
+        "8123"
+      ],
+      "port": 8123
     }
   ]
 }

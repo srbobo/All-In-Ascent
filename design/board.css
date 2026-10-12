@@ -79,6 +79,8 @@ body::before {
 .site-header .eyebrow { color: rgba(244,237,224,0.78); margin-top: var(--sp-3); }
 .site-header .eyebrow::before { color: var(--coral); }
 .site-nav { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: flex-end; }
+/* Feature-flagged controls (flags.js data-flag) stay hidden whatever their display class. */
+[data-flag][hidden] { display: none !important; }
 .site-nav .btn--ghost { background: transparent; color: var(--chalk); border-color: rgba(244,237,224,0.7); box-shadow: none; }
 .site-nav .btn--ghost:hover { background: var(--chalk); color: var(--ink); }
 .hero-tape-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
@@ -438,6 +440,9 @@ main { padding: var(--sp-5) var(--gutter) var(--sp-7); }
 .dice-note { margin-top: var(--sp-2); font-size: var(--fs-sm); color: var(--ink-soft); }
 .effect-list { display: grid; gap: var(--sp-2); list-style: none; }
 .effect-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-weight: 600; }
+.effect-list.custom-rules li { flex-wrap: nowrap; align-items: flex-start; font-weight: 500; }
+.effect-list.custom-rules li > span { flex: 1 1 0; min-width: 0; }
+.effect-list.custom-rules .aia-icon { flex: 0 0 auto; margin-top: 0.15em; }
 .effect-list .aia-die-chip { font-size: var(--fs-2xs); }
 .req-table, .stat-table, .shift-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .req-table th, .req-table td, .stat-table th, .stat-table td, .shift-table th, .shift-table td { padding: var(--sp-2) var(--sp-3); text-align: left; border-bottom: 1px solid var(--rule); }

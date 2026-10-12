@@ -24,6 +24,25 @@
 //   `node engine/build-data.js` (run by the test/playtest scripts; standalone
 //   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
 //
+// 1.2.0 (2026-10-11): Project Mode — player-made content (engine/content.js).
+//   - createGame({ content }) accepts a compiled content pack: custom
+//     climbers, route cards and gear cards join the printed deck for that
+//     game (state.content), and a replay from seed + characters + content
+//     reproduces it.
+//   - Custom climbers and custom gear carry rules built from an element
+//     catalog (conditions: wall, Milestone, route type, tag, hold/move
+//     feature, grade band, route requirement, Level; effects: stat bonus,
+//     requirement change, Time/Endurance cost, XP, extra/ignored dice, fall
+//     penalty, heal on send, 3-of-4 sends, sure sends only, free Lead access,
+//     rest bonus, Beta Boost on rest, Grit/Time each round, training gain
+//     and cap, starting Grit, max Endurance). The helpers evaluate them at the
+//     same points the printed abilities act; climb_resolved reports the
+//     rules that applied (customRules).
+//   - Round-start Time is now computed from every card with
+//     statEffect 'timePerRound' (roundStartTime) instead of Approach Shoes by
+//     name — the same number for the printed deck.
+//   The standard game is unchanged: same outcomes, same RNG streams. Minor
+//   bump for the new content system (baselines from 1.1.x stay comparable).
 // 1.1.0 (2026-10-11): Grit is how the game is played.
 //   - Local and online play create every game with GRIT_RULES; the UI shows
 //     Grit on route cards, Milestone rewards, training costs, gear prices and
@@ -185,5 +204,5 @@
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-export const ENGINE_VERSION = { major: 1, minor: 1, patch: 0 };
+export const ENGINE_VERSION = { major: 1, minor: 2, patch: 0 };
 export const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;

@@ -135,6 +135,7 @@ For playability in digital format:
 - `engine/engine.browser.js` - The engine bundled for the browser (generated; do not edit)
 - `online-mode.js`, `online.html`, `party/` - Online play: browser client and PartyKit server
 - `dashboard.html`, `dashboard.js`, `telemetry-client.js`, `party/telemetry.js` - Designer telemetry: anonymous match records of finished games and the dashboard that reads them (see DEPLOY.md)
+- `project.html`, `project.js`, `project-store.js`, `engine/content.js`, `review.html`, `review.js`, `party/submissions.js`, `flags.js` - Project Mode (feature flag): the workshop where players build climbers, route cards and gear from rule elements, the review queue for submitted cards, and the feature flags
 - `sim/`, `analysis/` - Bot playtests and balance reports
 - `tests/e2e/` - Browser end-to-end tests
 
@@ -156,6 +157,42 @@ npm run data:build
 That regenerates `engine/data.js` (data for Node) and
 `engine/engine.browser.js` (the engine for the browser, which also works when
 `index.html` is opened from disk). Commit both.
+
+### Project Mode (feature flag)
+
+Project Mode lets players build their own **climbers, route cards and gear
+cards** and play them in local games. It is off by default and switched per
+browser:
+
+```bash
+# open the game with the flag on (remembered in that browser), or off
+open "index.html?projectMode=on"
+open "index.html?projectMode=off"
+```
+
+With the flag on, the game's header links to the workshop (`project.html`)
+and the setup screen offers the workshop's climbers next to the printed five.
+A card is a plain JSON definition: a climber's body (stats, Endurance, growth)
+plus **rules**, each `{ when: [conditions], then: [effects] }` built from the
+element catalog in `engine/content.js` (conditions: wall, Milestone, route
+type, tag, hold/move feature, grade band, route requirement, Level; effects:
+stat bonus, requirement change, Time/Endurance cost, XP, extra or ignored
+dice, fall penalty, heal on send, 3-of-4 sends, free Lead access, rest bonus,
+Beta Boost on rest, Grit/Time each round, training gain and cap, starting
+Grit, max Endurance). Route cards use the printed deck's own fields. Every
+card **compiles** against the engine (`compileCharacter` / `compileRoute` /
+`compileGear`): element parameters have ranges, a condition must be able to
+decide every effect it is attached to, names must not clash with the printed
+deck. `createGame({ content })` refuses a pack that does not compile, keeps
+the compiled pack on `state.content`, and the engine's helpers evaluate the
+rules at the same points the printed abilities act — so a replay from seed +
+characters + content reproduces the game, and `climb_resolved` reports the
+rules that applied. Games with workshop content are not recorded for
+telemetry.
+
+"Submit for review" posts the card to the `submissions` party
+(`party/submissions.js`); `review.html` is the designer's queue (see
+DEPLOY.md for its tokens). Online play does not use workshop content yet.
 
 ### Tests
 

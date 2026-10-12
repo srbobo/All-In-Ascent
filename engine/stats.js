@@ -13,8 +13,8 @@
 // level-up or a milestone send exactly where it happened; roundStarts maps
 // steps back to rounds for the axis.
 
-import { ROUTES } from './data.js';
 import { usesGrit } from './helpers.js';
+import { routesForArea } from './content.js';
 
 export const GAME_SUMMARY_SCHEMA = 'aia-game-summary/1';
 
@@ -27,8 +27,9 @@ export const SUMMARY_AREAS = ['bouldering', 'topRope', 'leadClimbing', 'mileston
 
 // A route's difficulty for "hardest send": the sum of its printed stat
 // requirements (V-grades and YDS grades can't be compared with each other).
-function routeDifficulty(area, routeName) {
-  const route = (ROUTES[area] || []).find(r => r.name === routeName);
+// Custom routes (state.content) count like printed ones.
+function routeDifficulty(state, area, routeName) {
+  const route = (routesForArea(state.content, area) || []).find(r => r.name === routeName);
   return route ? SUMMARY_STATS.reduce((sum, k) => sum + (route[k] || 0), 0) : 0;
 }
 
@@ -117,7 +118,7 @@ export function summarizeGame(state) {
           }
         }
         if (p.success) {
-          const d = routeDifficulty(p.area, p.routeName);
+          const d = routeDifficulty(state, p.area, p.routeName);
           if (s.hardestSend === null || d > bestDifficulty[p.playerNum]) {
             bestDifficulty[p.playerNum] = d;
             s.hardestSend = { routeName: p.routeName, grade: p.grade, area: p.area, isMilestone: !!p.isMilestone, round };

@@ -33,6 +33,14 @@ const browserGlobals = {
   renderGameBoard: 'readonly', // defined in game.js, called by online-mode.js
   // The rules engine, loaded after game.js as engine/engine.browser.js.
   AscentEngine: 'readonly',
+  // Feature flags (flags.js), the Project Mode workshop (project-store.js)
+  // and the telemetry client (telemetry-client.js), loaded before game.js.
+  AscentFlags: 'readonly',
+  AscentWorkshop: 'readonly',
+  AscentTelemetry: 'readonly',
+  URL: 'readonly',
+  Blob: 'readonly',
+  FileReader: 'readonly',
   structuredClone: 'readonly',
   // Grit & Holds design system (design/*.js), loaded before game.js.
   AIAArt: 'readonly',
@@ -97,7 +105,7 @@ export default [
   },
   {
     // Browser classic scripts — global scope, no modules.
-    files: ['game.js', 'effects.js', 'online-mode.js', 'telemetry-client.js', 'design/**/*.js'],
+    files: ['game.js', 'effects.js', 'online-mode.js', 'telemetry-client.js', 'flags.js', 'project-store.js', 'project.js', 'review.js', 'design/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'script',
@@ -145,6 +153,7 @@ export default [
         ...browserGlobals,
         getGameState: 'readonly',
         setGameState: 'readonly',
+        AscentProject: 'readonly',
       },
     },
     rules,

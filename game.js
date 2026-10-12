@@ -9,7 +9,7 @@
 // engine/ (loaded in the browser as engine/engine.browser.js). See the RULES
 // ENGINE BRIDGE section below and CLAUDE.md.
 // Rules version is kept in step with the Node engine (engine/version.js).
-const GAME_VERSION = '1.1.0';
+const GAME_VERSION = '1.2.0';
 if (typeof window !== 'undefined') window.GAME_VERSION = GAME_VERSION;
 
 // Footer: show the rules engine's version, read from the engine bundle
@@ -328,11 +328,54 @@ function checkAreaAccess(area) {
  return AscentEngine.checkAreaAccess(gameState.players[gameState.currentPlayerIndex].character, area);
 }
 
-// The current player's stats for a climb (base + training + gear), as the
-// engine computes them.
-function computeClimbStats(char, route, area) {
+// The current player's stats for a climb (base + training + gear + Project
+// Mode rules), as the engine computes them.
+function computeClimbStats(char, route, area, isMilestone = false) {
  const player = gameState.players.find(p => p.character === char) || uiCurrent();
- return AscentEngine.computeEffectiveStats(char, route, area, gameState.attemptedRoutes[player.playerNum]);
+ return AscentEngine.computeEffectiveStats(char, route, area, gameState.attemptedRoutes[player.playerNum], isMilestone);
+}
+
+// ===== PROJECT MODE (feature flag: projectMode) =====
+//
+// With the flag on, the player's workshop cards (project-store.js, built in
+// project.html) join the printed deck: custom climbers are offered on the
+// setup screen and the game is created with the content pack. The engine
+// compiles and plays them (engine/content.js); game.js only lists them.
+let projectContent = { pack: null, errors: [] };
+let projectCharacters = {};
+
+function projectModeOn() {
+ return !!(window.AscentFlags && window.AscentFlags.isOn('projectMode') && window.AscentWorkshop);
+}
+
+function loadProjectContent() {
+ projectContent = projectModeOn() ? AscentWorkshop.contentPack() : { pack: null, errors: [] };
+ projectCharacters = {};
+ if (projectContent.pack) {
+  const compiled = AscentEngine.compileContentPack(projectContent.pack);
+  if (compiled.ok) projectCharacters = compiled.value.characters;
+ }
+}
+
+// Every climber on the setup screen: the printed five, then the workshop's.
+function setupRoster() {
+ return { ...CHARACTERS, ...projectCharacters };
+}
+
+function renderProjectModeNote() {
+ const note = document.getElementById('projectModeNote');
+ if (!note) return;
+ if (!projectModeOn()) { note.hidden = true; return; }
+ note.hidden = false;
+ const pack = projectContent.pack;
+ const n = pack ? (pack.characters.length + pack.routes.length + pack.gear.length) : 0;
+ const broken = projectContent.errors.filter(e => e.kind !== 'pack');
+ const packProblem = projectContent.errors.find(e => e.kind === 'pack');
+ note.innerHTML = `<span class="aia-chip aia-chip--ink">Project Mode</span> `
+  + (n ? `${n} workshop card${n === 1 ? '' : 's'} in this game` : 'No workshop cards yet')
+  + (broken.length ? ` · <span class="pm-warn">${broken.length} card${broken.length === 1 ? '' : 's'} left out (won't compile)</span>` : '')
+  + (packProblem ? ` · <span class="pm-warn">workshop left out: ${uiEsc(packProblem.errors[0].message)}</span>` : '')
+  + ` · <a href="project.html">Open the workshop</a>`;
 }
 
 // ===== UI HELPERS (Grit & Holds v2 design system) =====
@@ -391,7 +434,9 @@ function uiBlocker(wanted) {
  case 'notEnoughGrit': return `Need ${r.need} Grit · you have ${r.have}`;
  case 'trainingCap': return `Capped at +${r.cap} ${r.stat} · level up to train more`;
  case 'trainingLimit': return `Already trained ${r.limit}× this round`;
- case 'lifeOrDie': return 'Life or Die · stats must meet every requirement';
+ case 'lifeOrDie': return uiCurrent().character.key === 'freeSolo'
+  ? 'Life or Die · stats must meet every requirement'
+  : 'Sure sends only · stats must meet every requirement';
  default: return r.message;
  }
 }
@@ -413,9 +458,9 @@ function renderMilestonePanel() {
   const reason = uiBlocker({ type: 'milestone', difficulty });
   const card = AIACards.route(milestone.route, {
    area: milestone.area,
-   costs: getClimbCosts(char, milestone.route),
+   costs: getClimbCosts(char, milestone.route, milestone.area, true),
    milestone: difficulty,
-   stats: computeClimbStats(char, milestone.route, milestone.area),
+   stats: computeClimbStats(char, milestone.route, milestone.area, true),
    grit: AscentEngine.usesGrit(gameState.rules) ? AscentEngine.milestoneGritReward(gameState.rules, difficulty) : undefined,
    status: sent ? 'Sent' : null,
    tone: sent ? 'done' : null,
@@ -447,6 +492,8 @@ function startCharacterSelect() {
 
  setupPlayerCount = numPlayers;
  setupCharacterKeys = [];
+ loadProjectContent();
+ renderProjectModeNote();
 
  const charSelectionDiv = document.getElementById('characterSelection');
  if (!charSelectionDiv) return;
@@ -486,8 +533,9 @@ function renderCharacterSelect() {
  const takenBy = new Map(setupCharacterKeys.map((key, i) => [key, i + 1]));
  const next = allChosen ? null : { playerNum: setupCharacterKeys.length + 1 };
 
- Object.keys(CHARACTERS).forEach(charKey => {
-  const char = CHARACTERS[charKey];
+ const roster = setupRoster();
+ Object.keys(roster).forEach(charKey => {
+  const char = roster[charKey];
   const by = takenBy.get(charKey);
   const card = AIACards.climber(charKey, char, {
    status: by ? `Player ${by}` : null,
@@ -502,6 +550,7 @@ function renderCharacterSelect() {
    },
   });
   card.classList.add('character-card');
+  if (char.custom) card.classList.add('character-card--custom');
   card.dataset.charKey = charKey;
   container.appendChild(card);
  });
@@ -513,10 +562,10 @@ function renderCharacterSelect() {
    ? `Player ${next.playerNum} of ${setupPlayerCount}, choose your climber.`
    : 'Everyone is roped in. Start climbing when ready.';
  }
- const roster = document.getElementById('pickRoster');
- if (roster) {
-  roster.innerHTML = setupCharacterKeys.map((key, i) =>
-   `<li><span class="aia-chip" style="background: var(--${uiPlayerColor(i + 1)}); color: var(--on-${uiPlayerColor(i + 1)});">P${i + 1}</span>${uiEsc(CHARACTERS[key].name)}</li>`).join('');
+ const picks = document.getElementById('pickRoster');
+ if (picks) {
+  picks.innerHTML = setupCharacterKeys.map((key, i) =>
+   `<li><span class="aia-chip" style="background: var(--${uiPlayerColor(i + 1)}); color: var(--on-${uiPlayerColor(i + 1)});">P${i + 1}</span>${uiEsc(roster[key].name)}</li>`).join('');
  }
 }
 
@@ -554,8 +603,12 @@ function startGame() {
  // The engine deals the milestones, walls and shop from a random seed. The
  // seed is logged so a local game can be replayed exactly.
  const seed = Math.floor(Math.random() * 2 ** 32);
- // Every game is played with the Grit rules (engine GRIT_RULES).
- gameState = AscentEngine.createGame({ seed, characterKeys: setupCharacterKeys, rules: AscentEngine.GRIT_RULES }).state;
+ // Every game is played with the Grit rules (engine GRIT_RULES). With Project
+ // Mode on, the workshop's content pack joins the deck.
+ gameState = AscentEngine.createGame({
+  seed, characterKeys: setupCharacterKeys, rules: AscentEngine.GRIT_RULES,
+  ...(projectContent.pack ? { content: projectContent.pack } : {}),
+ }).state;
  gameStartedAt = Date.now();
 
  renderGameBoard();
@@ -711,7 +764,7 @@ function renderPlayers() {
    : 100;
   const spendableXP = AscentEngine.getSpendableXp(char);
   const xpToGo = getXPToNextLevel(char);
-  const beta = char.betaBoostActive ? 3 : 0;
+  const beta = char.betaBoostActive ? AscentEngine.betaBoostAmount(char) : 0;
   // Grit rules: Grit is the currency (training + gear); XP only raises your Level.
   const grit = AscentEngine.usesGrit(gameState.rules);
   const cap = AscentEngine.trainingCap(gameState.rules, char);
@@ -751,7 +804,7 @@ function renderPlayers() {
   sheet.innerHTML = `
    ${isCurrent ? '<span class="tape ps-now" aria-hidden="true">On the wall</span>' : ''}
    <div class="ps-head">
-    <div class="ps-portrait">${window.AIAArt ? AIAArt.climber(char.key) : ''}</div>
+    <div class="ps-portrait">${window.AIAArt ? AIAArt.climber(char.portrait || char.key) : ''}</div>
     <div>
      <h3 class="ps-name" id="ps-name-${n}"><span class="ps-num">P${n}</span>${uiEsc(char.name)}${isCurrent ? '<span class="sr-only"> (current turn)</span>' : ''}</h3>
      <div class="ps-meta"><span>${uiEsc(char.archetype)}</span><span>${uiIcon('location')} ${uiEsc(formatLocationName(char.location))}</span></div>
@@ -794,7 +847,7 @@ function renderPlayers() {
     <summary>${uiEsc(char.specialAbility.name)} · ability &amp; bonuses</summary>
     <div class="drawer">
      <p>${uiEsc(char.specialAbility.description)}</p>
-     ${char.betaBoostActive ? '<p class="beta-note">Beta Boost active · +3 to all stats on your next climb</p>' : ''}
+     ${char.betaBoostActive ? `<p class="beta-note">Beta Boost active · +${beta} to all stats on your next climb</p>` : ''}
      ${bonuses ? `<ul>${bonuses}</ul>` : '<p>No training or gear bonuses yet.</p>'}
      <p>Total XP ${char.xp} · ${char.level < 15 ? `${xpToGo} to level ${char.level + 1}` : 'max level'}</p>
      ${grit ? `<p>${char.grit || 0} Grit · training capped at +${cap} per stat at level ${char.level}</p>` : ''}
@@ -922,7 +975,7 @@ function createRouteCard(route, area, idx, opts = {}) {
 
  const card = AIACards.route(route, {
  area,
- costs: getClimbCosts(char, route),
+ costs: getClimbCosts(char, route, area),
  stats: computeClimbStats(char, route, area),
  grit: AscentEngine.usesGrit(gameState.rules) ? (route.grit || 0) : undefined,
  status: alreadyAttempted ? 'Attempted' : (ownedGear.length ? '+Gear' : null),
@@ -1053,11 +1106,12 @@ function isLegalNow(wanted) {
  return !!AscentEngine.findLegalAction(legalActionsNow(), wanted);
 }
 
-// Time and endurance a climb costs this character (character passives and gear).
-function getClimbCosts(char, route) {
+// Time and endurance a climb costs this character (character passives, gear
+// and Project Mode rules).
+function getClimbCosts(char, route, area, isMilestone = false) {
  return {
- time: AscentEngine.getEffectiveClimbTimeCost(char, route.time, route),
- endurance: AscentEngine.getEffectiveClimbEnduranceCost(char, route, route.endurance),
+ time: AscentEngine.getEffectiveClimbTimeCost(char, route.time, route, isMilestone, area),
+ endurance: AscentEngine.getEffectiveClimbEnduranceCost(char, route, route.endurance, area, isMilestone),
  };
 }
 
@@ -1089,6 +1143,8 @@ function dispatchAction(wanted, afterRender = null) {
 // server instead. Every local seat is a human at this table.
 function recordLocalGame(state) {
  if (!window.AscentTelemetry) return;
+ // Games with workshop content are experiments, not balance data.
+ if (state.content) return;
  const record = AscentEngine.buildMatchRecord(state, {
  id: window.AscentTelemetry.newId('local'),
  mode: 'local',
@@ -1283,7 +1339,7 @@ function logEvent(before, e) {
  const p = e.payload;
  switch (e.type) {
  case 'ability_activated':
- addLog(p.ability === 'Beta Boost' ? 'Beta Boost: +3 to all stats this climb!' : `${p.ability}: ${p.effect}`);
+ addLog(p.ability === 'Beta Boost' ? `Beta Boost: ${p.effect}!` : `${p.ability}: ${p.effect}`);
  break;
  case 'climb_resolved': {
  if (!p.success && before.players.find(pl => pl.playerNum === p.playerNum)?.character.key === 'ironLung') {
@@ -1476,13 +1532,15 @@ function showClimbResultFromEvents(before, events) {
  });
  const versatility = events.some(e => e.type === 'ability_activated' && e.payload.ability === 'Versatility');
  showClimbResult(route, [...rolled.dice, ...rolled.discardedDice], rolled.dice, c.effectiveStats, c.requirements,
- diceEffects, c.success, c.xpGained, versatility ? 'Versatility' : null, c.gearEffects.map(formatGearEffect), c.gritGained || 0);
+ diceEffects, c.success, c.xpGained, versatility ? 'Versatility' : null, c.gearEffects.map(formatGearEffect), c.gritGained || 0,
+ c.customRules || []);
 }
 
 // `rolls` lists every die rolled; the first diceUsed.length are the ones
 // applied (any extras, e.g. a Power Tap Belt discard, are shown dimmed).
 // `gearNotes` describes each gear effect that changed this climb.
-function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, activatedAbility, gearNotes = [], gritGained = 0) {
+// `customRules` lists the Project Mode rules the engine applied ({ source, text }).
+function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffects, success, xpGained, activatedAbility, gearNotes = [], gritGained = 0, customRules = []) {
  const modal = document.getElementById('climbModal');
  const title = document.getElementById('modalTitle');
  const body = document.getElementById('modalBody');
@@ -1537,6 +1595,7 @@ function showClimbResult(route, rolls, diceUsed, stats, effectiveReqs, diceEffec
 
  ${effectsHTML ? `<section class="result-section" aria-labelledby="res-fx"><h3 id="res-fx">Dice effects</h3><ul class="effect-list">${effectsHTML}</ul></section>` : ''}
  ${gearNotes.length ? `<section class="result-section" aria-labelledby="res-gear"><h3 id="res-gear">Gear effects</h3><ul class="effect-list gear-effects">${gearNotes.map(n => `<li>${uiIcon('gear')}<span>${uiEsc(n)}</span></li>`).join('')}</ul></section>` : ''}
+ ${customRules.length ? `<section class="result-section" aria-labelledby="res-custom"><h3 id="res-custom">Project rules</h3><ul class="effect-list custom-rules" data-testid="custom-rules">${customRules.map(r => `<li>${uiIcon('climber')}<span><b>${uiEsc(r.source)}</b> — ${uiEsc(r.text)}</span></li>`).join('')}</ul></section>` : ''}
 
  <section class="result-section" aria-labelledby="res-req">
   <h3 id="res-req">Requirements check</h3>

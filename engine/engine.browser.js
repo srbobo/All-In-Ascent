@@ -1,4 +1,4 @@
-// AUTO-GENERATED FROM engine/{rng,telemetry,version,helpers,state,engine,stats,match-record}.js — DO NOT EDIT BY HAND.
+// AUTO-GENERATED FROM engine/{rng,telemetry,version,content,helpers,state,engine,stats,match-record}.js — DO NOT EDIT BY HAND.
 //
 // Regenerate with: node engine/build-browser.js
 // The rules engine as one classic script, so local play (game.js) runs the
@@ -171,6 +171,25 @@ const __version = (function () {
 //   `node engine/build-data.js` (run by the test/playtest scripts; standalone
 //   `npm run data:build` / `data:check`). Tooling/parity only — no rules change.
 //
+// 1.2.0 (2026-10-11): Project Mode — player-made content (engine/content.js).
+//   - createGame({ content }) accepts a compiled content pack: custom
+//     climbers, route cards and gear cards join the printed deck for that
+//     game (state.content), and a replay from seed + characters + content
+//     reproduces it.
+//   - Custom climbers and custom gear carry rules built from an element
+//     catalog (conditions: wall, Milestone, route type, tag, hold/move
+//     feature, grade band, route requirement, Level; effects: stat bonus,
+//     requirement change, Time/Endurance cost, XP, extra/ignored dice, fall
+//     penalty, heal on send, 3-of-4 sends, sure sends only, free Lead access,
+//     rest bonus, Beta Boost on rest, Grit/Time each round, training gain
+//     and cap, starting Grit, max Endurance). The helpers evaluate them at the
+//     same points the printed abilities act; climb_resolved reports the
+//     rules that applied (customRules).
+//   - Round-start Time is now computed from every card with
+//     statEffect 'timePerRound' (roundStartTime) instead of Approach Shoes by
+//     name — the same number for the printed deck.
+//   The standard game is unchanged: same outcomes, same RNG streams. Minor
+//   bump for the new content system (baselines from 1.1.x stay comparable).
 // 1.1.0 (2026-10-11): Grit is how the game is played.
 //   - Local and online play create every game with GRIT_RULES; the UI shows
 //     Grit on route cards, Milestone rewards, training costs, gear prices and
@@ -332,16 +351,825 @@ const __version = (function () {
 // 0.2.0 (2026-05-02): added 3 strength-friendly V0/V1 routes (Power Pulley,
 //   Open Door, Brute Start), lowered Beginner's Fortune Tech requirement
 //   20 → 15, raised default maxRounds 30 → 45.
-const ENGINE_VERSION = { major: 1, minor: 1, patch: 0 };
+const ENGINE_VERSION = { major: 1, minor: 2, patch: 0 };
 const ENGINE_VERSION_STRING = `${ENGINE_VERSION.major}.${ENGINE_VERSION.minor}.${ENGINE_VERSION.patch}`;
 
 return { ENGINE_VERSION, ENGINE_VERSION_STRING };
+})();
+
+// ---- engine/content.js ----
+const __content = (function () {
+'use strict';
+const { ROUTES, GEAR_SHOP, CHARACTERS } = __data;
+// Project Mode — player-made content: climbers, route cards and gear cards.
+//
+// This module is the rules language for custom content. A content pack is a
+// plain JSON object that a game is created with (createGame({ content })):
+//
+//   {
+//     schema: 'aia-content/1',
+//     characters: { [key]: CustomCharacter },      // key starts with "custom-"
+//     routes:     { bouldering: [...], topRope: [...], leadClimbing: [...] },
+//     gear:       [ CustomGear ],
+//   }
+//
+// Custom climbers and custom gear carry RULES — ordered lists of
+// { when: [condition...], then: [effect...] } built from the element catalog
+// below (CONDITIONS and EFFECTS). A rule's effects apply whenever every one
+// of its conditions holds. Routes are plain cards (requirements, dice, tags)
+// in the same shape as the printed deck.
+//
+// Two jobs:
+//   1. compile*(definition) → { ok, errors, value }
+//      Validates a definition element by element (unknown elements, missing or
+//      out-of-range parameters, conditions that cannot apply to an effect's
+//      scope, name clashes with the printed deck) and returns the normalized,
+//      engine-ready value with its rules text generated. Nothing reaches the
+//      engine without compiling clean: createGame refuses a pack with errors.
+//   2. ruleEffects / effectSum / hasEffect
+//      Evaluate a climber's active rules (its own, plus those of every custom
+//      gear card it owns) in a context — the engine's helpers call these at
+//      each point a printed ability acts (stats, requirements, dice, costs,
+//      XP, rest, training, round start). Scopes:
+//        climb     a climb attempt: { route, area, isMilestone }
+//        access    entering a wall: { area }
+//        rest      a rest action
+//        round     the start of a new round
+//        training  a training session: { stat }
+//        setup     game setup (unconditional)
+//
+// Everything here is pure and JSON-friendly; the browser bundle exposes it as
+// part of window.AscentEngine so the builder UI compiles with the same code.
+
+
+
+const CONTENT_SCHEMA = 'aia-content/1';
+const SUBMISSION_SCHEMA = 'aia-submission/1';
+const CONTENT_KINDS = ['character', 'route', 'gear'];
+
+const STATS = ['strength', 'technique', 'focus', 'flexibility'];
+const AREAS = ['bouldering', 'topRope', 'leadClimbing'];
+const AREA_LABELS = { bouldering: 'Bouldering', topRope: 'Top Rope', leadClimbing: 'Lead' };
+const STAT_LABELS = { strength: 'Strength', technique: 'Technique', focus: 'Focus', flexibility: 'Flexibility', all: 'every stat' };
+const ALL_STATS = [...STATS, 'all'];
+const OPS = ['<', '<=', '>', '>='];
+const BANDS = ['easy', 'mid', 'hard'];
+const BAND_LABELS = { easy: 'easy (V0–V2, 5.6–5.9)', mid: 'mid (V3–V7, 5.10–5.11)', hard: 'hard (V8+, 5.12+)' };
+
+// The deck's vocabulary, so a custom route only uses words the rules know.
+const YDS = ['5.6', '5.7', '5.8', '5.9', '5.10a', '5.10b', '5.10c', '5.10d', '5.11a', '5.11b', '5.11c', '5.11d',
+  '5.12a', '5.12b', '5.12c', '5.12d', '5.13a', '5.13b', '5.13c', '5.13d', '5.14a', '5.14b', '5.14c', '5.14d'];
+const ROUTE_VOCAB = Object.freeze({
+  grades: {
+    bouldering: Array.from({ length: 13 }, (_, i) => `V${i}`),
+    topRope: YDS,
+    leadClimbing: YDS,
+  },
+  routeTypes: ['Slab', 'Vertical', 'Overhang', 'Traverse'],
+  holdFeatures: ['Jugs', 'Pinch', 'Crimp', 'Sloper'],
+  moveFeatures: ['Toe Hook', 'Heel Hook', 'Dynamic', 'Dyno', 'Roof'],
+  tags: ['Pinch/Crimp', 'Toe/Heel Hook', 'Roof/Sloper', 'Dynamic'],
+});
+const GEAR_CATEGORIES = ['Essential Safety Gear', 'Strategy Gear', 'Specialized Gear', 'Recovery Gear', 'Comfort Gear', 'Training Equipment'];
+// Portraits a custom climber can wear (the printed climbers' art) and accents.
+const PORTRAITS = Object.keys(CHARACTERS);
+const ACCENTS = ['coral', 'teal', 'violet', 'marigold', 'raspberry', 'lime', 'cobalt'];
+
+const LIMITS = Object.freeze({
+  rulesPerCard: 8, conditionsPerRule: 4, effectsPerRule: 4,
+  charactersPerPack: 8, routesPerPack: 24, gearPerPack: 12,
+});
+
+// Grade band of a route: 0 easy (V0–V2, 5.6–5.9), 1 mid (V3–V7, 5.10–5.11),
+// 2 hard (V8+, 5.12+). helpers.js re-exports this as gradeBand.
+function gradeBandOf(route) {
+  const g = String((route && route.grade) || '');
+  if (g.startsWith('V')) {
+    const v = Number(g.slice(1));
+    return v <= 2 ? 0 : v <= 7 ? 1 : 2;
+  }
+  const m = g.match(/^5\.(\d+)/);
+  const yds = m ? Number(m[1]) : 0;
+  return yds <= 9 ? 0 : yds <= 11 ? 1 : 2;
+}
+
+function compare(a, op, b) {
+  if (typeof a !== 'number') return false;
+  switch (op) {
+    case '<': return a < b;
+    case '<=': return a <= b;
+    case '>': return a > b;
+    case '>=': return a >= b;
+    default: return false;
+  }
+}
+const OP_WORDS = { '<': 'under', '<=': 'at most', '>': 'over', '>=': 'at least' };
+
+// =============================================================================
+// ELEMENT CATALOG
+// =============================================================================
+// Parameter specs: { type: 'enum', options, labels?, default? } |
+// { type: 'int', min, max, nonzero?, default? } (`default` is what a builder
+// starts a new element with).
+// `scopes` lists where a condition can be tested; an effect has one `scope`.
+// `for` says which cards may carry the element. `text` words the element.
+
+const CONDITIONS = Object.freeze({
+  area: {
+    label: 'Wall', help: 'The climb is on this wall.',
+    scopes: ['climb', 'access'],
+    params: { value: { type: 'enum', options: AREAS, labels: AREA_LABELS } },
+    test: (c, ctx) => ctx.area === c.value,
+    text: (c) => `on ${AREA_LABELS[c.value]}`,
+  },
+  milestone: {
+    label: 'Milestone', help: 'Whether the climb is a Milestone attempt.',
+    scopes: ['climb'],
+    params: { value: { type: 'enum', options: ['yes', 'no'], labels: { yes: 'Milestone attempts', no: 'regular routes' } } },
+    test: (c, ctx) => (ctx.isMilestone ? 'yes' : 'no') === c.value,
+    text: (c) => (c.value === 'yes' ? 'on Milestone attempts' : 'on regular routes'),
+  },
+  routeType: {
+    label: 'Route type', help: 'Slab, Vertical, Overhang or Traverse.',
+    scopes: ['climb'],
+    params: { value: { type: 'enum', options: ROUTE_VOCAB.routeTypes } },
+    test: (c, ctx) => !!ctx.route && ctx.route.routeType === c.value,
+    text: (c) => `on ${c.value} routes`,
+  },
+  tag: {
+    label: 'Route tag', help: 'The specialty tag printed on the route.',
+    scopes: ['climb'],
+    params: { value: { type: 'enum', options: ROUTE_VOCAB.tags } },
+    test: (c, ctx) => !!ctx.route && ctx.route.tag === c.value,
+    text: (c) => `on ${c.value} routes`,
+  },
+  holdFeature: {
+    label: 'Hold feature', help: 'The route has this kind of hold.',
+    scopes: ['climb'],
+    params: { value: { type: 'enum', options: ROUTE_VOCAB.holdFeatures } },
+    test: (c, ctx) => !!ctx.route && (ctx.route.holdFeatures || []).includes(c.value),
+    text: (c) => `on routes with ${c.value}`,
+  },
+  moveFeature: {
+    label: 'Move feature', help: 'The route has this kind of move.',
+    scopes: ['climb'],
+    params: { value: { type: 'enum', options: ROUTE_VOCAB.moveFeatures } },
+    test: (c, ctx) => !!ctx.route && (ctx.route.moveFeatures || []).includes(c.value),
+    text: (c) => `on routes with a ${c.value}`,
+  },
+  gradeBand: {
+    label: 'Grade band', help: 'Easy, mid or hard grades.',
+    scopes: ['climb'],
+    params: { value: { type: 'enum', options: BANDS, labels: BAND_LABELS } },
+    test: (c, ctx) => !!ctx.route && BANDS[gradeBandOf(ctx.route)] === c.value,
+    text: (c) => `on ${BAND_LABELS[c.value]} routes`,
+  },
+  statRequirement: {
+    label: 'Route requirement', help: 'Compare one of the route\'s printed requirements with a number.',
+    scopes: ['climb'],
+    params: {
+      stat: { type: 'enum', options: STATS, labels: STAT_LABELS },
+      op: { type: 'enum', options: OPS, labels: OP_WORDS },
+      value: { type: 'int', min: 0, max: 120, default: 30 },
+    },
+    test: (c, ctx) => !!ctx.route && compare(ctx.route[c.stat], c.op, c.value),
+    text: (c) => `when the route needs ${OP_WORDS[c.op]} ${c.value} ${STAT_LABELS[c.stat]}`,
+  },
+  level: {
+    label: 'Your Level', help: 'Compare the climber\'s Level with a number.',
+    scopes: ['climb', 'access', 'rest', 'round', 'training'],
+    params: { op: { type: 'enum', options: OPS, labels: OP_WORDS, default: '>=' }, value: { type: 'int', min: 1, max: 15, default: 3 } },
+    test: (c, ctx, char) => compare(char.level, c.op, c.value),
+    text: (c) => `at Level ${OP_WORDS[c.op]} ${c.value}`,
+  },
+});
+
+const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
+
+const EFFECTS = Object.freeze({
+  statBonus: {
+    label: 'Stat bonus', help: 'Add to (or take from) a stat for the climb.',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { stat: { type: 'enum', options: ALL_STATS, labels: STAT_LABELS }, amount: { type: 'int', min: -20, max: 20, nonzero: true, default: 3 } },
+    text: (e) => `${signed(e.amount)} ${STAT_LABELS[e.stat]}`,
+  },
+  requirementChange: {
+    label: 'Requirement change', help: 'Change the route\'s requirement after the dice (negative = easier, floored at 0).',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { stat: { type: 'enum', options: ALL_STATS, labels: STAT_LABELS }, amount: { type: 'int', min: -20, max: 20, nonzero: true, default: -3 } },
+    text: (e) => `${e.stat === 'all' ? 'every requirement' : `the ${STAT_LABELS[e.stat]} requirement`} ${signed(e.amount)}`,
+  },
+  timeCost: {
+    label: 'Time cost', help: 'Change the Time a climb costs (never below 1).',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: -3, max: 3, nonzero: true, default: -1 } },
+    text: (e) => `the climb costs ${signed(e.amount)} Time (min 1)`,
+  },
+  enduranceCost: {
+    label: 'Endurance cost', help: 'Change the Endurance a climb costs (never below 0).',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: -30, max: 30, nonzero: true, default: -5 } },
+    text: (e) => `the climb costs ${signed(e.amount)} Endurance`,
+  },
+  enduranceCostScale: {
+    label: 'Endurance cost %', help: 'Scale the Endurance a climb costs (rounded up).',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { percent: { type: 'int', min: 25, max: 200, default: 75 } },
+    text: (e) => `the climb costs ${e.percent}% Endurance`,
+  },
+  xpScale: {
+    label: 'XP %', help: 'Scale the XP a climb earns.',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { percent: { type: 'int', min: 25, max: 300, default: 125 } },
+    text: (e) => `the climb earns ${e.percent}% XP`,
+  },
+  xpBonus: {
+    label: 'XP bonus', help: 'Flat XP on a send, a fall, or either.',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { on: { type: 'enum', options: ['send', 'fall', 'any'], labels: { send: 'a send', fall: 'a fall', any: 'any climb' } }, amount: { type: 'int', min: -50, max: 50, nonzero: true, default: 10 } },
+    text: (e) => `${signed(e.amount)} XP on ${{ send: 'a send', fall: 'a fall', any: 'every climb' }[e.on]}`,
+  },
+  extraDie: {
+    label: 'Extra die', help: 'Roll one more d6 on a stat: a buff die lowers its requirement, a nerf die raises it.',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { stat: { type: 'enum', options: STATS, labels: STAT_LABELS }, kind: { type: 'enum', options: ['buff', 'nerf'] } },
+    text: (e) => `roll an extra ${e.kind} die on ${STAT_LABELS[e.stat]}`,
+  },
+  negateDice: {
+    label: 'Ignore dice', help: 'Nerf dice, buff dice, or every die count for nothing.',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { kind: { type: 'enum', options: ['nerf', 'buff', 'all'], labels: { nerf: 'nerf dice', buff: 'buff dice', all: 'all dice' } } },
+    text: (e) => `ignore ${{ nerf: 'every nerf die', buff: 'every buff die', all: 'every die' }[e.kind]}`,
+  },
+  failPenalty: {
+    label: 'Fall penalty', help: 'Extra Endurance lost on a fall.',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: 1, max: 30, default: 5 } },
+    text: (e) => `a fall costs ${e.amount} extra Endurance`,
+  },
+  ignoreFailPenalty: {
+    label: 'No fall penalty', help: 'Falls cost no extra Endurance (from any source).',
+    scope: 'climb', for: ['character', 'gear'],
+    params: {},
+    text: () => 'falls cost no extra Endurance',
+  },
+  successHeal: {
+    label: 'Heal on send', help: 'Recover Endurance after a send (up to your maximum).',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: 1, max: 30, default: 5 } },
+    text: (e) => `a send restores ${e.amount} Endurance`,
+  },
+  threeOfFour: {
+    label: 'Send with 3 of 4', help: 'The climb sends when 3 stats pass and the 4th misses by at most this much.',
+    scope: 'climb', for: ['character', 'gear'],
+    params: { nearMiss: { type: 'int', min: 0, max: 20, default: 3 } },
+    text: (e) => `send with 3 of 4 stats if the 4th misses by at most ${e.nearMiss}`,
+  },
+  sureSendOnly: {
+    label: 'Sure sends only', help: 'May only start a climb whose printed requirements your stats (base, training, permanent gear) already meet.',
+    scope: 'climb', for: ['character'],
+    params: {},
+    text: () => 'may only attempt climbs whose printed requirements your stats already meet',
+  },
+  freeAccess: {
+    label: 'Free access', help: 'Climb Lead without the Lead system cards.',
+    scope: 'access', for: ['character', 'gear'],
+    params: {},
+    text: () => 'climb Lead without the Lead system',
+  },
+  restBonus: {
+    label: 'Rest bonus', help: 'Extra Endurance from every rest (may exceed your maximum).',
+    scope: 'rest', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: -20, max: 40, nonzero: true, default: 10 } },
+    text: (e) => `rest restores ${signed(e.amount)} Endurance`,
+  },
+  betaBoostOnRest: {
+    label: 'Beta Boost on rest', help: 'Resting grants a bonus to every stat on your next climb.',
+    scope: 'rest', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: 1, max: 10, default: 3 } },
+    text: (e) => `rest grants +${e.amount} to every stat on your next climb`,
+  },
+  gritPerRound: {
+    label: 'Grit each round', help: 'Grit gained at the start of every round after the first.',
+    scope: 'round', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: 1, max: 5, default: 1 } },
+    text: (e) => `gain ${e.amount} Grit at the start of every round`,
+  },
+  timePerRound: {
+    label: 'Time each round', help: 'Change the Time you start every round with.',
+    scope: 'round', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: -2, max: 3, nonzero: true, default: 1 } },
+    text: (e) => `start every round with ${signed(e.amount)} Time`,
+  },
+  trainingGain: {
+    label: 'Training gain', help: 'Change what a training session gives (one stat or every stat).',
+    scope: 'training', for: ['character', 'gear'],
+    params: { stat: { type: 'enum', options: ALL_STATS, labels: STAT_LABELS }, amount: { type: 'int', min: -4, max: 5, nonzero: true, default: 1 } },
+    text: (e) => `${e.stat === 'all' ? 'training sessions' : `${STAT_LABELS[e.stat]} training`} give${e.stat === 'all' ? '' : 's'} ${signed(e.amount)}`,
+  },
+  trainingCapBonus: {
+    label: 'Training cap', help: 'Raise the training cap in every stat.',
+    scope: 'training', for: ['character', 'gear'],
+    params: { amount: { type: 'int', min: 1, max: 20, default: 5 } },
+    text: (e) => `your training cap is +${e.amount} in every stat`,
+  },
+  gritStart: {
+    label: 'Starting Grit', help: 'Extra Grit at the start of the game.',
+    scope: 'setup', for: ['character'],
+    params: { amount: { type: 'int', min: 1, max: 10, default: 2 } },
+    text: (e) => `start the game with +${e.amount} Grit`,
+  },
+  maxEndurance: {
+    label: 'Max Endurance', help: 'Permanently change maximum Endurance while owned.',
+    scope: 'setup', for: ['gear'],
+    params: { amount: { type: 'int', min: -30, max: 40, nonzero: true, default: 10 } },
+    text: (e) => `${signed(e.amount)} max Endurance`,
+  },
+});
+
+const SCOPES = Object.freeze(['climb', 'access', 'rest', 'round', 'training', 'setup']);
+
+// =============================================================================
+// RULES TEXT
+// =============================================================================
+
+function describeCondition(c) {
+  const spec = CONDITIONS[c && c.type];
+  return spec ? spec.text(c) : '?';
+}
+
+function describeEffect(e) {
+  const spec = EFFECTS[e && e.type];
+  return spec ? spec.text(e) : '?';
+}
+
+// One sentence per rule: "On Overhang routes: +5 Strength, the climb costs
+// -1 Time (min 1)." Unconditional rules read "Always: …".
+function describeRule(rule) {
+  const when = (rule.when || []).map(describeCondition);
+  const then = (rule.then || []).map(describeEffect).join(', ');
+  const head = when.length ? when.join(' and ') : 'always';
+  const sentence = `${head.charAt(0).toUpperCase()}${head.slice(1)}: ${then}.`;
+  return sentence;
+}
+
+function describeRules(rules) {
+  return (rules || []).map(describeRule).join(' ');
+}
+
+// =============================================================================
+// COMPILING
+// =============================================================================
+
+const isInt = (v) => Number.isInteger(v);
+const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+const str = (v) => (typeof v === 'string' ? v.trim() : '');
+
+function makeErrors() {
+  const errors = [];
+  const at = (path, message) => { errors.push({ path, message }); };
+  return { errors, at };
+}
+
+function checkParam(spec, value) {
+  if (spec.type === 'enum') {
+    return spec.options.includes(value) ? null : `must be one of ${spec.options.join(', ')}`;
+  }
+  if (spec.type === 'int') {
+    if (!isInt(value)) return 'must be a whole number';
+    if (value < spec.min || value > spec.max) return `must be between ${spec.min} and ${spec.max}`;
+    if (spec.nonzero && value === 0) return 'must not be 0';
+    return null;
+  }
+  return 'unknown parameter type';
+}
+
+// Normalize one element (a condition or an effect) against `catalog`.
+function compileElement(catalog, raw, path, at) {
+  if (!raw || typeof raw !== 'object') { at(path, 'not an element'); return null; }
+  const spec = catalog[raw.type];
+  if (!spec) { at(`${path}.type`, `unknown element "${raw.type}"`); return null; }
+  const out = { type: raw.type };
+  let ok = true;
+  for (const [name, pspec] of Object.entries(spec.params)) {
+    const problem = checkParam(pspec, raw[name]);
+    if (problem) { at(`${path}.${name}`, `${spec.label}: ${name} ${problem}`); ok = false; }
+    else out[name] = raw[name];
+  }
+  return ok ? out : null;
+}
+
+// Normalize a rule list for a `kind` ('character' | 'gear').
+function compileRules(rawRules, kind, path, at) {
+  if (rawRules === undefined || rawRules === null) return [];
+  if (!Array.isArray(rawRules)) { at(path, 'rules must be a list'); return []; }
+  if (rawRules.length > LIMITS.rulesPerCard) at(path, `at most ${LIMITS.rulesPerCard} rules per card`);
+  const rules = [];
+  rawRules.slice(0, LIMITS.rulesPerCard).forEach((raw, i) => {
+    const rp = `${path}[${i}]`;
+    if (!raw || typeof raw !== 'object') { at(rp, 'not a rule'); return; }
+    const whenRaw = Array.isArray(raw.when) ? raw.when : (raw.when === undefined ? [] : null);
+    const thenRaw = Array.isArray(raw.then) ? raw.then : null;
+    if (whenRaw === null) { at(`${rp}.when`, 'conditions must be a list'); return; }
+    if (thenRaw === null) { at(`${rp}.then`, 'a rule needs a list of effects'); return; }
+    if (!thenRaw.length) { at(`${rp}.then`, 'a rule needs at least one effect'); return; }
+    if (whenRaw.length > LIMITS.conditionsPerRule) at(`${rp}.when`, `at most ${LIMITS.conditionsPerRule} conditions per rule`);
+    if (thenRaw.length > LIMITS.effectsPerRule) at(`${rp}.then`, `at most ${LIMITS.effectsPerRule} effects per rule`);
+    const when = whenRaw.slice(0, LIMITS.conditionsPerRule).map((c, j) => compileElement(CONDITIONS, c, `${rp}.when[${j}]`, at));
+    const then = thenRaw.slice(0, LIMITS.effectsPerRule).map((e, j) => compileElement(EFFECTS, e, `${rp}.then[${j}]`, at));
+    if (when.includes(null) || then.includes(null)) return;
+    // Every effect must be allowed on this kind of card, and every condition
+    // must be testable where every effect acts.
+    let valid = true;
+    then.forEach((e, j) => {
+      const spec = EFFECTS[e.type];
+      if (!spec.for.includes(kind)) { at(`${rp}.then[${j}]`, `${spec.label} can't go on a ${kind} card`); valid = false; }
+      when.forEach((c, k) => {
+        const cspec = CONDITIONS[c.type];
+        if (!cspec.scopes.includes(spec.scope)) {
+          at(`${rp}.when[${k}]`, `"${cspec.label}" can't decide "${spec.label}" (it only applies ${spec.scope === 'climb' ? 'to climbs' : `at ${spec.scope}`})`);
+          valid = false;
+        }
+      });
+    });
+    const types = then.map(e => e.type);
+    if (new Set(types).size !== types.length) { at(`${rp}.then`, 'the same effect twice in one rule — change its amount instead'); valid = false; }
+    if (valid) rules.push({ id: str(raw.id) || `r${i + 1}`, when, then });
+  });
+  return rules;
+}
+
+// djb2 over the JSON text, as base36: a short signature for memo keys.
+function rulesHash(rules) {
+  const s = JSON.stringify(rules || []);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+function slugKey(name) {
+  const slug = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+  return `custom-${slug || 'climber'}`;
+}
+
+const KEY_RE = /^custom-[a-z0-9-]{1,40}$/;
+
+function checkName(name, path, at, { min = 2, max = 40 } = {}) {
+  const n = str(name);
+  if (n.length < min || n.length > max) at(path, `name must be ${min}–${max} characters`);
+  return n;
+}
+
+function checkStatBlock(raw, path, at, min, max, label) {
+  const out = {};
+  for (const k of STATS) {
+    const v = raw && raw[k];
+    if (!isNum(v) || v < min || v > max) at(`${path}.${k}`, `${label} ${STAT_LABELS[k]} must be between ${min} and ${max}`);
+    else out[k] = v;
+  }
+  return out;
+}
+
+// --- Climbers ---------------------------------------------------------------
+
+const CHARACTER_LIMITS = Object.freeze({
+  stat: { min: 5, max: 40 }, statTotal: { min: 40, max: 90 },
+  endurance: { min: 50, max: 160 },
+  growth: { min: 0, max: 6, step: 0.5 }, enduranceGrowth: { min: 0, max: 12, step: 0.5 },
+});
+
+function compileCharacter(raw, path = 'character') {
+  const { errors, at } = makeErrors();
+  if (!raw || typeof raw !== 'object') { at(path, 'not a climber'); return { ok: false, errors, value: null }; }
+  const L = CHARACTER_LIMITS;
+  const name = checkName(raw.name, `${path}.name`, at);
+  const key = str(raw.key) || slugKey(name);
+  if (!KEY_RE.test(key)) at(`${path}.key`, 'key must start with "custom-" and use letters, digits and dashes');
+  if (CHARACTERS[key]) at(`${path}.key`, 'key clashes with a printed climber');
+  const archetype = str(raw.archetype).slice(0, 40) || 'Custom climber';
+  const description = str(raw.description).slice(0, 240);
+  const startingStats = checkStatBlock(raw.startingStats, `${path}.startingStats`, at, L.stat.min, L.stat.max, 'starting');
+  const total = STATS.reduce((t, k) => t + (startingStats[k] || 0), 0);
+  if (Object.keys(startingStats).length === 4 && (total < L.statTotal.min || total > L.statTotal.max)) {
+    at(`${path}.startingStats`, `starting stats must add up to ${L.statTotal.min}–${L.statTotal.max} (now ${total})`);
+  }
+  const startingEndurance = raw.startingEndurance;
+  if (!isInt(startingEndurance) || startingEndurance < L.endurance.min || startingEndurance > L.endurance.max) {
+    at(`${path}.startingEndurance`, `starting Endurance must be a whole number between ${L.endurance.min} and ${L.endurance.max}`);
+  }
+  const growth = {};
+  const g = raw.growth || {};
+  for (const k of [...STATS, 'endurance']) {
+    const lim = k === 'endurance' ? L.enduranceGrowth : L.growth;
+    const v = g[k];
+    if (!isNum(v) || v < lim.min || v > lim.max || Math.round(v / lim.step) * lim.step !== v) {
+      at(`${path}.growth.${k}`, `${k === 'endurance' ? 'Endurance' : STAT_LABELS[k]} growth must be ${lim.min}–${lim.max} in steps of ${lim.step}`);
+    } else growth[k] = v;
+  }
+  const rules = compileRules(raw.rules, 'character', `${path}.rules`, at);
+  const ability = raw.specialAbility || {};
+  const abilityName = str(ability.name).slice(0, 40) || 'House rules';
+  const portrait = PORTRAITS.includes(raw.portrait) ? raw.portrait : PORTRAITS[0];
+  const accent = ACCENTS.includes(raw.accent) ? raw.accent : 'cobalt';
+  if (errors.length) return { ok: false, errors, value: null };
+  const value = {
+    key, name, archetype, description, portrait, accent, custom: true,
+    startingStats, startingEndurance, growth,
+    specialAbility: {
+      name: abilityName,
+      description: rules.length ? describeRules(rules) : 'No special rules.',
+      used: false,
+    },
+    rules,
+    rulesHash: rulesHash(rules),
+  };
+  return { ok: true, errors, value };
+}
+
+// --- Routes -----------------------------------------------------------------
+
+const ROUTE_LIMITS = Object.freeze({
+  requirement: { min: 0, max: 99 }, time: { min: 1, max: 8 }, endurance: { min: 0, max: 100 },
+  xpSuccess: { min: 5, max: 150 }, xpFail: { min: 0, max: 150 }, dice: 4,
+});
+
+function compileRoute(raw, path = 'route') {
+  const { errors, at } = makeErrors();
+  if (!raw || typeof raw !== 'object') { at(path, 'not a route'); return { ok: false, errors, value: null }; }
+  const L = ROUTE_LIMITS;
+  const name = checkName(raw.name, `${path}.name`, at);
+  const area = AREAS.includes(raw.area) ? raw.area : null;
+  if (!area) at(`${path}.area`, `wall must be one of ${AREAS.join(', ')}`);
+  if (area && (ROUTES[area] || []).some(r => r.name === name)) at(`${path}.name`, `"${name}" is already a printed ${AREA_LABELS[area]} route`);
+  const grade = str(raw.grade);
+  if (area && !ROUTE_VOCAB.grades[area].includes(grade)) at(`${path}.grade`, `grade must be one of ${ROUTE_VOCAB.grades[area].join(', ')}`);
+  const reqs = checkStatBlock(raw, path, at, L.requirement.min, L.requirement.max, 'required');
+  const intIn = (field, lim, label) => {
+    const v = raw[field];
+    if (!isInt(v) || v < lim.min || v > lim.max) { at(`${path}.${field}`, `${label} must be a whole number between ${lim.min} and ${lim.max}`); return null; }
+    return v;
+  };
+  const time = intIn('time', L.time, 'Time');
+  const endurance = intIn('endurance', L.endurance, 'Endurance');
+  const xpSuccess = intIn('xpSuccess', L.xpSuccess, 'XP on a send');
+  const xpFail = intIn('xpFail', L.xpFail, 'XP on a fall');
+  if (xpSuccess !== null && xpFail !== null && xpFail > xpSuccess) at(`${path}.xpFail`, 'XP on a fall can\'t exceed XP on a send');
+  const rollEffect = [];
+  const dice = Array.isArray(raw.rollEffect) ? raw.rollEffect : (raw.rollEffect === undefined ? [] : null);
+  if (dice === null) at(`${path}.rollEffect`, 'dice must be a list');
+  else {
+    if (dice.length > L.dice) at(`${path}.rollEffect`, `at most ${L.dice} dice`);
+    dice.slice(0, L.dice).forEach((d, i) => {
+      if (!d || !STATS.includes(d.stat) || ![1, -1].includes(d.modifier)) at(`${path}.rollEffect[${i}]`, 'a die needs a stat and a modifier of -1 (buff) or 1 (nerf)');
+      else rollEffect.push({ stat: d.stat, modifier: d.modifier });
+    });
+  }
+  const routeType = ROUTE_VOCAB.routeTypes.includes(raw.routeType) ? raw.routeType : null;
+  if (!routeType) at(`${path}.routeType`, `route type must be one of ${ROUTE_VOCAB.routeTypes.join(', ')}`);
+  const listOf = (field, options) => {
+    const v = raw[field] === undefined ? [] : raw[field];
+    if (!Array.isArray(v) || v.some(x => !options.includes(x))) { at(`${path}.${field}`, `must only list ${options.join(', ')}`); return []; }
+    return [...new Set(v)];
+  };
+  const holdFeatures = listOf('holdFeatures', ROUTE_VOCAB.holdFeatures);
+  const moveFeatures = listOf('moveFeatures', ROUTE_VOCAB.moveFeatures);
+  const tag = raw.tag === null || raw.tag === undefined || raw.tag === '' ? null : raw.tag;
+  if (tag !== null && !ROUTE_VOCAB.tags.includes(tag)) at(`${path}.tag`, `tag must be one of ${ROUTE_VOCAB.tags.join(', ')} or none`);
+  if (errors.length) return { ok: false, errors, value: null };
+  const value = {
+    name, area, grade, ...reqs, time, endurance, xpSuccess, xpFail, rollEffect,
+    gearModifiers: [], routeType, holdFeatures, moveFeatures, tag, custom: true,
+  };
+  return { ok: true, errors, value };
+}
+
+// --- Gear -------------------------------------------------------------------
+
+const GEAR_LIMITS = Object.freeze({ cost: { min: 20, max: 300 }, gritCost: { min: 1, max: 12 }, level: { min: 1, max: 15 } });
+
+function compileGear(raw, path = 'gear') {
+  const { errors, at } = makeErrors();
+  if (!raw || typeof raw !== 'object') { at(path, 'not a gear card'); return { ok: false, errors, value: null }; }
+  const L = GEAR_LIMITS;
+  const name = checkName(raw.name, `${path}.name`, at);
+  if (GEAR_SHOP.some(g => g.name === name)) at(`${path}.name`, `"${name}" is already a printed gear card`);
+  const category = GEAR_CATEGORIES.includes(raw.category) ? raw.category : null;
+  if (!category) at(`${path}.category`, `category must be one of ${GEAR_CATEGORIES.join(', ')}`);
+  const cost = raw.cost;
+  if (!isInt(cost) || cost < L.cost.min || cost > L.cost.max) at(`${path}.cost`, `XP cost must be a whole number between ${L.cost.min} and ${L.cost.max}`);
+  const gritCost = raw.gritCost;
+  if (!isInt(gritCost) || gritCost < L.gritCost.min || gritCost > L.gritCost.max) at(`${path}.gritCost`, `Grit cost must be a whole number between ${L.gritCost.min} and ${L.gritCost.max}`);
+  const prerequisiteLevel = raw.prerequisiteLevel === undefined ? 1 : raw.prerequisiteLevel;
+  if (!isInt(prerequisiteLevel) || prerequisiteLevel < L.level.min || prerequisiteLevel > L.level.max) at(`${path}.prerequisiteLevel`, `required Level must be ${L.level.min}–${L.level.max}`);
+  const description = str(raw.description).slice(0, 160);
+  const rules = compileRules(raw.rules, 'gear', `${path}.rules`, at);
+  if (!errors.length && !rules.length) at(`${path}.rules`, 'a gear card needs at least one rule');
+  if (errors.length) return { ok: false, errors, value: null };
+  const value = {
+    name, category, cost, gritCost, description, prerequisiteLevel, custom: true,
+    effectDisplay: describeRules(rules),
+    rules, rulesHash: rulesHash(rules),
+    // The printed-card fields the engine's gear code reads, as a no-op card:
+    // every effect of a custom card comes from its rules.
+    statEffect: 'none', value: 0, routeFilter: [], holdFeatureFilter: [],
+    prerequisiteItems: [], accessRequirement: null, restBonus: 0,
+  };
+  return { ok: true, errors, value };
+}
+
+// --- Packs ------------------------------------------------------------------
+
+function emptyContentPack() {
+  return { schema: CONTENT_SCHEMA, characters: {}, routes: { bouldering: [], topRope: [], leadClimbing: [] }, gear: [] };
+}
+
+// Does this pack add anything to the printed deck?
+function hasCustomContent(pack) {
+  if (!pack || typeof pack !== 'object') return false;
+  return Object.keys(pack.characters || {}).length > 0 ||
+    AREAS.some(a => ((pack.routes || {})[a] || []).length > 0) ||
+    (pack.gear || []).length > 0;
+}
+
+// Compile a whole pack. Accepts characters as a list or a keyed object, and
+// routes as a flat list (each with an `area`) or by wall. Returns the
+// normalized pack (characters keyed, routes by wall) or the errors.
+function compileContentPack(raw) {
+  const { errors, at } = makeErrors();
+  const pack = emptyContentPack();
+  if (!raw || typeof raw !== 'object') { at('pack', 'not a content pack'); return { ok: false, errors, value: null }; }
+  if (raw.schema !== undefined && raw.schema !== CONTENT_SCHEMA) at('pack.schema', `unknown schema "${raw.schema}"`);
+  const chars = Array.isArray(raw.characters) ? raw.characters : Object.values(raw.characters || {});
+  if (chars.length > LIMITS.charactersPerPack) at('pack.characters', `at most ${LIMITS.charactersPerPack} climbers in a pack`);
+  chars.slice(0, LIMITS.charactersPerPack).forEach((c, i) => {
+    const r = compileCharacter(c, `characters[${i}]`);
+    errors.push(...r.errors);
+    if (!r.ok) return;
+    if (pack.characters[r.value.key]) at(`characters[${i}].key`, `two climbers share the key "${r.value.key}"`);
+    else pack.characters[r.value.key] = r.value;
+  });
+  const routes = Array.isArray(raw.routes) ? raw.routes
+    : AREAS.flatMap(a => ((raw.routes || {})[a] || []).map(r => ({ ...r, area: r.area || a })));
+  if (routes.length > LIMITS.routesPerPack) at('pack.routes', `at most ${LIMITS.routesPerPack} routes in a pack`);
+  routes.slice(0, LIMITS.routesPerPack).forEach((rt, i) => {
+    const r = compileRoute(rt, `routes[${i}]`);
+    errors.push(...r.errors);
+    if (!r.ok) return;
+    if (pack.routes[r.value.area].some(x => x.name === r.value.name)) at(`routes[${i}].name`, `two ${AREA_LABELS[r.value.area]} routes are called "${r.value.name}"`);
+    else pack.routes[r.value.area].push(r.value);
+  });
+  const gear = Array.isArray(raw.gear) ? raw.gear : Object.values(raw.gear || {});
+  if (gear.length > LIMITS.gearPerPack) at('pack.gear', `at most ${LIMITS.gearPerPack} gear cards in a pack`);
+  gear.slice(0, LIMITS.gearPerPack).forEach((g, i) => {
+    const r = compileGear(g, `gear[${i}]`);
+    errors.push(...r.errors);
+    if (!r.ok) return;
+    if (pack.gear.some(x => x.name === r.value.name)) at(`gear[${i}].name`, `two gear cards are called "${r.value.name}"`);
+    else pack.gear.push(r.value);
+  });
+  return { ok: errors.length === 0, errors, value: errors.length ? null : pack };
+}
+
+// =============================================================================
+// LOOKUPS — the printed deck plus a pack's additions
+// =============================================================================
+
+function characterTemplate(content, key) {
+  return CHARACTERS[key] || (content && content.characters && content.characters[key]) || null;
+}
+
+function routesForArea(content, area) {
+  const extra = content && content.routes && content.routes[area];
+  return extra && extra.length ? ROUTES[area].concat(extra) : ROUTES[area];
+}
+
+function allRoutes(content) {
+  const out = {};
+  for (const a of AREAS) out[a] = routesForArea(content, a);
+  return out;
+}
+
+function gearPool(content) {
+  const extra = content && content.gear;
+  return extra && extra.length ? GEAR_SHOP.concat(extra) : GEAR_SHOP;
+}
+
+// A gear card by name: the printed deck or the game's custom cards.
+function findGear(state, name) {
+  const inPrinted = GEAR_SHOP.find(g => g.name === name);
+  if (inPrinted) return inPrinted;
+  if (state && state.content && state.content.gear) {
+    const own = state.content.gear.find(g => g.name === name);
+    if (own) return own;
+  }
+  return null;
+}
+
+// =============================================================================
+// EVALUATION — a climber's active rules in a context
+// =============================================================================
+
+// The rule sets that act for `char`: its own custom rules and the rules of
+// every custom gear card it owns (copied onto the climber when bought). An
+// empty list for every printed climber without custom gear.
+function activeRules(char) {
+  if (!char) return [];
+  const out = [];
+  if (char.customRules && char.customRules.length) out.push({ source: char.name || char.key, rules: char.customRules });
+  for (const g of char.gearRules || []) out.push({ source: g.gear, rules: g.rules });
+  return out;
+}
+
+// Short signature of every rule acting on `char`, for memo keys.
+function rulesSignature(char) {
+  if (!char) return '';
+  const parts = [];
+  if (char.customRules && char.customRules.length) parts.push(char.rulesHash || rulesHash(char.customRules));
+  for (const g of char.gearRules || []) parts.push(g.hash || rulesHash(g.rules));
+  return parts.join('+');
+}
+
+function conditionsHold(rule, ctx, char) {
+  for (const c of rule.when || []) {
+    const spec = CONDITIONS[c.type];
+    if (!spec || !spec.test(c, ctx, char)) return false;
+  }
+  return true;
+}
+
+// Every effect of `type` whose rule applies in `ctx` (one entry per effect,
+// tagged with the card it came from and its rule).
+function ruleEffects(char, type, ctx = {}) {
+  const sets = activeRules(char);
+  if (!sets.length) return [];
+  const out = [];
+  for (const { source, rules } of sets) {
+    for (const rule of rules) {
+      let hit = null;
+      for (const e of rule.then || []) {
+        if (e.type !== type) continue;
+        if (hit === null) hit = conditionsHold(rule, ctx, char);
+        if (hit) out.push({ ...e, source, ruleId: rule.id });
+      }
+    }
+  }
+  return out;
+}
+
+function effectSum(char, type, ctx = {}, param = 'amount') {
+  let total = 0;
+  for (const e of ruleEffects(char, type, ctx)) total += e[param] || 0;
+  return total;
+}
+
+function hasEffect(char, type, ctx = {}) {
+  return ruleEffects(char, type, ctx).length > 0;
+}
+
+// The climb-scope rules that applied to a climb, worded for the climb result:
+// [{ source, ruleId, text }]. Read-only.
+function describeAppliedClimbRules(char, ctx) {
+  const out = [];
+  for (const { source, rules } of activeRules(char)) {
+    for (const rule of rules) {
+      if (!(rule.then || []).some(e => EFFECTS[e.type] && EFFECTS[e.type].scope === 'climb')) continue;
+      if (!conditionsHold(rule, ctx, char)) continue;
+      out.push({ source, ruleId: rule.id, text: describeRule({ ...rule, then: rule.then.filter(e => EFFECTS[e.type].scope === 'climb') }) });
+    }
+  }
+  return out;
+}
+
+// =============================================================================
+// SUBMISSIONS — a card sent for the designer's review
+// =============================================================================
+
+const SUBMISSION_STATUSES = ['new', 'approved', 'rejected'];
+
+// Check a submission the way the server does. Returns null when acceptable,
+// else a short reason. The definition must compile.
+function validateSubmission(sub) {
+  if (!sub || typeof sub !== 'object' || Array.isArray(sub)) return 'not an object';
+  if (sub.schema !== SUBMISSION_SCHEMA) return 'unknown schema';
+  if (typeof sub.id !== 'string' || !/^[\w.:-]{6,100}$/.test(sub.id)) return 'bad id';
+  if (!CONTENT_KINDS.includes(sub.kind)) return 'bad kind';
+  if (sub.author !== undefined && sub.author !== null && (typeof sub.author !== 'string' || sub.author.length > 40)) return 'bad author';
+  if (sub.note !== undefined && sub.note !== null && (typeof sub.note !== 'string' || sub.note.length > 500)) return 'bad note';
+  if (typeof sub.engineVersion !== 'string' || sub.engineVersion.length > 20) return 'bad engineVersion';
+  const compiled = sub.kind === 'character' ? compileCharacter(sub.definition)
+    : sub.kind === 'route' ? compileRoute(sub.definition) : compileGear(sub.definition);
+  if (!compiled.ok) return `does not compile: ${compiled.errors[0].message}`;
+  return null;
+}
+
+return { CONTENT_SCHEMA, SUBMISSION_SCHEMA, CONTENT_KINDS, STATS, AREAS, ROUTE_VOCAB, GEAR_CATEGORIES, PORTRAITS, ACCENTS, LIMITS, gradeBandOf, CONDITIONS, EFFECTS, SCOPES, describeCondition, describeEffect, describeRule, describeRules, compileRules, rulesHash, slugKey, CHARACTER_LIMITS, compileCharacter, ROUTE_LIMITS, compileRoute, GEAR_LIMITS, compileGear, emptyContentPack, hasCustomContent, compileContentPack, characterTemplate, routesForArea, allRoutes, gearPool, findGear, activeRules, rulesSignature, ruleEffects, effectSum, hasEffect, describeAppliedClimbRules, SUBMISSION_STATUSES, validateSubmission };
 })();
 
 // ---- engine/helpers.js ----
 const __helpers = (function () {
 'use strict';
 const { TRAINING_AREAS, GEAR_SHOP, XP_TABLE, CHARACTERS } = __data;
+const { gradeBandOf, ruleEffects, effectSum, hasEffect, rulesSignature } = __content;
 // Engine helpers: pure computations used by action handlers.
 //
 // Everything here is READ-ONLY unless the function name says otherwise.
@@ -360,6 +1188,15 @@ const { TRAINING_AREAS, GEAR_SHOP, XP_TABLE, CHARACTERS } = __data;
 
 
 
+
+// Project Mode (content.js): custom climbers and custom gear carry rules that
+// act at the same points as the printed abilities. Every hook below asks
+// ruleEffects / effectSum / hasEffect with a context; for a printed climber
+// without custom gear these return nothing and the helper plays exactly as
+// before. The climb context names the route, its wall and whether the attempt
+// is a Milestone, so a rule like "on Overhang routes, +5 Strength" can decide.
+const climbCtx = (route, area, isMilestone) => ({ scope: 'climb', route, area: area || null, isMilestone: !!isMilestone });
+
 // =============================================================================
 // AREA ACCESS (game.js:367-412)
 // =============================================================================
@@ -377,6 +1214,8 @@ function checkAreaAccess(char, area) {
   if (area === 'bouldering' || area === 'topRope') {
     return { hasAccess: true, missingItems: [] };
   }
+  // Custom rule: free access (no Lead system needed).
+  if (hasEffect(char, 'freeAccess', { scope: 'access', area })) return { hasAccess: true, missingItems: [] };
 
   const owned = new Set(char.equipment);
 
@@ -578,24 +1417,31 @@ function calculateGearBonuses(char, route, area, attemptedRoutesForPlayer) {
 // Combines base + training + permanent gear bonuses + per-route gear bonuses.
 // Does NOT apply character-ability overrides (Route Reader Beta Boost etc.) —
 // those are applied inside resolveClimbOutcome because they consume flags.
-function computeEffectiveStats(char, route, area, attemptedRoutesForPlayer) {
+// Custom rules (content.js) add their stat bonuses here too, so route cards,
+// previews and real climbs all show the same numbers; `isMilestone` tells a
+// Milestone-only rule whether it applies.
+function computeEffectiveStats(char, route, area, attemptedRoutesForPlayer, isMilestone = false) {
   const perRouteGear = calculateGearBonuses(char, route, area, attemptedRoutesForPlayer);
-  return {
+  const stats = {
     strength:    char.stats.strength    + char.trainingBonuses.strength    + char.gearBonuses.strength    + perRouteGear.strength,
     technique:   char.stats.technique   + char.trainingBonuses.technique   + char.gearBonuses.technique   + perRouteGear.technique,
     focus:       char.stats.focus       + char.trainingBonuses.focus       + char.gearBonuses.focus       + perRouteGear.focus,
     flexibility: char.stats.flexibility + char.trainingBonuses.flexibility + char.gearBonuses.flexibility + perRouteGear.flexibility,
   };
+  for (const e of ruleEffects(char, 'statBonus', climbCtx(route, area, isMilestone))) {
+    for (const k of (e.stat === 'all' ? STAT_KEYS : [e.stat])) stats[k] += e.amount;
+  }
+  return stats;
 }
 
 // Effective stats for one specific climb, exactly as the climb handler will
 // use them: computeEffectiveStats, plus Route Reader's Beta Boost (+3 all, if
 // active) and an optional stat shift. Read-only — it does NOT consume the
 // Beta Boost or the once-per-round shift; the climb handler does that.
-function computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift = null) {
-  let stats = computeEffectiveStats(char, route, area, attemptedRoutesForPlayer);
+function computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift = null, isMilestone = false) {
+  let stats = computeEffectiveStats(char, route, area, attemptedRoutesForPlayer, isMilestone);
   if (char.betaBoostActive) {
-    const b = abilityParam(char, 'betaBoost') ?? 3;
+    const b = betaBoostAmount(char);
     stats = {
       strength: stats.strength + b, technique: stats.technique + b,
       focus: stats.focus + b, flexibility: stats.flexibility + b,
@@ -603,6 +1449,13 @@ function computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift = 
   }
   if (shift) stats = applyStatShiftToStats(stats, shift);
   return stats;
+}
+
+// What an active Beta Boost adds to every stat: the Route Reader's printed
+// (or tuned) +3, or the amount a custom "Beta Boost on rest" rule granted.
+function betaBoostAmount(char) {
+  if (char.key === 'routeReader') return abilityParam(char, 'betaBoost') ?? 3;
+  return char.betaBoostAmount ?? 3;
 }
 
 // =============================================================================
@@ -635,8 +1488,14 @@ function abilityParam(char, name) {
 }
 
 // How many stats a climb needs, and how far a Route Reader's 4th may miss.
-function passRule(char, isMilestone = false) {
-  if (char.key !== 'routeReader') return { needed: 4, nearMiss: Infinity };
+// `ctx` (optional, { route, area }) lets a custom "send with 3 of 4" rule
+// decide for this climb.
+function passRule(char, isMilestone = false, ctx = null) {
+  if (char.key !== 'routeReader') {
+    const own = ctx ? ruleEffects(char, 'threeOfFour', climbCtx(ctx.route, ctx.area, isMilestone)) : [];
+    if (own.length) return { needed: 3, nearMiss: Math.max(...own.map(e => e.nearMiss)) };
+    return { needed: 4, nearMiss: Infinity };
+  }
   const all4 = (isMilestone && abilityParam(char, 'milestonePasses') === 4) ||
     (abilityParam(char, 'boostOnly') && !char.betaBoostActive);
   if (all4) return { needed: 4, nearMiss: Infinity };
@@ -652,7 +1511,8 @@ function passRule(char, isMilestone = false) {
 // Sprinter's "Flash Speed": -2 (min 1). Technician's "Perfect Beta": +1.
 // Engine v0.3.0 also applies gear effectKind 'timeCostReduction' for tagged routes
 // (Trick Foot Manual: Toe/Heel Hook climbs cost 1 less time).
-function getEffectiveClimbTimeCost(char, baseTime, route = null, isMilestone = false) {
+// `area` (optional) is the climb's wall, for custom rules that depend on it.
+function getEffectiveClimbTimeCost(char, baseTime, route = null, isMilestone = false, area = null) {
   let t = baseTime;
   if (char.key === 'sprinter') t = Math.max(1, t - abilityParam(char, 'timeReduction'));
   if (char.key === 'technician') {
@@ -670,21 +1530,34 @@ function getEffectiveClimbTimeCost(char, baseTime, route = null, isMilestone = f
       }
     }
   }
+  // Custom rules: Time cost changes, never below 1.
+  if (route) {
+    const delta = effectSum(char, 'timeCost', climbCtx(route, area, isMilestone));
+    if (delta) t = Math.max(1, t + delta);
+  }
   return t;
 }
 
 // Engine v0.3.0 — endurance cost adjustment based on gear that targets route tags.
 // Body Tension Belt halves endurance cost on Roof/Sloper routes.
-// Returns the modified endurance cost (rounded up).
-function getEffectiveClimbEnduranceCost(char, route, baseEndurance) {
-  if (!route || !route.tag) return baseEndurance;
+// Returns the modified endurance cost (rounded up). `area` and `isMilestone`
+// (optional) describe the climb for custom rules.
+function getEffectiveClimbEnduranceCost(char, route, baseEndurance, area = null, isMilestone = false) {
+  if (!route) return baseEndurance;
   let e = baseEndurance;
-  for (const gearName of char.equipment || []) {
-    const gear = GEAR_SHOP.find(g => g.name === gearName);
-    if (gear && gear.effectKind === 'enduranceHalvedOnTag' && gear.tagFilter === route.tag) {
-      e = Math.ceil(e / 2);
+  if (route.tag) {
+    for (const gearName of char.equipment || []) {
+      const gear = GEAR_SHOP.find(g => g.name === gearName);
+      if (gear && gear.effectKind === 'enduranceHalvedOnTag' && gear.tagFilter === route.tag) {
+        e = Math.ceil(e / 2);
+      }
     }
   }
+  // Custom rules: flat changes, then percentage scaling (rounded up), never below 0.
+  const ctx = climbCtx(route, area, isMilestone);
+  const delta = effectSum(char, 'enduranceCost', ctx);
+  if (delta) e = Math.max(0, e + delta);
+  for (const s of ruleEffects(char, 'enduranceCostScale', ctx)) e = Math.ceil(e * s.percent / 100);
   return e;
 }
 
@@ -727,21 +1600,33 @@ function getSpendableXp(char) {
 // Base: route.rollEffect (e.g. [{stat:'technique',modifier:-1}]).
 // Sprinter appends one extra {stat:'focus',modifier:+1} nerf die.
 // Returns a fresh array — does not mutate the route.
-function buildEffectRollArray(char, route) {
+// `area` / `isMilestone` (optional) describe the climb for custom "extra die"
+// rules; each adds one die tagged with its card as `source`.
+function buildEffectRollArray(char, route, area = null, isMilestone = false) {
   const effects = (route.rollEffect || []).map(e => ({ ...e }));
   if (char.key === 'sprinter' && abilityParam(char, 'focusCrux')) {
     effects.push({ stat: 'focus', modifier: 1, source: 'sprinter_flash_speed' });
+  }
+  for (const e of ruleEffects(char, 'extraDie', climbCtx(route, area, isMilestone))) {
+    effects.push({ stat: e.stat, modifier: e.kind === 'buff' ? -1 : 1, source: `custom:${e.source}` });
   }
   return effects;
 }
 
 // The modifier a die will actually apply for this character once character
 // overrides run (see applyDiceToRequirements): Free Solo negates every die,
-// Technician negates nerf dice. Used to decide which dice are worth improving.
-function effectiveDieModifier(char, effect) {
+// Technician negates nerf dice, and a custom "ignore dice" rule negates the
+// kind it names. Used to decide which dice are worth improving. `ctx` is the
+// climb context (climbCtx) when known.
+function effectiveDieModifier(char, effect, ctx = null) {
   if (!effect) return 0;
   if (char && char.key === 'freeSolo') return 0;
   if (char && char.key === 'technician' && effect.modifier === 1) return 0;
+  if (ctx) {
+    for (const e of ruleEffects(char, 'negateDice', ctx)) {
+      if (e.kind === 'all' || (e.kind === 'nerf' && effect.modifier === 1) || (e.kind === 'buff' && effect.modifier === -1)) return 0;
+    }
+  }
   return effect.modifier;
 }
 
@@ -782,25 +1667,26 @@ function effectiveDieModifier(char, effect) {
 //
 // Returns the final dice array. Use resolveClimbDice when you also need the
 // Mountain Mentor choice (pass it to applyDiceToRequirements as mentorIndex).
-function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilestone = false, trace = null, stats = null) {
-  return resolveClimbDice(() => rng.rollDie(6), effectRollArray, char, route, isMilestone, stats, trace).dice;
+function rollClimbDice(rng, effectRollArray, char = null, route = null, isMilestone = false, trace = null, stats = null, area = null) {
+  return resolveClimbDice(() => rng.rollDie(6), effectRollArray, char, route, isMilestone, stats, trace, area).dice;
 }
 
 // Shared dice procedure. `drawDie()` supplies each d6 (the engine passes the
 // game RNG; climbSendProbability passes scripted values to enumerate every
 // outcome exactly). Returns { dice, mentorIndex } where mentorIndex is the
-// nerf die Mountain Mentor ignores (null if none / not owned).
-function resolveClimbDice(drawDie, effectRollArray, char = null, route = null, isMilestone = false, stats = null, trace = null) {
+// nerf die Mountain Mentor ignores (null if none / not owned). `area` is the
+// climb's wall (for custom rules).
+function resolveClimbDice(drawDie, effectRollArray, char = null, route = null, isMilestone = false, stats = null, trace = null, area = null) {
   const numDice = Math.max(2, effectRollArray.length);
   const rolls = [];
   for (let i = 0; i < numDice; i++) rolls.push(drawDie());
-  return finishClimbDice(rolls, drawDie, effectRollArray, char, route, isMilestone, stats, trace);
+  return finishClimbDice(rolls, drawDie, effectRollArray, char, route, isMilestone, stats, trace, area);
 }
 
 // Everything after the initial roll. Split out so the probability enumerator
 // can supply the initial roll itself and only script the follow-up dice.
-function finishClimbDice(rolls, drawDie, effectRollArray, char, route, isMilestone, stats, trace = null) {
-  const ctx = makeDiceContext(effectRollArray, char, route, isMilestone, stats);
+function finishClimbDice(rolls, drawDie, effectRollArray, char, route, isMilestone, stats, trace = null, area = null) {
+  const ctx = makeDiceContext(effectRollArray, char, route, isMilestone, stats, area);
   const note = (gear, extra) => trace && trace.push({ gear: gear.name, effectKind: gear.effectKind, ...extra });
 
   if (ctx.reroll) {
@@ -829,7 +1715,7 @@ function finishClimbDice(rolls, drawDie, effectRollArray, char, route, isMilesto
   return { dice, mentorIndex };
 }
 
-function makeDiceContext(effects, char, route, isMilestone, stats) {
+function makeDiceContext(effects, char, route, isMilestone, stats, area = null) {
   const owned = (char && char.equipment ? char.equipment : [])
     .map(name => GEAR_SHOP.find(g => g.name === name))
     .filter(Boolean);
@@ -838,7 +1724,8 @@ function makeDiceContext(effects, char, route, isMilestone, stats) {
   const memo = find('treatOneDieAsValue', false);
   const coach = isMilestone ? find('milestoneBuffDiceBonus', false) : null;
   const n = effects.length;
-  const mods = effects.map(e => effectiveDieModifier(char, e));
+  const climb = climbCtx(route, area, isMilestone);
+  const mods = effects.map(e => effectiveDieModifier(char, e, climb));
   const mentor = !!find('negateOneNerfDie', false);
   // Dice whose value can change the outcome for this character.
   const live = mods.map((m, i) => (m !== 0 ? i : -1)).filter(i => i >= 0);
@@ -846,7 +1733,7 @@ function makeDiceContext(effects, char, route, isMilestone, stats) {
   // stat-blind choices leave it alone (it counts for nothing).
   const mentorDefault = mentor ? (live.find(i => mods[i] === 1) ?? null) : null;
   return {
-    char, route, effects, stats, n, mods, live, mentor, mentorDefault, isMilestone,
+    char, route, area, effects, stats, n, mods, live, mentor, mentorDefault, isMilestone,
     // Dice a stat-blind choice may pick: live, and not the one Mentor negates.
     pickable: stats ? live : live.filter(i => i !== mentorDefault),
     reroll: find('rerollOnTag', true) || null,
@@ -862,14 +1749,15 @@ function makeDiceContext(effects, char, route, isMilestone, stats) {
 // The deciding margin is the margin on the stat that settles the climb (the
 // worst stat, or the 3rd-best for a Route Reader). Higher is better.
 function scoreDice(ctx, dice, mentorIndex) {
-  const { requirements } = applyDiceToRequirements(ctx.char, ctx.route, ctx.effects, dice, { mentorIndex });
-  return scoreRequirements(ctx.char, ctx.stats, requirements, ctx.isMilestone);
+  const { requirements } = applyDiceToRequirements(ctx.char, ctx.route, ctx.effects, dice, { mentorIndex, area: ctx.area, isMilestone: ctx.isMilestone });
+  return scoreRequirements(ctx.char, ctx.stats, requirements, ctx.isMilestone, ctx);
 }
 
-// Same send rule as resolveClimbOutcome (passRule), as a score.
-function scoreRequirements(char, stats, requirements, isMilestone = false) {
+// Same send rule as resolveClimbOutcome (passRule), as a score. `ctx`
+// ({ route, area }) is the climb, for custom send rules.
+function scoreRequirements(char, stats, requirements, isMilestone = false, ctx = null) {
   const margins = STAT_KEYS.map(k => stats[k] - requirements[k]).sort((a, b) => b - a);
-  const { needed, nearMiss } = passRule(char, isMilestone);
+  const { needed, nearMiss } = passRule(char, isMilestone, ctx);
   const deciding = needed === 4 ? margins[3] : Math.min(margins[2], margins[3] + nearMiss);
   return [deciding >= 0 ? 1 : 0, deciding, margins[0] + margins[1] + margins[2] + margins[3]];
 }
@@ -997,16 +1885,21 @@ const STAT_KEYS = ['strength', 'technique', 'focus', 'flexibility'];
 // deciding margin (stat − requirement on the stat that settles the climb):
 // useful to rank options when pSend is 0 or 1.
 function climbSendProbability(char, route, area, attemptedRoutesForPlayer = {}, { isMilestone = false, shift = null } = {}) {
-  const stats = computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift);
+  const stats = computeClimbStats(char, route, area, attemptedRoutesForPlayer, shift, isMilestone);
   // Memoised: the result depends only on the character, its gear, the climb's
   // stats and the route — and bots ask about the same climbs every turn.
+  // Custom rules (the climber's and its custom gear's) are part of the key
+  // through their signature; a custom route is keyed by its printed numbers
+  // and features like any other, plus the wall for wall-dependent rules.
+  const sig = rulesSignature(char);
   const memoKey = `${char.key}|${char.equipment.join(',')}|${stats.strength},${stats.technique},${stats.focus},${stats.flexibility}|` +
     `${isMilestone ? 1 : 0}|${route.strength},${route.technique},${route.focus},${route.flexibility}|${route.tag || ''}|` +
     `${(route.rollEffect || []).map(e => `${e.stat}${e.modifier}`).join(',')}|` +
-    `${char.betaBoostActive ? 1 : 0}|${char.abilityParams ? JSON.stringify(char.abilityParams) : ''}`;
+    `${char.betaBoostActive ? 1 : 0}|${char.abilityParams ? JSON.stringify(char.abilityParams) : ''}` +
+    (sig ? `|${sig}|${area}|${route.name}|${route.grade}|${route.routeType}|${(route.holdFeatures || []).join('/')}|${(route.moveFeatures || []).join('/')}|${char.level}` : '');
   const hit = SEND_MEMO.get(memoKey);
   if (hit) return { ...hit, stats };
-  const result = exactSendProbability(char, route, isMilestone, stats);
+  const result = exactSendProbability(char, route, isMilestone, stats, area);
   if (SEND_MEMO.size > 50000) SEND_MEMO.clear();
   SEND_MEMO.set(memoKey, result);
   return { ...result, stats };
@@ -1014,9 +1907,10 @@ function climbSendProbability(char, route, area, attemptedRoutesForPlayer = {}, 
 
 const SEND_MEMO = new Map();
 
-function exactSendProbability(char, route, isMilestone, stats) {
-  const effects = buildEffectRollArray(char, route);
-  const live = effects.map((e, i) => (effectiveDieModifier(char, e) !== 0 ? i : -1)).filter(i => i >= 0);
+function exactSendProbability(char, route, isMilestone, stats, area = null) {
+  const climb = climbCtx(route, area, isMilestone);
+  const effects = buildEffectRollArray(char, route, area, isMilestone);
+  const live = effects.map((e, i) => (effectiveDieModifier(char, e, climb) !== 0 ? i : -1)).filter(i => i >= 0);
   const base = new Array(Math.max(2, effects.length)).fill(1);
   const combos = 6 ** live.length;
   let pSend = 0;
@@ -1027,9 +1921,9 @@ function exactSendProbability(char, route, isMilestone, stats) {
     for (const i of live) { rolls[i] = (c % 6) + 1; c = Math.floor(c / 6); }
     enumerateFollowUpDraws(
       (draw) => {
-        const res = finishClimbDice(rolls.slice(), draw, effects, char, route, isMilestone, stats);
-        const { requirements } = applyDiceToRequirements(char, route, effects, res.dice, { mentorIndex: res.mentorIndex });
-        return scoreRequirements(char, stats, requirements, isMilestone);
+        const res = finishClimbDice(rolls.slice(), draw, effects, char, route, isMilestone, stats, null, area);
+        const { requirements } = applyDiceToRequirements(char, route, effects, res.dice, { mentorIndex: res.mentorIndex, area, isMilestone });
+        return scoreRequirements(char, stats, requirements, isMilestone, climb);
       },
       (score, weight) => {
         pSend += (score[0] * weight) / combos;
@@ -1080,6 +1974,8 @@ function enumerateFollowUpDraws(run, emit) {
 // Returns { requirements, appliedModifiers }
 //   appliedModifiers = array of {die, stat, modifier, deltaApplied, source}
 //   for telemetry. modifier is the POST-override value actually applied.
+// `opts.area` / `opts.isMilestone` describe the climb for custom rules
+// (ignored dice, requirement changes).
 function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts = {}) {
   const requirements = {
     strength: route.strength,
@@ -1088,6 +1984,7 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts =
     flexibility: route.flexibility,
   };
   const appliedModifiers = [];
+  const climb = climbCtx(route, opts.area, opts.isMilestone);
 
   const hasMentor = (char.equipment || []).some(name => {
     const g = GEAR_SHOP.find(x => x.name === name);
@@ -1098,7 +1995,7 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts =
     if (opts.mentorIndex !== undefined) {
       mentorIndex = opts.mentorIndex;
     } else {
-      const first = effectRollArray.findIndex(e => effectiveDieModifier(char, e) === 1);
+      const first = effectRollArray.findIndex(e => effectiveDieModifier(char, e, climb) === 1);
       mentorIndex = first === -1 ? null : first;
     }
   }
@@ -1106,7 +2003,7 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts =
   for (let i = 0; i < effectRollArray.length; i++) {
     const effect = effectRollArray[i];
     const die = diceRolls[i] ?? 0;
-    let effectiveMod = effectiveDieModifier(char, effect);
+    let effectiveMod = effectiveDieModifier(char, effect, climb);
     // Mountain Mentor — the chosen nerf die counts as 0.
     if (effectiveMod === 1 && i === mentorIndex) effectiveMod = 0;
 
@@ -1132,6 +2029,10 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts =
       requirements[k] = Math.max(0, requirements[k] - cut);
     }
   }
+  // Custom rules: requirement changes (negative = easier), floored at 0.
+  for (const e of ruleEffects(char, 'requirementChange', climb)) {
+    for (const k of (e.stat === 'all' ? STAT_KEYS : [e.stat])) requirements[k] = Math.max(0, requirements[k] + e.amount);
+  }
   return { requirements, appliedModifiers };
 }
 
@@ -1143,7 +2044,8 @@ function applyDiceToRequirements(char, route, effectRollArray, diceRolls, opts =
 // Route Reader's "Versatility" passive: succeeds if 3 of 4 stats pass.
 // All other characters: must pass all 4.
 // Returns { success, perStatPass }.
-function resolveClimbOutcome(char, effectiveStats, requirements, isMilestone = false) {
+// `ctx` (optional, { route, area }) is the climb, for custom send rules.
+function resolveClimbOutcome(char, effectiveStats, requirements, isMilestone = false, ctx = null) {
   const perStatPass = {
     strength:    effectiveStats.strength    >= requirements.strength,
     technique:   effectiveStats.technique   >= requirements.technique,
@@ -1151,7 +2053,7 @@ function resolveClimbOutcome(char, effectiveStats, requirements, isMilestone = f
     flexibility: effectiveStats.flexibility >= requirements.flexibility,
   };
   const passCount = Object.values(perStatPass).filter(Boolean).length;
-  const { needed, nearMiss } = passRule(char, isMilestone);
+  const { needed, nearMiss } = passRule(char, isMilestone, ctx);
   let success = passCount >= needed;
   // A Route Reader's one failing stat may have to be a near miss (variant).
   if (success && passCount < 4 && Number.isFinite(nearMiss)) {
@@ -1169,9 +2071,13 @@ function resolveClimbOutcome(char, effectiveStats, requirements, isMilestone = f
 //   Adds a flat +N XP to every failed climb.
 //
 // Returns an integer (floored).
-function computeClimbXp(char, route, success) {
+// `ctx` (optional, { area, isMilestone }) describes the climb for custom XP
+// rules (XP %, XP bonus).
+function computeClimbXp(char, route, success, ctx = null) {
   const base = success ? route.xpSuccess : route.xpFail;
   let xp = base * getXpMultiplier(char);
+  const climb = ctx ? climbCtx(route, ctx.area, ctx.isMilestone) : null;
+  if (climb) for (const e of ruleEffects(char, 'xpScale', climb)) xp *= e.percent / 100;
   if (!success && char.key === 'ironLung') {
     xp += Math.floor(xp * abilityParam(char, 'failXpBonus'));
   }
@@ -1182,28 +2088,40 @@ function computeClimbXp(char, route, success) {
       if (gear && gear.effectKind === 'failBonusXp') xp += (gear.value || 0);
     }
   }
-  return Math.floor(xp);
+  if (climb) {
+    for (const e of ruleEffects(char, 'xpBonus', climb)) {
+      if (e.on === 'any' || (e.on === 'send' && success) || (e.on === 'fall' && !success)) xp += e.amount;
+    }
+  }
+  return Math.max(0, Math.floor(xp));
 }
 
 // Iron Lung "Relentless": extra 5 endurance cost on failure.
 // Engine v0.3.0 gear effect (ignoreFailPenalty / Mental Anchor): ignores the penalty.
-function getFailureEnduranceExtra(char) {
+// `ctx` (optional, { route, area, isMilestone }) is the climb for custom rules
+// (fall penalty, no fall penalty).
+function getFailureEnduranceExtra(char, ctx = null) {
+  const climb = ctx ? climbCtx(ctx.route, ctx.area, ctx.isMilestone) : null;
   // Mental Anchor — bypass even Iron Lung's −5 fail penalty
   for (const gearName of char.equipment || []) {
     const gear = GEAR_SHOP.find(g => g.name === gearName);
     if (gear && gear.effectKind === 'ignoreFailPenalty') return 0;
   }
-  return char.key === 'ironLung' ? abilityParam(char, 'failEndurance') : 0;
+  if (climb && hasEffect(char, 'ignoreFailPenalty', climb)) return 0;
+  const base = char.key === 'ironLung' ? abilityParam(char, 'failEndurance') : 0;
+  return base + (climb ? effectSum(char, 'failPenalty', climb) : 0);
 }
 
 // Engine v0.3.0 — Power Spotting heals endurance after every successful climb.
-// Returns the amount to heal (0 if no such gear owned).
-function getSuccessEnduranceHeal(char) {
+// Returns the amount to heal (0 if no such gear owned). `ctx` (optional,
+// { route, area, isMilestone }) is the climb for custom "heal on send" rules.
+function getSuccessEnduranceHeal(char, ctx = null) {
   let heal = 0;
   for (const gearName of char.equipment || []) {
     const gear = GEAR_SHOP.find(g => g.name === gearName);
     if (gear && gear.effectKind === 'successHealEndurance') heal += (gear.value || 0);
   }
+  if (ctx) heal += effectSum(char, 'successHeal', climbCtx(ctx.route, ctx.area, ctx.isMilestone));
   return heal;
 }
 
@@ -1242,16 +2160,18 @@ const CLIMB_GEAR_EFFECT_KINDS = Object.freeze([
 // `diceTrace` is the trace from rollClimbDice; `appliedModifiers` comes from
 // applyDiceToRequirements.
 function describeClimbGearEffects({
-  char, route, effectRollArray, diceTrace, appliedModifiers, success, timeCost, enduranceCost, healed, isMilestone = false,
+  char, route, effectRollArray, diceTrace, appliedModifiers, success, timeCost, enduranceCost, healed, isMilestone = false, area = null,
 }) {
   const out = [];
   const names = (kind) => ownedGearWithEffect(char, kind).map(g => g.name).join(', ');
+  const climb = climbCtx(route, area, isMilestone);
 
-  const charOnlyTime = getEffectiveClimbTimeCost(char, route.time, null, isMilestone);
-  if (timeCost < charOnlyTime) {
+  // Printed-gear cost effects only; custom rules report through climb_resolved's customRules.
+  const charOnlyTime = getEffectiveClimbTimeCost(char, route.time, null, isMilestone) + effectSum(char, 'timeCost', climb);
+  if (timeCost < charOnlyTime && ownedGearWithEffect(char, 'timeCostReduction').length) {
     out.push({ gear: names('timeCostReduction'), effectKind: 'timeCostReduction', from: charOnlyTime, to: timeCost });
   }
-  if (enduranceCost < route.endurance) {
+  if (enduranceCost < route.endurance && ownedGearWithEffect(char, 'enduranceHalvedOnTag').some(g => g.tagFilter === route.tag)) {
     out.push({ gear: names('enduranceHalvedOnTag'), effectKind: 'enduranceHalvedOnTag', from: route.endurance, to: enduranceCost });
   }
   for (const t of diceTrace) {
@@ -1261,7 +2181,7 @@ function describeClimbGearEffects({
   const mentor = ownedGearWithEffect(char, 'negateOneNerfDie')[0];
   if (mentor) {
     effectRollArray.forEach((effect, i) => {
-      if (effectiveDieModifier(char, effect) === 1 && appliedModifiers[i] && appliedModifiers[i].modifier === 0) {
+      if (effectiveDieModifier(char, effect, climb) === 1 && appliedModifiers[i] && appliedModifiers[i].modifier === 0) {
         out.push({ gear: mentor.name, effectKind: 'negateOneNerfDie', die: i, value: appliedModifiers[i].die, stat: effect.stat });
       }
     });
@@ -1336,10 +2256,15 @@ function getTrainingBonusBoost(char) {
 // Time, Endurance and stat gain of one session at `area` for `char`.
 function trainingSpec(rules, area, char) {
   const r = rules || {};
+  // Custom rules: training gain for this stat (or every stat).
+  let custom = 0;
+  for (const e of ruleEffects(char, 'trainingGain', { scope: 'training', stat: area.stat })) {
+    if (e.stat === 'all' || e.stat === area.stat) custom += e.amount;
+  }
   return {
     time: r.trainTime ?? area.time,
     endurance: Math.round(area.endurance * (r.trainEnduranceMult ?? 1)),
-    gain: (r.trainBonus ?? area.bonus) + getTrainingBonusBoost(char),
+    gain: Math.max(1, (r.trainBonus ?? area.bonus) + getTrainingBonusBoost(char) + custom),
   };
 }
 
@@ -1349,8 +2274,8 @@ function trainingCap(rules, char) {
   if (r.trainCapBase === undefined || r.trainCapBase === null) return Infinity;
   const own = (r.characters && r.characters[char.key]) || {};
   if (own.uncapped) return Infinity;
-  // Hangboard Program (trainingCapBonus) raises the cap.
-  let bonus = 0;
+  // Hangboard Program (trainingCapBonus) raises the cap; so do custom rules.
+  let bonus = effectSum(char, 'trainingCapBonus', { scope: 'training' });
   for (const n of char.equipment || []) {
     const g = GEAR_SHOP.find(x => x.name === n);
     if (g && g.effectKind === 'trainingCapBonus') bonus += g.value || 0;
@@ -1408,17 +2333,8 @@ function usesGrit(rules) {
 }
 
 // Grade band of a route: 0 easy (V0–V2, 5.6–5.9), 1 mid (V3–V7, 5.10–5.11),
-// 2 hard (V8+, 5.12+).
-function gradeBand(route) {
-  const g = String(route.grade || '');
-  if (g.startsWith('V')) {
-    const v = Number(g.slice(1));
-    return v <= 2 ? 0 : v <= 7 ? 1 : 2;
-  }
-  const m = g.match(/^5\.(\d+)/);
-  const yds = m ? Number(m[1]) : 0;
-  return yds <= 9 ? 0 : yds <= 11 ? 1 : 2;
-}
+// 2 hard (V8+, 5.12+). Defined in content.js (custom rules use it too).
+const gradeBand = gradeBandOf;
 
 // Grit a freshly dealt route card carries.
 function routeGritValue(rules, route) {
@@ -1511,8 +2427,10 @@ function ownsEffect(char, kind) {
 //   toward the guarantee. Per-route gear bonuses (situational discounts
 //   like Crimp Sequence Decoder's tag re-roll) still do NOT count — those
 //   are climb-time effects, not "do I have the strength" capabilities.
-function freeSoloCanAttempt(char, route) {
-  if (char.key !== 'freeSolo') return true;
+// A custom "sure sends only" rule gates the same way; `area` / `isMilestone`
+// (optional) describe the climb for its conditions.
+function freeSoloCanAttempt(char, route, area = null, isMilestone = false) {
+  if (char.key !== 'freeSolo' && !hasEffect(char, 'sureSendOnly', climbCtx(route, area, isMilestone))) return true;
   const get = (s) =>
     char.stats[s] +
     (char.trainingBonuses?.[s] || 0) +
@@ -1621,7 +2539,8 @@ function bestRouteReaderShift(char, route, area, attemptedRoutesForPlayer, isMil
 // at (maxEndurance + restBonus). The cap lets rest-bonus gear push you
 // ABOVE max. Somewhat unusual but matches game.js.
 function computeRestRecovery(char) {
-  let restBonus = 0;
+  // Custom rules: rest bonus (the climber's and its custom gear's).
+  let restBonus = effectSum(char, 'restBonus', { scope: 'rest' });
   for (const name of char.equipment) {
     const g = GEAR_SHOP.find(x => x.name === name);
     if (g && typeof g.restBonus === 'number') restBonus += g.restBonus;
@@ -1640,7 +2559,8 @@ function computeRestRecovery(char) {
 // Level-up recomputes maxEndurance from the growth formula, so this has to be
 // added back or the gear bonus would vanish at the next level.
 function getGearMaxEnduranceBonus(char) {
-  let bonus = 0;
+  // Custom gear: its "max Endurance" rules (unconditional, setup scope).
+  let bonus = effectSum(char, 'maxEndurance', { scope: 'setup' });
   for (const name of char.equipment || []) {
     const g = GEAR_SHOP.find(x => x.name === name);
     if (!g) continue;
@@ -1648,6 +2568,19 @@ function getGearMaxEnduranceBonus(char) {
     if (typeof g.enduranceBonus === 'number') bonus += g.enduranceBonus;
   }
   return bonus;
+}
+
+// Time a climber starts each round with: 10, plus every owned card that
+// adds Time at round start (Approach Shoes), plus custom "Time each round"
+// rules. Never below 1.
+function roundStartTime(char) {
+  let t = 10;
+  for (const name of char.equipment || []) {
+    const g = GEAR_SHOP.find(x => x.name === name);
+    if (g && g.statEffect === 'timePerRound') t += g.value || 0;
+  }
+  t += effectSum(char, 'timePerRound', { scope: 'round' });
+  return Math.max(1, t);
 }
 
 // If the character's cumulative XP has crossed the next-level threshold,
@@ -1660,8 +2593,9 @@ function applyLevelUpIfNeeded(char) {
   if (char.xp < nextRow.cumulative) return { leveledUp: false };
 
   // The climber's own body numbers (a rules variant may have adjusted them at
-  // setup — rules.characters[key].body), else the character template's.
-  const base = CHARACTERS[char.key];
+  // setup — rules.characters[key].body; a custom climber always carries its
+  // own), else the character template's.
+  const base = CHARACTERS[char.key] || {};
   const tmpl = {
     startingStats: char.startingStats || base.startingStats,
     startingEndurance: char.startingEndurance ?? base.startingEndurance,
@@ -1812,17 +2746,18 @@ function dispatchToolCall(legalActions, toolCall) {
   }
 }
 
-return { checkAreaAccess, getSectionCapacity, getOccupiedBelayerStations, isBelayerStationFree, canClimbTopRopeRoute, pickFreeBelayerStation, isTrainingEquipment, getPlayersInSection, canEnterSection, calculateGearBonuses, computeEffectiveStats, computeClimbStats, DEFAULT_ABILITY, abilityParam, passRule, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, getXpMultiplier, getGearPurchaseTimeCost, getEffectiveGearCost, getSpendableXp, buildEffectRollArray, rollClimbDice, resolveClimbDice, climbSendProbability, applyDiceToRequirements, resolveClimbOutcome, computeClimbXp, getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal, CLIMB_GEAR_EFFECT_KINDS, describeClimbGearEffects, getTrainingBonusBoost, trainingSpec, trainingCap, trainingAllowed, GRIT_RULES, perRoundGrit, startingGrit, usesGrit, gradeBand, routeGritValue, dealRouteGrit, milestoneGritReward, trainingGritCost, gearPrice, gearFunds, payForGear, gearInGame, claimClimbGrit, freeSoloCanAttempt, applyBetaBoostIfActive, MAX_STAT_SHIFT, isWellFormedStatShift, canUseStatShift, applyStatShiftToStats, bestRouteReaderShift, computeRestRecovery, getGearMaxEnduranceBonus, applyLevelUpIfNeeded, dispatchToolCall };
+return { checkAreaAccess, getSectionCapacity, getOccupiedBelayerStations, isBelayerStationFree, canClimbTopRopeRoute, pickFreeBelayerStation, isTrainingEquipment, getPlayersInSection, canEnterSection, calculateGearBonuses, computeEffectiveStats, computeClimbStats, betaBoostAmount, DEFAULT_ABILITY, abilityParam, passRule, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, getXpMultiplier, getGearPurchaseTimeCost, getEffectiveGearCost, getSpendableXp, buildEffectRollArray, rollClimbDice, resolveClimbDice, climbSendProbability, applyDiceToRequirements, resolveClimbOutcome, computeClimbXp, getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal, CLIMB_GEAR_EFFECT_KINDS, describeClimbGearEffects, getTrainingBonusBoost, trainingSpec, trainingCap, trainingAllowed, GRIT_RULES, perRoundGrit, startingGrit, usesGrit, gradeBand, routeGritValue, dealRouteGrit, milestoneGritReward, trainingGritCost, gearPrice, gearFunds, payForGear, gearInGame, claimClimbGrit, freeSoloCanAttempt, applyBetaBoostIfActive, MAX_STAT_SHIFT, isWellFormedStatShift, canUseStatShift, applyStatShiftToStats, bestRouteReaderShift, computeRestRecovery, getGearMaxEnduranceBonus, roundStartTime, applyLevelUpIfNeeded, dispatchToolCall };
 })();
 
 // ---- engine/state.js ----
 const __state = (function () {
 'use strict';
-const { ROUTES, GEAR_SHOP, CHARACTERS } = __data;
+const { ROUTES } = __data;
 const { createRng } = __rng;
 const { makeEmitter } = __telemetry;
 const { ENGINE_VERSION_STRING } = __version;
 const { dealRouteGrit, gearInGame, startingGrit, usesGrit } = __helpers;
+const { compileContentPack, hasCustomContent, characterTemplate, routesForArea, gearPool, effectSum } = __content;
 // Game state factory.
 //
 // Responsibilities:
@@ -1840,6 +2775,7 @@ const { dealRouteGrit, gearInGame, startingGrit, usesGrit } = __helpers;
 //   state.attemptedRoutes is a PLAIN OBJECT, not a Set, so the whole state
 //   object serializes cleanly to JSON. Keys look like "bouldering:Crux Problem"
 //   and values are true. This matches the Set-based semantics from game.js.
+
 
 
 
@@ -1866,16 +2802,17 @@ function belayerCountFor(playerCount) {
   return Math.max(1, playerCount - 1);
 }
 
-// The routes of `area` that may be dealt to the wall: the area's deck minus
-// this game's milestone routes. Milestone cards sit on the milestone board for
-// the whole game, so they never also appear as a regular route.
-function regularRoutePool(milestoneRoutes, area) {
+// The routes of `area` that may be dealt to the wall: the area's deck (plus
+// the game's custom routes, `content`) minus this game's milestone routes.
+// Milestone cards sit on the milestone board for the whole game, so they
+// never also appear as a regular route.
+function regularRoutePool(milestoneRoutes, area, content = null) {
   const milestoneNames = new Set(
     Object.values(milestoneRoutes || {})
       .filter(m => m && m.area === area)
       .map(m => m.route.name),
   );
-  return ROUTES[area].filter(r => !milestoneNames.has(r.name));
+  return routesForArea(content, area).filter(r => !milestoneNames.has(r.name));
 }
 
 // Draw the Top Rope rotation as N belayer stations of ROUTES_PER_BELAYER routes
@@ -1894,7 +2831,11 @@ function drawTopRopeStations(rng, belayerCount, pool = ROUTES.topRope) {
 
 // `rules` (optional): balance-experiment overrides, stored on the state as
 // state.rules — see trainingSpec in helpers.js. Omit for the standard rules.
-function createGame({ seed, characterKeys, rules = null }) {
+// `content` (optional): a Project Mode content pack (content.js) — custom
+// climbers, route cards and gear cards added to the printed deck for this
+// game. It must compile; the normalized pack is stored as state.content so a
+// replay from the state's seed, characters and content reproduces the game.
+function createGame({ seed, characterKeys, rules = null, content = null }) {
   // Validate inputs up front — these are the pipeline's guarantees,
   // so a bad input is a programming bug, not runtime noise.
   if (!Array.isArray(characterKeys) || characterKeys.length < 1 || characterKeys.length > 4) {
@@ -1904,8 +2845,16 @@ function createGame({ seed, characterKeys, rules = null }) {
     // Per playtest design decision (2026-04-21): no duplicate characters in a game.
     throw new Error('duplicate character keys are not allowed');
   }
+  let pack = null;
+  if (content && hasCustomContent(content)) {
+    const compiled = compileContentPack(content);
+    if (!compiled.ok) {
+      throw new Error(`content pack does not compile: ${compiled.errors.map(e => `${e.path}: ${e.message}`).join('; ')}`);
+    }
+    pack = compiled.value;
+  }
   for (const key of characterKeys) {
-    if (!CHARACTERS[key]) throw new Error(`unknown character key: ${key}`);
+    if (!characterTemplate(pack, key)) throw new Error(`unknown character key: ${key}`);
   }
   if (typeof seed !== 'number' || !Number.isFinite(seed)) {
     throw new Error('seed must be a finite number');
@@ -1915,9 +2864,14 @@ function createGame({ seed, characterKeys, rules = null }) {
   const emitter = makeEmitter(0);
 
   // Build players.
-  const players = characterKeys.map((key, i) => makePlayer(i + 1, key));
-  // Grit economy: every climber starts with rules.grit.start Grit.
-  if (usesGrit(rules)) players.forEach((p, i) => { p.character.grit = startingGrit(rules, p.character.key, i); });
+  const players = characterKeys.map((key, i) => makePlayer(i + 1, key, pack));
+  // Grit economy: every climber starts with rules.grit.start Grit (plus a
+  // custom climber's "starting Grit" rules).
+  if (usesGrit(rules)) {
+    players.forEach((p, i) => {
+      p.character.grit = startingGrit(rules, p.character.key, i) + effectSum(p.character, 'gritStart', { scope: 'setup' });
+    });
+  }
   // Rules-variant ability tuning (rules.characters[key].ability), copied onto
   // the climber so every helper sees it (abilityParam in helpers.js), and body
   // tuning (rules.characters[key].body: startingStats / startingEndurance /
@@ -1935,20 +2889,20 @@ function createGame({ seed, characterKeys, rules = null }) {
 
   // Pick milestone routes FIRST (matches game.js:773 ordering — milestones
   // are selected before the per-area route rotation is drawn).
-  const milestones = pickMilestoneRoutes(rng);
+  const milestones = pickMilestoneRoutes(rng, pack);
 
   // Draw the opening rotation. Bouldering and Lead keep a flat list of 5;
   // Top Rope is split into belayerCount stations of 2 routes each.
   // Milestone routes are excluded from every wall's deck.
   // Grit-economy rules place Grit on every card as it is dealt.
   const availableRoutes = {
-    bouldering: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'bouldering'), 5)),
-    topRope: dealRouteGrit(rules, drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope'))),
-    leadClimbing: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'leadClimbing'), 5)),
+    bouldering: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'bouldering', pack), 5)),
+    topRope: dealRouteGrit(rules, drawTopRopeStations(rng, belayerCount, regularRoutePool(milestones, 'topRope', pack))),
+    leadClimbing: dealRouteGrit(rules, rng.pickN(regularRoutePool(milestones, 'leadClimbing', pack), 5)),
   };
 
   // Draw 3 non-access-card items for the shop rotation.
-  const availableGear = initializeGearShop(rng, rules);
+  const availableGear = initializeGearShop(rng, rules, pack);
 
   // Seed per-player attempt tracking.
   const attemptedRoutes = {};
@@ -1976,6 +2930,8 @@ function createGame({ seed, characterKeys, rules = null }) {
     belayerCount,
     attemptedRoutes,
     ...(rules ? { rules: { ...rules } } : {}),
+    // Project Mode: the compiled content pack this game is played with.
+    ...(pack ? { content: pack } : {}),
     gameEnded: false,
     winner: null,
     pendingLevelUp: null,
@@ -2001,7 +2957,9 @@ function createGame({ seed, characterKeys, rules = null }) {
       startingStats: { ...p.character.stats },
       startingEndurance: p.character.maxEndurance,
       specialAbility: p.character.specialAbility.name,
+      ...(p.character.custom ? { custom: true } : {}),
     })),
+    ...(pack ? { customContent: { characters: Object.keys(pack.characters), routes: Object.values(pack.routes).flat().map(r => r.name), gear: pack.gear.map(g => g.name) } } : {}),
     milestoneRoutes: serializeMilestones(milestones),
     // Top Rope belayer-station count for this game (players − 1).
     belayerCount,
@@ -2042,11 +3000,18 @@ function applyBody(c, body) {
   c.currentEndurance = c.startingEndurance;
 }
 
-function makePlayer(playerNum, characterKey) {
-  const tmpl = CHARACTERS[characterKey];
+function makePlayer(playerNum, characterKey, content = null) {
+  const tmpl = characterTemplate(content, characterKey);
   // Deep-clone so the per-player `specialAbility.used` flag (and any
   // future per-player mutation) doesn't bleed into the shared template.
   const charBase = JSON.parse(JSON.stringify(tmpl));
+  // A custom climber's rules act through content.js activeRules; the
+  // template's `rules` list moves to `customRules` so it can't be mistaken for
+  // the game's rules variant.
+  if (charBase.custom) {
+    charBase.customRules = charBase.rules;
+    delete charBase.rules;
+  }
   return {
     playerNum,
     character: {
@@ -2091,14 +3056,15 @@ function makePlayer(playerNum, characterKey) {
 // beginner, one intermediate, one expert — solving the "3-expert / 3-beginner
 // bad draw" problem that plagued v0.3.x.
 //
-// Grade-to-bucket mapping mirrors game.js:523-545 exactly.
-function pickMilestoneRoutes(rng) {
+// Grade-to-bucket mapping mirrors game.js:523-545 exactly. Custom routes
+// (`content`) are candidates like any printed card.
+function pickMilestoneRoutes(rng, content = null) {
   const beginner = [];
   const intermediate = [];
   const expert = [];
 
   for (const area of Object.keys(ROUTES)) {
-    for (const route of ROUTES[area]) {
+    for (const route of routesForArea(content, area)) {
       const { grade } = route;
       // Bouldering V-grade buckets.
       if (['V0', 'V1', 'V2'].includes(grade)) {
@@ -2171,9 +3137,10 @@ function pickMilestoneRoutes(rng) {
 
 // Initialize the 3-slot random gear shop. Access cards are handled
 // separately (they're always available for purchase, not rotated in).
-function initializeGearShop(rng, rules = null) {
+function initializeGearShop(rng, rules = null, content = null) {
   // Variant-only cards are dealt only when their rules variant is in play.
-  const nonAccessGear = GEAR_SHOP.filter(g => !ACCESS_CARDS.includes(g.name) && gearInGame(rules, g));
+  // Custom gear (`content`) joins the rotation deck.
+  const nonAccessGear = gearPool(content).filter(g => !ACCESS_CARDS.includes(g.name) && gearInGame(rules, g));
   return rng.pickN(nonAccessGear, 3);
 }
 
@@ -2225,7 +3192,8 @@ const { GEAR_SHOP, TRAINING_AREAS } = __data;
 const { createRng } = __rng;
 const { makeEmitter } = __telemetry;
 const { ACCESS_CARDS, drawTopRopeStations, regularRoutePool } = __state;
-const { checkAreaAccess, canEnterSection, getPlayersInSection, canClimbTopRopeRoute, pickFreeBelayerStation, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, getGearPurchaseTimeCost, getSpendableXp, buildEffectRollArray, resolveClimbDice, computeClimbStats, applyDiceToRequirements, resolveClimbOutcome, computeClimbXp, getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal, describeClimbGearEffects, freeSoloCanAttempt, trainingSpec, trainingAllowed, trainingCap, usesGrit, trainingGritCost, gearFunds, gearPrice, payForGear, claimClimbGrit, dealRouteGrit, gearInGame, perRoundGrit, abilityParam, computeRestRecovery, applyLevelUpIfNeeded, bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, MAX_STAT_SHIFT } = __helpers;
+const { findGear, gearPool, effectSum, describeAppliedClimbRules } = __content;
+const { checkAreaAccess, canEnterSection, getPlayersInSection, canClimbTopRopeRoute, pickFreeBelayerStation, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, getGearPurchaseTimeCost, getSpendableXp, buildEffectRollArray, resolveClimbDice, computeClimbStats, applyDiceToRequirements, resolveClimbOutcome, computeClimbXp, getFailureEnduranceExtra, getSuccessEnduranceHeal, applySuccessHeal, describeClimbGearEffects, freeSoloCanAttempt, trainingSpec, trainingAllowed, trainingCap, usesGrit, trainingGritCost, gearFunds, gearPrice, payForGear, claimClimbGrit, dealRouteGrit, gearInGame, perRoundGrit, betaBoostAmount, roundStartTime, computeRestRecovery, applyLevelUpIfNeeded, bestRouteReaderShift, canUseStatShift, isWellFormedStatShift, MAX_STAT_SHIFT } = __helpers;
 // Engine public API.
 //
 // This is the surface that everything else (UI adapter, agents, simulation
@@ -2258,6 +3226,7 @@ const { checkAreaAccess, canEnterSection, getPlayersInSection, canClimbTopRopeRo
 //     the engine no longer imposes one. Sim harnesses keep their own
 //     MAX_STEPS counter to catch runaway agent loops (a programming bug,
 //     not a gameplay condition).
+
 
 
 
@@ -2312,12 +3281,12 @@ function getLegalActions(state) {
       // Top Rope: the route's belayer station must be free for this player
       // (a station held by another player blocks both of its routes).
       if (area === 'topRope' && !canClimbTopRopeRoute(state, player.playerNum, route)) continue;
-      const timeCost = getEffectiveClimbTimeCost(char, route.time, route);
-      const enduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance);
+      const timeCost = getEffectiveClimbTimeCost(char, route.time, route, false, area);
+      const enduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance, area, false);
       if (char.timeRemaining < timeCost) continue;
       if (char.currentEndurance < enduranceCost) continue;
       // Free Solo "Life or Die" — must meet all base requirements.
-      if (!freeSoloCanAttempt(char, route)) continue;
+      if (!freeSoloCanAttempt(char, route, area, false)) continue;
       actions.push({ type: 'climb', area, routeName: route.name });
       // Route Reader "Versatility": also offer this climb with the most useful
       // once-per-round stat shift, when one helps. (applyAction accepts any
@@ -2345,11 +3314,11 @@ function getLegalActions(state) {
       const sec = canEnterSection(m.area, player.playerNum, state);
       if (!sec.canEnter) continue;
     }
-    const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route, true);
-    const enduranceCost = getEffectiveClimbEnduranceCost(char, m.route, m.route.endurance);
+    const timeCost = getEffectiveClimbTimeCost(char, m.route.time, m.route, true, m.area);
+    const enduranceCost = getEffectiveClimbEnduranceCost(char, m.route, m.route.endurance, m.area, true);
     if (char.timeRemaining < timeCost) continue;
     if (char.currentEndurance < enduranceCost) continue;
-    if (!freeSoloCanAttempt(char, m.route)) continue;
+    if (!freeSoloCanAttempt(char, m.route, m.area, true)) continue;
     actions.push({ type: 'milestone', difficulty, area: m.area, routeName: m.route.name });
     // Rules variant: Versatility's stat shift on a Milestone — offered as a
     // variant of the attempt, like regular climbs.
@@ -2457,9 +3426,9 @@ function illegalActionReason(state, wanted) {
     if (sec.canEnter) return null;
     return reason('sectionFull', `You can't climb here right now: ${sec.reason}.`, { occupants: occupantsOf(area) });
   };
-  const costGate = (route, isMilestone = false) => {
-    const t = getEffectiveClimbTimeCost(char, route.time, route, isMilestone);
-    const e = getEffectiveClimbEnduranceCost(char, route, route.endurance);
+  const costGate = (route, isMilestone, area) => {
+    const t = getEffectiveClimbTimeCost(char, route.time, route, isMilestone, area);
+    const e = getEffectiveClimbEnduranceCost(char, route, route.endurance, area, isMilestone);
     if (char.timeRemaining < t) return notEnough('notEnoughTime', 'time', t, char.timeRemaining);
     if (char.currentEndurance < e) return notEnough('notEnoughEndurance', 'endurance', e, char.currentEndurance);
     return null;
@@ -2484,7 +3453,7 @@ function illegalActionReason(state, wanted) {
         const full = sectionGate(wanted.area);
         if (full) return full;
       }
-      return costGate(route) || (!freeSoloCanAttempt(char, route) ? lifeOrDie() : null)
+      return costGate(route, false, wanted.area) || (!freeSoloCanAttempt(char, route, wanted.area, false) ? lifeOrDie() : null)
         || reason('unavailable', 'That climb is not available right now.');
     }
     case 'milestone': {
@@ -2503,7 +3472,7 @@ function illegalActionReason(state, wanted) {
         const full = sectionGate(m.area);
         if (full) return full;
       }
-      return costGate(m.route, true) || (!freeSoloCanAttempt(char, m.route) ? lifeOrDie() : null)
+      return costGate(m.route, true, m.area) || (!freeSoloCanAttempt(char, m.route, m.area, true) ? lifeOrDie() : null)
         || reason('unavailable', 'That milestone is not available right now.');
     }
     case 'train': {
@@ -2534,7 +3503,7 @@ function illegalActionReason(state, wanted) {
     case 'rest':
       return reason('notEnoughTime', 'Not enough time to rest.', { need: 1, have: char.timeRemaining });
     case 'buyGear': {
-      const gear = GEAR_SHOP.find(g => g.name === wanted.gearName);
+      const gear = findGear(state, wanted.gearName);
       if (!gear) return reason('noSuchGear', 'There is no such gear.');
       if (char.equipment.includes(gear.name)) return reason('alreadyOwned', `You already own ${gear.name}.`);
       const inShop = state.availableGear.some(g => g.name === gear.name) || ACCESS_CARDS.includes(gear.name);
@@ -2712,15 +3681,18 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     state_attemptedRoutesMark(s, player.playerNum, area, route.name);
   }
 
+  // The climb, for custom rules (content.js): which route, wall and kind.
+  const climb = { route, area, isMilestone };
+
   // 3. Deduct time (character + gear modified).
-  const timeCost = getEffectiveClimbTimeCost(char, route.time, route, isMilestone);
+  const timeCost = getEffectiveClimbTimeCost(char, route.time, route, isMilestone, area);
   const timeBefore = char.timeRemaining;
   char.timeRemaining -= timeCost;
 
   // 4. Deduct endurance — base cost may be reduced by gear (Body Tension Belt).
   // Iron Lung's failure penalty is added later, after success/fail is known.
   const enduranceBefore = char.currentEndurance;
-  const baseEnduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance);
+  const baseEnduranceCost = getEffectiveClimbEnduranceCost(char, route, route.endurance, area, isMilestone);
   char.currentEndurance -= baseEnduranceCost;
 
   // 5-6. Effective stats for this climb: base + training + gear + per-route
@@ -2729,7 +3701,7 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   //      real climbs can't drift apart. Consuming the flags happens below.
   //      (Route attempted-marks don't feed gear bonuses in v0.7+ data, but use
   //      the pre-climb marks so a preview and the climb see identical input.)
-  const effectiveStats = computeClimbStats(char, route, area, attemptedBefore, shift);
+  const effectiveStats = computeClimbStats(char, route, area, attemptedBefore, shift, isMilestone);
   // The Beta Boost is spent by this climb; the flag is cleared once the outcome
   // is known, because a rules variant can make Versatility depend on it.
   const boostSpent = !!char.betaBoostActive;
@@ -2738,7 +3710,7 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
       playerNum: player.playerNum,
       character: char.key,
       ability: 'Beta Boost',
-      effect: `+${abilityParam(char, 'betaBoost') ?? 3} all stats for this climb`,
+      effect: `+${betaBoostAmount(char)} all stats for this climb`,
     });
   }
 
@@ -2756,10 +3728,10 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   // 7. Build and roll dice (Sprinter gets +1 nerf die; v0.3.0 gear may
   //    re-roll, add an extra die, replace dice, or shift dice on milestones).
   //    Gear choices ("your choice") are made against effectiveStats.
-  const effectArray = buildEffectRollArray(char, route);
+  const effectArray = buildEffectRollArray(char, route, area, isMilestone);
   const diceTrace = [];
-  const { dice, mentorIndex } = resolveClimbDice(() => rng.rollDie(6), effectArray, char, route, isMilestone, effectiveStats, diceTrace);
-  const { requirements, appliedModifiers } = applyDiceToRequirements(char, route, effectArray, dice, { mentorIndex });
+  const { dice, mentorIndex } = resolveClimbDice(() => rng.rollDie(6), effectArray, char, route, isMilestone, effectiveStats, diceTrace, area);
+  const { requirements, appliedModifiers } = applyDiceToRequirements(char, route, effectArray, dice, { mentorIndex, area, isMilestone });
 
   emitter.emit('dice_rolled', {
     playerNum: player.playerNum,
@@ -2774,9 +3746,9 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   });
 
   // 8. Resolve outcome.
-  const outcome = resolveClimbOutcome(char, effectiveStats, requirements, isMilestone);
+  const outcome = resolveClimbOutcome(char, effectiveStats, requirements, isMilestone, climb);
   if (boostSpent) char.betaBoostActive = false;
-  const xpGained = computeClimbXp(char, route, outcome.success);
+  const xpGained = computeClimbXp(char, route, outcome.success, climb);
   char.xp += xpGained;
   // Grit economy: a regular send takes the Grit on the card; a milestone
   // send pays its tier's reward.
@@ -2785,16 +3757,18 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
   // 9. Iron Lung failure penalty (Mental Anchor gear bypasses).
   let failPenalty = 0;
   if (!outcome.success) {
-    failPenalty = getFailureEnduranceExtra(char);
+    failPenalty = getFailureEnduranceExtra(char, climb);
     char.currentEndurance -= failPenalty;
   }
   // 9b. Power Spotting: successful climbs heal endurance, up to maxEndurance.
   let healed = 0;
   if (outcome.success) {
     const beforeHeal = char.currentEndurance;
-    char.currentEndurance = applySuccessHeal(char.currentEndurance, char.maxEndurance, getSuccessEnduranceHeal(char));
+    char.currentEndurance = applySuccessHeal(char.currentEndurance, char.maxEndurance, getSuccessEnduranceHeal(char, climb));
     healed = char.currentEndurance - beforeHeal;
   }
+  // Custom rules (the climber's and its custom gear's) that applied to this climb.
+  const customRules = describeAppliedClimbRules(char, { scope: 'climb', route, area, isMilestone });
   // Floor endurance at 0. Going negative is nonsensical for downstream checks.
   if (char.currentEndurance < 0) char.currentEndurance = 0;
 
@@ -2815,8 +3789,10 @@ function resolveClimbShared(s, rng, emitter, route, area, isMilestone, difficult
     // Every gear effect that changed this climb (see describeClimbGearEffects).
     gearEffects: describeClimbGearEffects({
       char, route, effectRollArray: effectArray, diceTrace, appliedModifiers,
-      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed, isMilestone,
+      success: outcome.success, timeCost, enduranceCost: baseEnduranceCost, healed, isMilestone, area,
     }),
+    // Project Mode: every custom rule that applied, worded ({ source, ruleId, text }).
+    ...(customRules.length ? { customRules } : {}),
     resourcesDelta: {
       time: { before: timeBefore, after: char.timeRemaining, delta: -timeCost },
       endurance: { before: enduranceBefore, after: char.currentEndurance, delta: char.currentEndurance - enduranceBefore },
@@ -2909,12 +3885,20 @@ function handleRest(s, rng, action, emitter) {
   const { newEndurance, delta, restBonusApplied } = computeRestRecovery(char);
   char.currentEndurance = newEndurance;
 
-  // Route Reader's "Versatility" activates Beta Boost on rest. Other
+  // Route Reader's "Versatility" activates Beta Boost on rest, as does a
+  // custom "Beta Boost on rest" rule (for the amount the rules grant). Other
   // characters ignore this flag.
   let betaActivated = false;
   if (char.key === 'routeReader') {
     char.betaBoostActive = true;
     betaActivated = true;
+  } else {
+    const boost = effectSum(char, 'betaBoostOnRest', { scope: 'rest' });
+    if (boost > 0) {
+      char.betaBoostActive = true;
+      char.betaBoostAmount = boost;
+      betaActivated = true;
+    }
   }
 
   emitter.emit('rest_action', {
@@ -2933,7 +3917,7 @@ function handleRest(s, rng, action, emitter) {
 function handleBuyGear(s, rng, action, emitter) {
   const player = s.players[s.currentPlayerIndex];
   const char = player.character;
-  const gear = GEAR_SHOP.find(g => g.name === action.gearName);
+  const gear = findGear(s, action.gearName);
   if (!gear) throw new Error(`buyGear: no gear "${action.gearName}"`);
 
   // XP, or Grit under the Grit-economy rules (XP is then never spent).
@@ -2950,6 +3934,16 @@ function handleBuyGear(s, rng, action, emitter) {
   // Permanent stat & endurance effects from the purchased item.
   // Matches game.js:2299-2391 branch-by-branch.
   const gearApplied = {};
+  // A custom card's rules now act for this climber (content.js activeRules);
+  // its permanent max-Endurance rules apply at once, like Locking Carabiner.
+  if (gear.custom) {
+    char.gearRules = [...(char.gearRules || []), { gear: gear.name, hash: gear.rulesHash, rules: gear.rules }];
+    const maxEnd = effectSum({ gearRules: [{ gear: gear.name, rules: gear.rules }] }, 'maxEndurance', { scope: 'setup' });
+    if (maxEnd) {
+      char.maxEndurance += maxEnd;
+      gearApplied.maxEndurance = maxEnd;
+    }
+  }
   if (gear.statEffect === 'endurance') {
     char.maxEndurance += gear.value;
     gearApplied.maxEndurance = gear.value;
@@ -3010,7 +4004,7 @@ function replaceGearInRotation(s, rng, purchasedName) {
     ...ownedByAny,
     ...ACCESS_CARDS,
   ]);
-  const pool = GEAR_SHOP.filter(g => !unavailable.has(g.name) && gearInGame(s.rules, g));
+  const pool = gearPool(s.content).filter(g => !unavailable.has(g.name) && gearInGame(s.rules, g));
 
   if (pool.length === 0) {
     s.availableGear.splice(idx, 1);
@@ -3128,14 +4122,14 @@ function endRound(s, rng, emitter) {
   //   2 → refresh bouldering,    advance to 0
   let cleared;
   if (s.routeClearingPosition === 0) {
-    s.availableRoutes.leadClimbing = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing'), 5));
+    s.availableRoutes.leadClimbing = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'leadClimbing', s.content), 5));
     cleared = 'leadClimbing';
   } else if (s.routeClearingPosition === 1) {
     // Refresh all belayer stations together (2×belayerCount routes).
-    s.availableRoutes.topRope = dealRouteGrit(s.rules, drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope')));
+    s.availableRoutes.topRope = dealRouteGrit(s.rules, drawTopRopeStations(rng, s.belayerCount, regularRoutePool(s.milestoneRoutes, 'topRope', s.content)));
     cleared = 'topRope';
   } else {
-    s.availableRoutes.bouldering = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering'), 5));
+    s.availableRoutes.bouldering = dealRouteGrit(s.rules, rng.pickN(regularRoutePool(s.milestoneRoutes, 'bouldering', s.content), 5));
     cleared = 'bouldering';
   }
   s.routeClearingPosition = (s.routeClearingPosition + 1) % 3;
@@ -3146,13 +4140,13 @@ function endRound(s, rng, emitter) {
   // player back to the Lobby automatically (RuleModifications 2026-06-27).
   for (const p of s.players) {
     const c = p.character;
-    const approachBonus = c.equipment.includes('Approach Shoes') ? 1 : 0;
-    c.timeRemaining = 10 + approachBonus;
+    // 10 Time, plus Approach Shoes and custom "Time each round" rules.
+    c.timeRemaining = roundStartTime(c);
     c.abilityUsed = false;
     c.trainedThisRound = 0;
     c.freeSessionUsed = false;
-    // Grit economy: the per-round allowance.
-    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key);
+    // Grit economy: the per-round allowance, plus custom "Grit each round" rules.
+    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key) + effectSum(c, 'gritPerRound', { scope: 'round' });
     c.location = 'lobby';
     c.belayerStation = null;
   }
@@ -3196,8 +4190,8 @@ return { getLegalActions, findLegalAction, illegalActionReason, explainIllegalAc
 // ---- engine/stats.js ----
 const __stats = (function () {
 'use strict';
-const { ROUTES } = __data;
 const { usesGrit } = __helpers;
+const { routesForArea } = __content;
 // End-of-game statistics — the numbers behind the post-game summary.
 //
 //   summarizeGame(state) → plain JSON object (schema GAME_SUMMARY_SCHEMA)
@@ -3227,8 +4221,9 @@ const SUMMARY_AREAS = ['bouldering', 'topRope', 'leadClimbing', 'milestone', 'tr
 
 // A route's difficulty for "hardest send": the sum of its printed stat
 // requirements (V-grades and YDS grades can't be compared with each other).
-function routeDifficulty(area, routeName) {
-  const route = (ROUTES[area] || []).find(r => r.name === routeName);
+// Custom routes (state.content) count like printed ones.
+function routeDifficulty(state, area, routeName) {
+  const route = (routesForArea(state.content, area) || []).find(r => r.name === routeName);
   return route ? SUMMARY_STATS.reduce((sum, k) => sum + (route[k] || 0), 0) : 0;
 }
 
@@ -3317,7 +4312,7 @@ function summarizeGame(state) {
           }
         }
         if (p.success) {
-          const d = routeDifficulty(p.area, p.routeName);
+          const d = routeDifficulty(state, p.area, p.routeName);
           if (s.hardestSend === null || d > bestDifficulty[p.playerNum]) {
             bestDifficulty[p.playerNum] = d;
             s.hardestSend = { routeName: p.routeName, grade: p.grade, area: p.area, isMilestone: !!p.isMilestone, round };
@@ -3602,6 +4597,49 @@ return {
   makeEmitter: __telemetry.makeEmitter,
   ENGINE_VERSION: __version.ENGINE_VERSION,
   ENGINE_VERSION_STRING: __version.ENGINE_VERSION_STRING,
+  CONTENT_SCHEMA: __content.CONTENT_SCHEMA,
+  SUBMISSION_SCHEMA: __content.SUBMISSION_SCHEMA,
+  CONTENT_KINDS: __content.CONTENT_KINDS,
+  STATS: __content.STATS,
+  AREAS: __content.AREAS,
+  ROUTE_VOCAB: __content.ROUTE_VOCAB,
+  GEAR_CATEGORIES: __content.GEAR_CATEGORIES,
+  PORTRAITS: __content.PORTRAITS,
+  ACCENTS: __content.ACCENTS,
+  LIMITS: __content.LIMITS,
+  gradeBandOf: __content.gradeBandOf,
+  CONDITIONS: __content.CONDITIONS,
+  EFFECTS: __content.EFFECTS,
+  SCOPES: __content.SCOPES,
+  describeCondition: __content.describeCondition,
+  describeEffect: __content.describeEffect,
+  describeRule: __content.describeRule,
+  describeRules: __content.describeRules,
+  compileRules: __content.compileRules,
+  rulesHash: __content.rulesHash,
+  slugKey: __content.slugKey,
+  CHARACTER_LIMITS: __content.CHARACTER_LIMITS,
+  compileCharacter: __content.compileCharacter,
+  ROUTE_LIMITS: __content.ROUTE_LIMITS,
+  compileRoute: __content.compileRoute,
+  GEAR_LIMITS: __content.GEAR_LIMITS,
+  compileGear: __content.compileGear,
+  emptyContentPack: __content.emptyContentPack,
+  hasCustomContent: __content.hasCustomContent,
+  compileContentPack: __content.compileContentPack,
+  characterTemplate: __content.characterTemplate,
+  routesForArea: __content.routesForArea,
+  allRoutes: __content.allRoutes,
+  gearPool: __content.gearPool,
+  findGear: __content.findGear,
+  activeRules: __content.activeRules,
+  rulesSignature: __content.rulesSignature,
+  ruleEffects: __content.ruleEffects,
+  effectSum: __content.effectSum,
+  hasEffect: __content.hasEffect,
+  describeAppliedClimbRules: __content.describeAppliedClimbRules,
+  SUBMISSION_STATUSES: __content.SUBMISSION_STATUSES,
+  validateSubmission: __content.validateSubmission,
   checkAreaAccess: __helpers.checkAreaAccess,
   getSectionCapacity: __helpers.getSectionCapacity,
   getOccupiedBelayerStations: __helpers.getOccupiedBelayerStations,
@@ -3614,6 +4652,7 @@ return {
   calculateGearBonuses: __helpers.calculateGearBonuses,
   computeEffectiveStats: __helpers.computeEffectiveStats,
   computeClimbStats: __helpers.computeClimbStats,
+  betaBoostAmount: __helpers.betaBoostAmount,
   DEFAULT_ABILITY: __helpers.DEFAULT_ABILITY,
   abilityParam: __helpers.abilityParam,
   passRule: __helpers.passRule,
@@ -3662,6 +4701,7 @@ return {
   bestRouteReaderShift: __helpers.bestRouteReaderShift,
   computeRestRecovery: __helpers.computeRestRecovery,
   getGearMaxEnduranceBonus: __helpers.getGearMaxEnduranceBonus,
+  roundStartTime: __helpers.roundStartTime,
   applyLevelUpIfNeeded: __helpers.applyLevelUpIfNeeded,
   dispatchToolCall: __helpers.dispatchToolCall,
   belayerCountFor: __state.belayerCountFor,
