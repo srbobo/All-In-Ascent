@@ -17,7 +17,7 @@ import {
 } from './helpers.js';
 import { summarizeGame } from './stats.js';
 import { deriveSeed } from './rng.js';
-import { ROUTES, GEAR_SHOP, CHARACTERS } from './data.js';
+import { ROUTES, GEAR_SHOP } from './data.js';
 import { ENGINE_VERSION_STRING } from './version.js';
 
 const results = [];

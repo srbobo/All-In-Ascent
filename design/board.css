@@ -79,8 +79,6 @@ body::before {
 .site-header .eyebrow { color: rgba(244,237,224,0.78); margin-top: var(--sp-3); }
 .site-header .eyebrow::before { color: var(--coral); }
 .site-nav { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: flex-end; }
-/* Feature-flagged controls (flags.js data-flag) stay hidden whatever their display class. */
-[data-flag][hidden] { display: none !important; }
 .site-nav .btn--ghost { background: transparent; color: var(--chalk); border-color: rgba(244,237,224,0.7); box-shadow: none; }
 .site-nav .btn--ghost:hover { background: var(--chalk); color: var(--ink); }
 .hero-tape-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
