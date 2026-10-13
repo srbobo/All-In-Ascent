@@ -41,6 +41,10 @@
 //   - Round-start Time is now computed from every card with
 //     statEffect 'timePerRound' (roundStartTime) instead of Approach Shoes by
 //     name — the same number for the printed deck.
+//   - Grit on custom cards (2026-10-13): a custom route may print its own
+//     Grit (printedGrit; routeGritValue honours it, else the grade's usual
+//     amount), and a custom climber prints starting Grit and Grit each round
+//     (gritStart / gritPerRound, added at setup and every round end).
 //   The standard game is unchanged: same outcomes, same RNG streams. Minor
 //   bump for the new content system (baselines from 1.1.x stay comparable).
 // 1.1.0 (2026-10-11): Grit is how the game is played.

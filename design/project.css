@@ -20,6 +20,7 @@
 .pm-new { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
 .pm-list { list-style: none; margin: 0 0 var(--sp-4); padding: 0; display: grid; gap: var(--sp-2); }
 .pm-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-2); padding: var(--sp-2); border-radius: var(--r-md, 10px); background: var(--paper-deep); }
+.pm-item__tools { display: inline-flex; align-items: center; gap: 4px; }
 .pm-list li.is-editing { outline: 2px solid var(--ink); }
 .pm-list .pm-item__name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pm-list .pm-item__meta { display: block; font-size: var(--fs-2xs); color: var(--ink-muted); font-family: var(--font-mono); letter-spacing: 0.04em; }

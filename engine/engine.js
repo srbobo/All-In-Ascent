@@ -966,7 +966,7 @@ function endRound(s, rng, emitter) {
     c.trainedThisRound = 0;
     c.freeSessionUsed = false;
     // Grit economy: the per-round allowance, plus custom "Grit each round" rules.
-    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key) + effectSum(c, 'gritPerRound', { scope: 'round' });
+    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key) + (c.gritPerRound || 0) + effectSum(c, 'gritPerRound', { scope: 'round' });
     c.location = 'lobby';
     c.belayerStation = null;
   }

@@ -351,6 +351,17 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: var(--lh-snug); 
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 .aia-card__price b, .aia-card__endurance b { font-size: 1.15em; font-weight: 800; }
+/* Grit chip on a climber card (Project Mode): sits under the endurance badge. */
+.aia-card__grit {
+  position: absolute; top: 2.7em; right: 0.3em; z-index: 1;
+  display: inline-flex; align-items: baseline; gap: 0.2em;
+  padding: 0.2em 0.55em; border-radius: var(--r-btn);
+  background: var(--c-grit); color: var(--chalk);
+  font-family: var(--font-display); font-size: 0.85em; font-weight: 700; line-height: 1.2;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.aia-card__grit b { font-size: 1.15em; font-weight: 800; }
+.aia-card__grit .aia-icon { width: 1.1em; height: 1.1em; }
 .aia-card__price span { font-family: var(--font-mono); font-size: var(--t-meta); letter-spacing: 0.08em; }
 .aia-card__price .aia-icon, .aia-card__endurance .aia-icon { align-self: center; color: var(--marigold); }
 .aia-card__bonus {

@@ -76,7 +76,7 @@
     if (!c.ok) {
       const p = document.createElement('p');
       p.className = 'pm-note';
-      p.textContent = `Does not compile with engine ${E.ENGINE_VERSION_STRING}: ${c.errors[0].message}`;
+      p.textContent = `This card no longer works with rules engine ${E.ENGINE_VERSION_STRING}: ${c.errors[0].message}`;
       return p;
     }
     if (sub.kind === 'character') return AIACards.climber(c.value.key, c.value);
@@ -129,7 +129,7 @@
           <button class="btn btn--raspberry" type="button" data-status="rejected">Reject</button>
           <button class="btn btn--ghost" type="button" data-status="new">Back to new</button>
           <button class="btn btn--ghost" type="button" data-workshop>Add to my workshop</button>
-          <button class="btn btn--ghost" type="button" data-copy>Copy JSON</button>
+          <button class="btn btn--ghost" type="button" data-copy title="Copy the card's definition to paste elsewhere">Copy card</button>
           <button class="btn btn--ghost" type="button" data-delete>Delete</button>
         </div>`;
       item.append(preview, body);
@@ -178,7 +178,7 @@
       banner(`"${saved.name}" added to your workshop (project.html).`);
     } else if (btn.dataset.copy !== undefined) {
       const text = JSON.stringify(sub.definition, null, 2);
-      try { await navigator.clipboard.writeText(text); banner('Definition copied.'); } catch { prompt('Copy the definition:', text); }
+      try { await navigator.clipboard.writeText(text); banner('Card copied.'); } catch { prompt('Copy the card:', text); }
     }
   }
 

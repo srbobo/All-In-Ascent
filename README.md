@@ -179,8 +179,9 @@ type, tag, hold/move feature, grade band, route requirement, Level; effects:
 stat bonus, requirement change, Time/Endurance cost, XP, extra or ignored
 dice, fall penalty, heal on send, 3-of-4 sends, free Lead access, rest bonus,
 Beta Boost on rest, Grit/Time each round, training gain and cap, starting
-Grit, max Endurance). Route cards use the printed deck's own fields. Every
-card **compiles** against the engine (`compileCharacter` / `compileRoute` /
+Grit, max Endurance), plus plain Grit numbers (a climber's starting Grit and
+Grit each round, the Grit printed on a route). Route cards use the printed
+deck's own fields. Every card **compiles** against the engine (`compileCharacter` / `compileRoute` /
 `compileGear`): element parameters have ranges, a condition must be able to
 decide every effect it is attached to, names must not clash with the printed
 deck. `createGame({ content })` refuses a pack that does not compile, keeps
