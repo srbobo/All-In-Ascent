@@ -11,7 +11,7 @@
 // default bot is the planner (the playtest bot; it finishes every game). A
 // game still running after --max-steps actions is recorded unfinished.
 // --out writes one record per line (the dashboard's "Load file" reads it);
-// --post sends each record to a telemetry server (the PartyKit host's
+// --post sends each record to a telemetry server (the backend host's
 // /parties/telemetry/global). Records get finishedAt timestamps spread over
 // the last --days days (default 14) so the dashboard's timeline has shape.
 

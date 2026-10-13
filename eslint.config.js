@@ -62,12 +62,13 @@ const nodeGlobals = {
   fetch: 'readonly',
   URL: 'readonly',
   URLSearchParams: 'readonly',
-  Response: 'readonly', // PartyKit onRequest (Workers + Node 18+ global)
+  Response: 'readonly', // PartyServer onRequest (Workers + Node 18+ global)
   Request: 'readonly',
   crypto: 'readonly',   // Web Crypto (Workers + Node 19+ global): randomUUID
   Buffer: 'readonly',
   AbortController: 'readonly',
   structuredClone: 'readonly',
+  WebSocket: 'readonly', // Node 22+ global: party/_worker-test.js plays over one
   TextEncoder: 'readonly',
   TextDecoder: 'readonly',
   Date: 'readonly',
@@ -97,7 +98,8 @@ export default [
       'online/vendor/**', // vendored third-party library
       'engine/data.js',   // auto-generated from game.js
       'engine/engine.browser.js', // auto-generated from engine/*.js
-      '.partykit/**',
+      '.wrangler/**',     // wrangler dev state
+      '.site/**',         // party/build-site.js output (copies of the site)
       '.claude/**',
       'test-results/**', // Playwright output
       'playwright-report/**',
@@ -105,7 +107,7 @@ export default [
   },
   {
     // Browser classic scripts — global scope, no modules.
-    files: ['game.js', 'effects.js', 'online-mode.js', 'telemetry-client.js', 'flags.js', 'project-store.js', 'project.js', 'review.js', 'design/**/*.js'],
+    files: ['game.js', 'effects.js', 'online-mode.js', 'backend.js', 'telemetry-client.js', 'flags.js', 'project-store.js', 'project.js', 'review.js', 'design/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'script',
@@ -132,7 +134,7 @@ export default [
     rules,
   },
   {
-    // Node ES modules: engine, sim, analysis, PartyKit server, tooling.
+    // Node ES modules: engine, sim, analysis, the Worker (party/), tooling.
     files: ['engine/**/*.js', 'sim/**/*.js', 'analysis/**/*.js', 'party/**/*.js', 'playwright.config.js', 'eslint.config.js'],
     languageOptions: {
       ecmaVersion: 2023,

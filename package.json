@@ -1,7 +1,7 @@
 {
   "name": "all-in-ascent",
   "version": "1.2.0",
-  "description": "Rock climbing board game with automated agent playtest pipeline + multiplayer online play (PartyKit).",
+  "description": "Rock climbing board game with automated agent playtest pipeline + multiplayer online play (PartyServer on Cloudflare Workers).",
   "type": "module",
   "private": true,
   "scripts": {
@@ -12,7 +12,7 @@
     "test:bots": "node sim/test-planner.js",
     "balance": "node sim/run-balance.js",
     "tune:planner": "node sim/tune-planner.js",
-    "test:party": "BOT_MOVE_DELAY_MS=0 node party/_smoke.js && node party/_telemetry-test.js && node party/_submissions-test.js",
+    "test:party": "BOT_MOVE_DELAY_MS=0 node party/_smoke.js && node party/_telemetry-test.js && node party/_submissions-test.js && node party/_worker-test.js",
     "test:e2e": "playwright test",
     "test:engine": "node engine/build-data.js && node engine/build-browser.js && node engine/test-data.js && node engine/test-state.js && node engine/test-helpers.js && node engine/test-engine.js && node engine/test-rules-v07.js && node engine/test-rules-v08.js && node engine/test-rules-grit.js && node engine/test-rules-characters.js && node engine/test-observe.js && node engine/test-stats.js && node engine/test-ui-support.js && node engine/test-match-record.js && node engine/test-content.js && node engine/test-browser-engine.js",
     "playtest": "npm run test:engine && node sim/run-matrix.js --config=sim/config.json && node analysis/build-report.js --open",
@@ -24,13 +24,16 @@
     "detail": "node analysis/game-detail.js",
     "game": "node sim/run-one-game.js",
     "telemetry:sample": "node sim/telemetry-sample.js",
-    "online:dev": "partykit dev",
-    "online:deploy": "partykit deploy"
+    "online:dev": "wrangler dev",
+    "online:deploy": "wrangler deploy"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
     "eslint": "^10.6.0",
-    "partykit": "^0.0.115",
-    "partysocket": "^1.0.2"
+    "partysocket": "^1.0.2",
+    "wrangler": "^4.150.0"
+  },
+  "dependencies": {
+    "partyserver": "^0.5.10"
   }
 }

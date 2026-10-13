@@ -133,7 +133,7 @@ For playability in digital format:
 - `game.js` - Game data (source of truth for characters, routes, gear) and the browser UI
 - `engine/` - The rules engine: `state.js` (setup), `engine.js` (legal actions, applying actions), `helpers.js` (formulas)
 - `engine/engine.browser.js` - The engine bundled for the browser (generated; do not edit)
-- `online-mode.js`, `online.html`, `party/` - Online play: browser client and PartyKit server
+- `online-mode.js`, `online.html`, `backend.js`, `party/` - Online play: browser client and the PartyServer Worker on Cloudflare (`party/server.js`, configured by `wrangler.jsonc`; see DEPLOY.md)
 - `dashboard.html`, `dashboard.js`, `telemetry-client.js`, `party/telemetry.js` - Designer telemetry: anonymous match records of finished games and the dashboard that reads them (see DEPLOY.md)
 - `project.html`, `project.js`, `project-store.js`, `engine/content.js`, `review.html`, `review.js`, `party/submissions.js`, `flags.js` - Project Mode (feature flag): the workshop where players build climbers, route cards and gear from rule elements, the review queue for submitted cards, and the feature flags
 - `sim/`, `analysis/` - Bot playtests and balance reports
@@ -146,7 +146,7 @@ For playability in digital format:
 Local hot-seat play, online play and the bots all run the same engine in
 `engine/`. `game.js` contains no game rules: it renders the engine's state,
 turns clicks into engine actions (`AscentEngine.getLegalActions` /
-`applyAction` locally, the PartyKit server online) and shows the events the
+`applyAction` locally, the Worker's GameRoom online) and shows the events the
 engine emits. To change a rule, change `engine/`; to change game data, change
 the GAME DATA section of `game.js`. Then run:
 
@@ -202,10 +202,10 @@ npm test
 
 runs everything: the linter, a check that generated files are up to date,
 the engine unit tests (including a check that the browser bundle plays
-identically to the engine), the PartyKit server smoke test, and the browser
+identically to the engine), the server tests (the rooms in Node, then the Worker itself in workerd), and the browser
 end-to-end tests. The end-to-end tests play local games through the real UI
 and require each one to replay identically through the engine; they also play
-an online game against the real PartyKit room code. Individually:
+an online game against the real GameRoom code. Individually:
 
 ```bash
 npm run lint

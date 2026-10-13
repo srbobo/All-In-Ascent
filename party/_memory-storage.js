@@ -1,5 +1,5 @@
-// In-memory stand-in for a Durable Object's `room.storage`, for running the
-// PartyKit parties outside PartyKit (party/_smoke.js, tests/e2e/serve.js).
+// In-memory stand-in for a Durable Object's `ctx.storage`, for running the
+// rooms outside the Workers runtime (party/_test-server.js).
 // Covers the calls the parties make: get, put, delete (one key or many) and
 // list({ prefix, limit, startAfter }) in key order. Not deployed.
 

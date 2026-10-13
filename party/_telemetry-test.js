@@ -1,11 +1,12 @@
 // Tests for the telemetry party (party/telemetry.js) and for the GameRoom
-// recording finished online games into it. Runs both PartyKit classes
-// in-process with in-memory storage (party/_memory-storage.js). Not deployed.
+// recording finished online games into it. Runs both rooms in-process over
+// party/_test-server.js (in-memory storage). Not deployed.
 //
 //   BOT_MOVE_DELAY_MS=0 node party/_telemetry-test.js   (npm run test:party)
 
-import TelemetryRoom, { TELEMETRY_ROOM } from './telemetry.js';
-import GameRoom from './game.js';
+import { TelemetryRoom, TELEMETRY_ROOM } from './telemetry.js';
+import { GameRoom } from './game.js';
+import { TestServer } from './_test-server.js';
 import { createMemoryStorage } from './_memory-storage.js';
 import { createGame } from '../engine/state.js';
 import { getLegalActions, applyAction } from '../engine/engine.js';
@@ -22,7 +23,7 @@ function check(label, cond, detail) {
 const URL_BASE = `http://x/parties/telemetry/${TELEMETRY_ROOM}`;
 function makeTelemetry(env = {}, id = TELEMETRY_ROOM) {
   const storage = createMemoryStorage();
-  return { storage, room: new TelemetryRoom({ id, env, storage }) };
+  return { storage, room: new (TelemetryRoom(TestServer))({ name: id, env, storage }) };
 }
 const post = (room, body) => room.onRequest(new Request(URL_BASE, { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }));
 const get = (room, query = '') => room.onRequest(new Request(`${URL_BASE}${query}`));
@@ -109,40 +110,39 @@ const record = await finishedRecord(5, 'local-test-0001');
 // ---------------------------------------------------------------------------
 {
   const { room: store, storage } = makeTelemetry();
-  const fakeRoom = {
-    id: 'telemetry-online',
-    env: {},
-    broadcast: () => {},
-    storage: { put: async () => {} },
-    context: {
-      parties: {
-        telemetry: {
-          get: (id) => ({
-            fetch: (init) => (id === TELEMETRY_ROOM ? store.onRequest(new Request(URL_BASE, init)) : Promise.resolve(new Response('', { status: 404 }))),
-          }),
+  // As party/server.js does with getServerByName: the GameRoom gets a stub of
+  // the telemetry room and fetches its PartyServer path.
+  const telemetryPaths = [];
+  const Room = class extends GameRoom(TestServer) {
+    telemetry() {
+      return {
+        fetch: (req) => {
+          telemetryPaths.push(new URL(req.url).pathname);
+          return store.onRequest(req);
         },
-      },
-    },
+      };
+    }
   };
-  const game = new GameRoom(fakeRoom);
+  const game = new Room({ name: 'telemetry-online' });
   const conn = { id: 'host', send() {}, close() {} };
   game.onConnect(conn, { request: { url: 'ws://x/party?username=alice&password=pw' } });
-  await game.onMessage(JSON.stringify({ type: 'select_character', characterKey: 'routeReader' }), conn);
-  await game.onMessage(JSON.stringify({ type: 'add_bot', difficulty: 'easy' }), conn);
-  await game.onMessage(JSON.stringify({ type: 'start_game' }), conn);
+  await game.onMessage(conn, JSON.stringify({ type: 'select_character', characterKey: 'routeReader' }));
+  await game.onMessage(conn, JSON.stringify({ type: 'add_bot', difficulty: 'easy' }));
+  await game.onMessage(conn, JSON.stringify({ type: 'start_game' }));
   const human = createPlannerAgent({ seed: 3 });
   for (let guard = 0; guard < 5000 && game.phase === 'in_progress'; guard++) {
     if (game.botRunning) { await new Promise(r => setTimeout(r, 5)); continue; }
     if (game.botAgents[game.state.currentPlayerIndex]) { await game.maybePlayBot(); continue; }
     const legal = getLegalActions(game.state);
     const { actionIndex } = await human.chooseAction({ state: game.state, legalActions: legal });
-    await game.onMessage(JSON.stringify({ type: 'action', actionIndex }), conn);
+    await game.onMessage(conn, JSON.stringify({ type: 'action', actionIndex }));
   }
   // endGame is not awaited by advance(); let it finish posting.
   for (let i = 0; i < 50 && storage.data.size === 0; i++) await new Promise(r => setTimeout(r, 10));
   check('online game completed', game.phase === 'completed');
   const stored = [...storage.data.values()];
   check('online game recorded exactly once', stored.length === 1);
+  check('online record posted to the telemetry room', telemetryPaths.join() === `/parties/telemetry/${TELEMETRY_ROOM}`, telemetryPaths.join());
   const rec = stored[0];
   check('online record: mode, id and timing', rec && rec.mode === 'online' && /^online-[\w-]+$/.test(rec.id)
     && rec.startedAt === game.startedAt && rec.finishedAt === game.finishedAt && rec.durationMs === game.finishedAt - game.startedAt);
@@ -152,8 +152,8 @@ const record = await finishedRecord(5, 'local-test-0001');
   check('online record: no usernames', rec && !JSON.stringify(rec).includes('alice'));
 }
 {
-  // Without a telemetry party (e.g. an older deploy) a game still ends cleanly.
-  const game = new GameRoom({ id: 'no-telemetry', env: {}, broadcast: () => {}, storage: { put: async () => {} } });
+  // Without a telemetry room (GameRoom's default telemetry()) a game still ends cleanly.
+  const game = new (GameRoom(TestServer))({ name: 'no-telemetry' });
   game.state = createGame({ seed: 1, characterKeys: ['technician', 'sprinter'], rules: GRIT_RULES }).state;
   let threw = false;
   try { await game.recordMatch(); } catch { threw = true; }

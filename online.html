@@ -153,9 +153,9 @@
 
 <div id="toast" class="toast hidden"></div>
 
+<script src="backend.js"></script>
 <script>
-  // ----- Backend host resolution (same logic as online-mode.js) -----
-  const PRODUCTION_PARTYKIT_HOST = 'all-in-ascent.srbobo.partykit.dev';
+  // ----- Backend host resolution (production host: backend.js) -----
 
   function resolveBackendHost() {
     const params = new URLSearchParams(window.location.search);
@@ -165,7 +165,7 @@
     if (h === '127.0.0.1' || h === 'localhost' || h === '0.0.0.0') {
       return window.location.host;
     }
-    return PRODUCTION_PARTYKIT_HOST;
+    return AscentBackend.PRODUCTION_HOST;
   }
 
   // ----- Persistence + form prefill -----
@@ -196,8 +196,8 @@
     const password = document.getElementById('password').value;
     if (!username) { toast('Enter a name'); return; }
     const host = resolveBackendHost();
-    if (!host || host.includes('YOUR-PARTYKIT-USERNAME')) {
-      toast('Backend not configured — see online.html PRODUCTION_PARTYKIT_HOST', 8000);
+    if (!host) {
+      toast('Backend not configured — see backend.js PRODUCTION_HOST', 8000);
       return;
     }
     savePrefs({ username, room, password });

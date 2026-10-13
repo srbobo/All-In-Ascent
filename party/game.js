@@ -1,8 +1,13 @@
-// All In Ascent — PartyKit GameRoom
+// All In Ascent — GameRoom (PartyServer)
 //
 // One Durable Object instance per room (room ID = path segment of the
-// WebSocket URL the client connects to). Holds the authoritative game state
-// in memory; clients send actions and receive state broadcasts.
+// WebSocket URL the client connects to, /parties/main/<room>). Holds the
+// authoritative game state in memory; clients send actions and receive state
+// broadcasts.
+//
+// GameRoom is a mixin over a PartyServer `Server` base: party/server.js (the
+// Worker) builds `class Main extends GameRoom(Server)`, and the Node tests
+// build it over party/_test-server.js, which needs no Workers runtime.
 //
 // Phases:
 //   'lobby'       — players join, pick characters, host can add bots and start
@@ -22,7 +27,7 @@
 //
 // Log shipping:
 //   - When the game ends, the full JSONL event stream is POSTed to
-//     env.LOG_WEBHOOK_URL (set via `partykit env add LOG_WEBHOOK_URL`).
+//     env.LOG_WEBHOOK_URL (set via `npx wrangler secret put LOG_WEBHOOK_URL`).
 //   - If no webhook is set, the log is stored in DO storage under
 //     `log:<finishedAt>` for later retrieval.
 
@@ -46,14 +51,18 @@ const BOT_LEVELS = {
 };
 
 const MAX_SEATS = 4;
-// Pause between bot moves so humans can read what happened. Overridable via
-// env for headless runs (party/_smoke.js sets 0); `globalThis.process` is
-// undefined in the Cloudflare Workers runtime, so the fallback applies there.
+// Pause between bot moves so humans can read what happened. Headless runs set
+// BOT_MOVE_DELAY_MS=0: Node tests in the process environment (party/_smoke.js),
+// the Worker as a var (party/_worker-test.js, or .dev.vars for `wrangler dev`).
 const BOT_MOVE_DELAY_MS = Number(globalThis.process?.env?.BOT_MOVE_DELAY_MS ?? 800);
 
-export default class GameRoom {
-  constructor(room) {
-    this.room = room;
+export const GameRoom = (Base) => class GameRoom extends Base {
+  // The game lives in memory (no storage round-trips per move), so the
+  // Durable Object must not hibernate between messages.
+  static options = { hibernate: false };
+
+  constructor(...args) {
+    super(...args);
     this.phase = 'lobby';
     this.password = null;            // set by host on creation
     this.hostId = null;              // first connection's id
@@ -157,7 +166,7 @@ export default class GameRoom {
   // Message dispatch
   // ------------------------------------------------------------------
 
-  async onMessage(message, conn) {
+  async onMessage(conn, message) {
     let msg;
     try { msg = JSON.parse(message); } catch { return; }
     const seat = this.seats.find(s => s && s.id === conn.id);
@@ -253,7 +262,7 @@ export default class GameRoom {
         connected: s.connected,
       })),
     };
-    this.room.broadcast(JSON.stringify(payload));
+    this.broadcast(JSON.stringify(payload));
   }
 
   // ------------------------------------------------------------------
@@ -367,7 +376,7 @@ export default class GameRoom {
         if (legal.length === 0) break;
         const { actionIndex } = await agent.chooseAction({ state: this.state, legalActions: legal });
         // Brief delay so humans can read what happened.
-        await new Promise(r => setTimeout(r, BOT_MOVE_DELAY_MS));
+        await new Promise(r => setTimeout(r, Number(this.env?.BOT_MOVE_DELAY_MS ?? BOT_MOVE_DELAY_MS)));
         if (this.phase !== 'in_progress') break;
         this.advance(legal[actionIndex]);
       }
@@ -375,7 +384,7 @@ export default class GameRoom {
       // A bot-agent or engine throw must not escape as an unhandled rejection —
       // maybePlayBot() is fire-and-forget from startGame(). Log and leave the
       // room alive; the stalled bot seat surfaces on the next human action.
-      console.error(`[GameRoom ${this.room?.id}] bot loop error:`, err);
+      console.error(`[GameRoom ${this.name}] bot loop error:`, err);
     } finally {
       this.botRunning = false;
     }
@@ -413,8 +422,15 @@ export default class GameRoom {
     await this.recordMatch();
   }
 
+  // The telemetry server (party/telemetry.js) this room records finished
+  // games in — a Durable Object stub with fetch(). party/server.js returns
+  // getServerByName(env.Telemetry, TELEMETRY_ROOM); null records nothing.
+  telemetry() {
+    return null;
+  }
+
   async recordMatch() {
-    const telemetry = this.room.context?.parties?.telemetry;
+    const telemetry = await this.telemetry();
     if (!telemetry) return;
     const record = buildMatchRecord(this.state, {
       id: `online-${crypto.randomUUID()}`,
@@ -426,11 +442,11 @@ export default class GameRoom {
         : { controller: 'human' })),
     });
     try {
-      const res = await telemetry.get(TELEMETRY_ROOM).fetch({
+      const res = await telemetry.fetch(new Request(`https://telemetry.internal/parties/telemetry/${TELEMETRY_ROOM}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(record),
-      });
+      }));
       if (!res.ok) console.error('telemetry rejected the match record', res.status, await res.text());
     } catch (err) {
       console.error('telemetry failed', err);
@@ -439,14 +455,14 @@ export default class GameRoom {
 
   async shipLogs() {
     const jsonl = this.events.map(e => JSON.stringify(e)).join('\n');
-    const webhook = this.room.env?.LOG_WEBHOOK_URL;
+    const webhook = this.env?.LOG_WEBHOOK_URL;
     if (webhook) {
       try {
         await fetch(webhook, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            room: this.room.id,
+            room: this.name,
             startedAt: this.startedAt,
             finishedAt: this.finishedAt,
             log: jsonl,
@@ -460,7 +476,7 @@ export default class GameRoom {
     }
     // No webhook (or webhook failed) — keep in DO storage for retrieval.
     try {
-      await this.room.storage.put(`log:${this.finishedAt}`, jsonl);
+      await this.ctx.storage.put(`log:${this.finishedAt}`, jsonl);
     } catch (err) {
       console.error('log storage failed', err);
     }
@@ -478,14 +494,14 @@ export default class GameRoom {
   async onRequest(req) {
     const url = new URL(req.url);
     if (req.method === 'GET' && url.searchParams.has('logs')) {
-      const list = await this.room.storage.list({ prefix: 'log:' });
+      const list = await this.ctx.storage.list({ prefix: 'log:' });
       const keys = [...list.keys()].map(k => k.slice('log:'.length));
       return new Response(JSON.stringify(keys), {
         headers: { 'content-type': 'application/json' },
       });
     }
     if (req.method === 'GET' && url.searchParams.has('log')) {
-      const jsonl = await this.room.storage.get(`log:${url.searchParams.get('log')}`);
+      const jsonl = await this.ctx.storage.get(`log:${url.searchParams.get('log')}`);
       if (!jsonl) return new Response('log not found', { status: 404 });
       return new Response(jsonl, {
         headers: { 'content-type': 'application/x-ndjson' },
@@ -503,7 +519,7 @@ export default class GameRoom {
   }
 
   broadcastState(extra = {}) {
-    this.room.broadcast(JSON.stringify({ ...this.stateMessage(), ...extra }));
+    this.broadcast(JSON.stringify({ ...this.stateMessage(), ...extra }));
   }
 
   stateMessage() {
@@ -524,4 +540,4 @@ export default class GameRoom {
       })),
     };
   }
-}
+};

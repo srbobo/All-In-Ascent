@@ -3,7 +3,7 @@
 // bundle load exactly as they do from Netlify.
 //
 // It also hosts the real telemetry party (party/telemetry.js, in-memory
-// storage) at /parties/telemetry/<room>, as `partykit dev` would, so local
+// storage) at /parties/telemetry/<room>, as `wrangler dev` would, so local
 // games record their match records here and the dashboard can read them —
 // and the Project Mode review queue (party/submissions.js) at
 // /parties/submissions/<room>.
@@ -14,8 +14,9 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import TelemetryRoom from '../../party/telemetry.js';
-import SubmissionsRoom from '../../party/submissions.js';
+import { TelemetryRoom } from '../../party/telemetry.js';
+import { SubmissionsRoom } from '../../party/submissions.js';
+import { TestServer } from '../../party/_test-server.js';
 import { createMemoryStorage } from '../../party/_memory-storage.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -26,12 +27,12 @@ const TYPES = {
 };
 
 const PARTIES = {
-  telemetry: { Room: TelemetryRoom, env: { TELEMETRY_ADMIN_TOKEN: 'e2e-admin' }, storage: createMemoryStorage(), rooms: new Map() },
-  submissions: { Room: SubmissionsRoom, env: { SUBMISSIONS_ADMIN_TOKEN: 'e2e-admin' }, storage: createMemoryStorage(), rooms: new Map() },
+  telemetry: { Room: TelemetryRoom(TestServer), env: { TELEMETRY_ADMIN_TOKEN: 'e2e-admin' }, storage: createMemoryStorage(), rooms: new Map() },
+  submissions: { Room: SubmissionsRoom(TestServer), env: { SUBMISSIONS_ADMIN_TOKEN: 'e2e-admin' }, storage: createMemoryStorage(), rooms: new Map() },
 };
 function partyRoom(party, id) {
   const p = PARTIES[party];
-  if (!p.rooms.has(id)) p.rooms.set(id, new p.Room({ id, env: p.env, storage: p.storage }));
+  if (!p.rooms.has(id)) p.rooms.set(id, new p.Room({ name: id, env: p.env, storage: p.storage }));
   return p.rooms.get(id);
 }
 

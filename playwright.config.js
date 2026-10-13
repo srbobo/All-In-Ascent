@@ -1,5 +1,5 @@
 // End-to-end tests: drive the real browser game (index.html) for local
-// hot-seat play and for online play against the real PartyKit GameRoom.
+// hot-seat play and for online play against the real GameRoom (party/game.js).
 //
 //   npm run test:e2e
 //

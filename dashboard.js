@@ -7,19 +7,18 @@
 // statistics of its own.
 //
 // Where it reads from:
-//   ?source=<host>             that PartyKit host (e.g. 127.0.0.1:1999)
-//   served from localhost or a *.partykit.dev host → the same origin
-//   anywhere else (file://, Netlify)                → the production PartyKit host
+//   ?source=<host>             that backend host (e.g. 127.0.0.1:1999)
+//   served by a backend (localhost, the Worker)  → the same origin
+//   anywhere else (file://, Netlify)             → the production host (backend.js)
 // If the server sets TELEMETRY_READ_TOKEN the page asks for it once and keeps
 // it in this browser.
 //
-// ES module: open it over http(s) (PartyKit serves it next to the game);
+// ES module: open it over http(s) (the Worker serves it next to the game);
 // browsers block module imports from file://.
 
 import { aggregateMatches, MATCH_FILTER_DEFAULTS } from './engine/match-report.js';
 import { CHARACTERS } from './engine/data.js';
 
-const PRODUCTION_PARTYKIT_HOST = 'all-in-ascent.srbobo.partykit.dev';
 const PATH = '/parties/telemetry/global';
 const TOKEN_KEY = 'all-in-ascent.telemetry-token';
 const MIN_N = 5;
@@ -388,10 +387,10 @@ function sourceUrl() {
     return `${/^(127\.0\.0\.1|localhost|0\.0\.0\.0)(:|$)/.test(host) ? 'http' : 'https'}://${host}${PATH}`;
   }
   const h = window.location.hostname;
-  if (window.location.protocol.startsWith('http') && (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h.endsWith('.partykit.dev'))) {
+  if (window.location.protocol.startsWith('http') && window.AscentBackend.servedByBackend(h)) {
     return window.location.origin + PATH;
   }
-  return `https://${PRODUCTION_PARTYKIT_HOST}${PATH}`;
+  return `https://${window.AscentBackend.PRODUCTION_HOST}${PATH}`;
 }
 function storedToken() {
   try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }

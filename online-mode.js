@@ -1,4 +1,4 @@
-// online-mode.js — turns index.html into a PartyKit online client when the
+// online-mode.js — turns index.html into an online client (PartySocket) when the
 // URL contains ?online=1. The same renderers, the same UI — just driven by
 // server state instead of local mutations.
 //

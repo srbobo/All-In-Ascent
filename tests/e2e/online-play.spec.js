@@ -1,7 +1,7 @@
-// Online play (index.html?online=1) against the real PartyKit GameRoom.
+// Online play (index.html?online=1) against the real GameRoom.
 //
 // The page's WebSocket is routed to an in-process GameRoom (party/game.js) —
-// the same server code PartyKit deploys — so the test covers the online
+// the same room code the Worker (party/server.js) deploys — so the test covers the online
 // client, the lobby, the server's engine and the bots without a network.
 
 import { test, expect } from '@playwright/test';
@@ -13,32 +13,26 @@ import {
 import { buildMatchRecord } from '../../engine/match-record.js';
 
 process.env.BOT_MOVE_DELAY_MS = '0';
-const { default: GameRoom } = await import('../../party/game.js');
-const { default: TelemetryRoom, TELEMETRY_ROOM } = await import('../../party/telemetry.js');
-const { createMemoryStorage } = await import('../../party/_memory-storage.js');
+const { GameRoom } = await import('../../party/game.js');
+const { TelemetryRoom, TELEMETRY_ROOM } = await import('../../party/telemetry.js');
+const { TestServer } = await import('../../party/_test-server.js');
 
 // Start a GameRoom and route the page's PartySocket connection to it. The
-// room gets its own telemetry party (room.telemetryStorage holds what it
-// records), as PartyKit's room.context.parties provides in production.
+// room gets its own telemetry room (room.telemetryStorage holds what it
+// records), as party/server.js provides with getServerByName in production.
 async function connectToRoom(page, roomId) {
-  const conns = new Set();
-  const telemetryStorage = createMemoryStorage();
-  const telemetry = new TelemetryRoom({ id: TELEMETRY_ROOM, env: {}, storage: telemetryStorage });
-  const room = new GameRoom({
-    id: roomId,
-    env: {},
-    broadcast: (msg) => { for (const c of conns) c.send(msg); },
-    storage: { put: async () => {} },
-    context: { parties: { telemetry: { get: () => ({ fetch: (init) => telemetry.onRequest(new Request(`http://x/parties/telemetry/${TELEMETRY_ROOM}`, init)) }) } } },
-  });
-  room.telemetryStorage = telemetryStorage;
+  const telemetry = new (TelemetryRoom(TestServer))({ name: TELEMETRY_ROOM });
+  const room = new (class extends GameRoom(TestServer) {
+    telemetry() { return { fetch: (req) => telemetry.onRequest(req) }; }
+  })({ name: roomId });
+  room.telemetryStorage = telemetry.ctx.storage;
   let n = 0;
   await page.routeWebSocket(new RegExp(`/parties/main/${roomId}`), (ws) => {
     const conn = { id: `conn-${n++}`, send: (m) => ws.send(m), close: () => ws.close() };
-    conns.add(conn);
+    room.connect(conn);
     room.onConnect(conn, { request: { url: ws.url().replace(/^ws/, 'http') } });
-    ws.onMessage((m) => room.onMessage(String(m), conn));
-    ws.onClose(() => { conns.delete(conn); room.onClose(conn); });
+    ws.onMessage((m) => room.onMessage(conn, String(m)));
+    ws.onClose(() => { room.disconnect(conn); room.onClose(conn); });
   });
   return room;
 }

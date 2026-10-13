@@ -8,8 +8,20 @@ results/
 # macOS Finder metadata.
 .DS_Store
 
-# PartyKit dev-server local state (Durable Object cache, etc.) — regenerated on
-# every `partykit dev` run, never useful in version control.
+# wrangler dev local state (Durable Object storage, etc.) — regenerated on
+# every `wrangler dev` run, never useful in version control.
+.wrangler/
+
+# The static site the Worker serves, copied by party/build-site.js.
+.site/
+
+# Local secrets for `wrangler dev`.
+.dev.vars
+
+# Production secrets, uploaded with `npx wrangler secret bulk .prod.vars`.
+.prod.vars
+
+# Leftover state of the old `partykit dev` (before the move to wrangler).
 .partykit/
 
 # Playwright end-to-end test output (npm run test:e2e).

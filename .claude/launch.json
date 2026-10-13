@@ -12,10 +12,10 @@
       "port": 8011
     },
     {
-      "name": "partykit",
+      "name": "worker",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
-        "partykit",
+        "wrangler",
         "dev",
         "--port",
         "1999"
