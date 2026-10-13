@@ -11,7 +11,7 @@ import {
 import { createGame } from './state.js';
 import { applyAction, getLegalActions, illegalActionReason } from './engine.js';
 import {
-  GRIT_RULES, computeClimbStats, climbSendProbability, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost,
+  GRIT_RULES, computeClimbStats, climbSendProbability, getEffectiveClimbTimeCost, getEffectiveClimbEnduranceCost, routeGritValue, dealRouteGrit,
   computeClimbXp, buildEffectRollArray, applyDiceToRequirements, resolveClimbOutcome, computeRestRecovery,
   trainingSpec, trainingCap, checkAreaAccess, applyLevelUpIfNeeded, roundStartTime,
 } from './helpers.js';
@@ -350,6 +350,31 @@ function climber(rules, body = {}) {
   check('climb_resolved lists the custom rules that applied (climber and gear)', res.customRules.map(r => r.source).sort().join(',') === 'Kneebar Pads,The Overhang Ace', JSON.stringify(res.customRules));
   const sum = summarizeGame(climbed.state);
   check('the post-game statistics count the custom route as the hardest send', sum.players[0].hardestSend && sum.players[0].hardestSend.routeName === 'Roof Rat Traverse');
+}
+
+// =============================================================================
+// Grit printed on cards
+// =============================================================================
+{
+  const plain = compileRoute(ROOF).value;
+  check('a custom route gets its grade\'s usual Grit unless the builder sets one', plain.printedGrit === 3 && routeGritValue(GRIT_RULES, plain) === 3);
+  const own = compileRoute({ ...ROOF, grit: 5 }).value;
+  check('a route may print its own Grit', own.printedGrit === 5 && routeGritValue(GRIT_RULES, own) === 5);
+  check('Grit on a route is range-checked', !compileRoute({ ...ROOF, grit: 9 }).ok && compileRoute({ ...ROOF, grit: 0 }).ok);
+  const dealt = dealRouteGrit(GRIT_RULES, [own]);
+  check('a dealt custom route carries its printed Grit', dealt[0].grit === 5);
+  check('printed routes are untouched', routeGritValue(GRIT_RULES, ROUTES.bouldering[0]) === 2);
+
+  const gritty = compileCharacter({ ...OVERHANG, key: 'custom-gritty', name: 'Gritty', rules: [], gritStart: 3, gritPerRound: 2 });
+  check('a climber may print starting Grit and Grit each round', gritty.ok && gritty.value.gritStart === 3 && gritty.value.gritPerRound === 2, errorsAt(gritty));
+  check('a climber\'s Grit numbers are range-checked', !compileCharacter({ ...OVERHANG, gritStart: 11 }).ok && !compileCharacter({ ...OVERHANG, gritPerRound: -1 }).ok);
+  check('they default to 0', compileCharacter({ ...OVERHANG, rules: [] }).value.gritStart === 0);
+  const { state } = createGame({ seed: 2, characterKeys: ['custom-gritty', 'technician'], rules: GRIT_RULES, content: { characters: [gritty.value] } });
+  check('starting Grit: seat Grit plus the card\'s', state.players[0].character.grit === 3 && state.players[1].character.grit === 2);
+  const next = applyAction(state, { type: 'endTurn' });
+  const r2 = applyAction({ ...next.state, currentPlayerIndex: next.state.currentPlayerIndex }, { type: 'endTurn' });
+  const gc = r2.state.players[0].character;
+  check('Grit each round is added at every new round', r2.state.round === 2 && gc.grit === 5, JSON.stringify({ round: r2.state.round, grit: gc.grit }));
 }
 
 // =============================================================================

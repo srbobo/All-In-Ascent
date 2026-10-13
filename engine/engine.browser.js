@@ -188,6 +188,10 @@ const __version = (function () {
 //   - Round-start Time is now computed from every card with
 //     statEffect 'timePerRound' (roundStartTime) instead of Approach Shoes by
 //     name — the same number for the printed deck.
+//   - Grit on custom cards (2026-10-13): a custom route may print its own
+//     Grit (printedGrit; routeGritValue honours it, else the grade's usual
+//     amount), and a custom climber prints starting Grit and Grit each round
+//     (gritStart / gritPerRound, added at setup and every round end).
 //   The standard game is unchanged: same outcomes, same RNG streams. Minor
 //   bump for the new content system (baselines from 1.1.x stay comparable).
 // 1.1.0 (2026-10-11): Grit is how the game is played.
@@ -835,6 +839,7 @@ function checkStatBlock(raw, path, at, min, max, label) {
 const CHARACTER_LIMITS = Object.freeze({
   stat: { min: 5, max: 40 }, statTotal: { min: 40, max: 90 },
   endurance: { min: 50, max: 160 },
+  gritStart: { min: 0, max: 10 }, gritPerRound: { min: 0, max: 5 },
   growth: { min: 0, max: 6, step: 0.5 }, enduranceGrowth: { min: 0, max: 12, step: 0.5 },
 });
 
@@ -866,6 +871,15 @@ function compileCharacter(raw, path = 'character') {
       at(`${path}.growth.${k}`, `${k === 'endurance' ? 'Endurance' : STAT_LABELS[k]} growth must be ${lim.min}–${lim.max} in steps of ${lim.step}`);
     } else growth[k] = v;
   }
+  // Grit (the Grit rules): what the climber starts with and gains each
+  // round, as plain numbers on the card. Conditional versions are rules.
+  const gritField = (field, lim, label) => {
+    const v = raw[field] === undefined || raw[field] === null ? 0 : raw[field];
+    if (!isInt(v) || v < lim.min || v > lim.max) { at(`${path}.${field}`, `${label} must be a whole number between ${lim.min} and ${lim.max}`); return 0; }
+    return v;
+  };
+  const gritStart = gritField('gritStart', L.gritStart, 'starting Grit');
+  const gritPerRound = gritField('gritPerRound', L.gritPerRound, 'Grit each round');
   const rules = compileRules(raw.rules, 'character', `${path}.rules`, at);
   const ability = raw.specialAbility || {};
   const abilityName = str(ability.name).slice(0, 40) || 'House rules';
@@ -874,7 +888,7 @@ function compileCharacter(raw, path = 'character') {
   if (errors.length) return { ok: false, errors, value: null };
   const value = {
     key, name, archetype, description, portrait, accent, custom: true,
-    startingStats, startingEndurance, growth,
+    startingStats, startingEndurance, growth, gritStart, gritPerRound,
     specialAbility: {
       name: abilityName,
       description: rules.length ? describeRules(rules) : 'No special rules.',
@@ -890,8 +904,14 @@ function compileCharacter(raw, path = 'character') {
 
 const ROUTE_LIMITS = Object.freeze({
   requirement: { min: 0, max: 99 }, time: { min: 1, max: 8 }, endurance: { min: 0, max: 100 },
-  xpSuccess: { min: 5, max: 150 }, xpFail: { min: 0, max: 150 }, dice: 4,
+  xpSuccess: { min: 5, max: 150 }, xpFail: { min: 0, max: 150 }, dice: 4, grit: { min: 0, max: 6 },
 });
+
+// The Grit a route of this grade carries under the Grit rules (what a custom
+// route gets when its builder leaves the Grit field alone).
+function defaultRouteGrit(route) {
+  return [2, 3, 4][gradeBandOf(route)];
+}
 
 function compileRoute(raw, path = 'route') {
   const { errors, at } = makeErrors();
@@ -935,10 +955,19 @@ function compileRoute(raw, path = 'route') {
   const moveFeatures = listOf('moveFeatures', ROUTE_VOCAB.moveFeatures);
   const tag = raw.tag === null || raw.tag === undefined || raw.tag === '' ? null : raw.tag;
   if (tag !== null && !ROUTE_VOCAB.tags.includes(tag)) at(`${path}.tag`, `tag must be one of ${ROUTE_VOCAB.tags.join(', ')} or none`);
+  // Grit printed on the card (Grit rules): the grade's usual amount unless the
+  // builder sets one. Kept as printedGrit — `grit` on a dealt card is what is
+  // left to take.
+  let printedGrit = null;
+  if (raw.grit !== undefined && raw.grit !== null && raw.grit !== '') {
+    if (!isInt(raw.grit) || raw.grit < L.grit.min || raw.grit > L.grit.max) at(`${path}.grit`, `Grit on the card must be a whole number between ${L.grit.min} and ${L.grit.max}`);
+    else printedGrit = raw.grit;
+  }
   if (errors.length) return { ok: false, errors, value: null };
   const value = {
     name, area, grade, ...reqs, time, endurance, xpSuccess, xpFail, rollEffect,
     gearModifiers: [], routeType, holdFeatures, moveFeatures, tag, custom: true,
+    printedGrit: printedGrit === null ? defaultRouteGrit({ grade }) : printedGrit,
   };
   return { ok: true, errors, value };
 }
@@ -1162,7 +1191,7 @@ function validateSubmission(sub) {
   return null;
 }
 
-return { CONTENT_SCHEMA, SUBMISSION_SCHEMA, CONTENT_KINDS, STATS, AREAS, ROUTE_VOCAB, GEAR_CATEGORIES, PORTRAITS, ACCENTS, LIMITS, gradeBandOf, CONDITIONS, EFFECTS, SCOPES, describeCondition, describeEffect, describeRule, describeRules, compileRules, rulesHash, slugKey, CHARACTER_LIMITS, compileCharacter, ROUTE_LIMITS, compileRoute, GEAR_LIMITS, compileGear, emptyContentPack, hasCustomContent, compileContentPack, characterTemplate, routesForArea, allRoutes, gearPool, findGear, activeRules, rulesSignature, ruleEffects, effectSum, hasEffect, describeAppliedClimbRules, SUBMISSION_STATUSES, validateSubmission };
+return { CONTENT_SCHEMA, SUBMISSION_SCHEMA, CONTENT_KINDS, STATS, AREAS, ROUTE_VOCAB, GEAR_CATEGORIES, PORTRAITS, ACCENTS, LIMITS, gradeBandOf, CONDITIONS, EFFECTS, SCOPES, describeCondition, describeEffect, describeRule, describeRules, compileRules, rulesHash, slugKey, CHARACTER_LIMITS, compileCharacter, ROUTE_LIMITS, defaultRouteGrit, compileRoute, GEAR_LIMITS, compileGear, emptyContentPack, hasCustomContent, compileContentPack, characterTemplate, routesForArea, allRoutes, gearPool, findGear, activeRules, rulesSignature, ruleEffects, effectSum, hasEffect, describeAppliedClimbRules, SUBMISSION_STATUSES, validateSubmission };
 })();
 
 // ---- engine/helpers.js ----
@@ -2338,6 +2367,8 @@ const gradeBand = gradeBandOf;
 
 // Grit a freshly dealt route card carries.
 function routeGritValue(rules, route) {
+  // A custom route may print its own Grit (content.js compileRoute).
+  if (typeof route.printedGrit === 'number') return route.printedGrit;
   const table = (rules.grit && rules.grit.routeGrit) || DEFAULT_ROUTE_GRIT;
   return table[gradeBand(route)] ?? 0;
 }
@@ -2869,7 +2900,7 @@ function createGame({ seed, characterKeys, rules = null, content = null }) {
   // custom climber's "starting Grit" rules).
   if (usesGrit(rules)) {
     players.forEach((p, i) => {
-      p.character.grit = startingGrit(rules, p.character.key, i) + effectSum(p.character, 'gritStart', { scope: 'setup' });
+      p.character.grit = startingGrit(rules, p.character.key, i) + (p.character.gritStart || 0) + effectSum(p.character, 'gritStart', { scope: 'setup' });
     });
   }
   // Rules-variant ability tuning (rules.characters[key].ability), copied onto
@@ -4146,7 +4177,7 @@ function endRound(s, rng, emitter) {
     c.trainedThisRound = 0;
     c.freeSessionUsed = false;
     // Grit economy: the per-round allowance, plus custom "Grit each round" rules.
-    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key) + effectSum(c, 'gritPerRound', { scope: 'round' });
+    if (usesGrit(s.rules)) c.grit = (c.grit || 0) + perRoundGrit(s.rules, c.key) + (c.gritPerRound || 0) + effectSum(c, 'gritPerRound', { scope: 'round' });
     c.location = 'lobby';
     c.belayerStation = null;
   }
@@ -4621,6 +4652,7 @@ return {
   CHARACTER_LIMITS: __content.CHARACTER_LIMITS,
   compileCharacter: __content.compileCharacter,
   ROUTE_LIMITS: __content.ROUTE_LIMITS,
+  defaultRouteGrit: __content.defaultRouteGrit,
   compileRoute: __content.compileRoute,
   GEAR_LIMITS: __content.GEAR_LIMITS,
   compileGear: __content.compileGear,

@@ -10,6 +10,7 @@
 import { test, expect } from '@playwright/test';
 import { compileCharacter, compileContentPack, describeRule } from '../../engine/content.js';
 import { ROUTES } from '../../engine/data.js';
+import { GRIT_RULES, routeGritValue } from '../../engine/helpers.js';
 import {
   seedPageRandom, collectPageErrors, collectDialogs, startLocalGame, playRandomly, replayInEngine, asJson, cardAction, fastEffects,
 } from './support.js';
@@ -29,7 +30,7 @@ const ROOF_RAT = {
 };
 const CHALK_LINE = {
   name: 'Chalk Line', area: 'bouldering', grade: 'V2', strength: 24, technique: 28, focus: 24, flexibility: 20, time: 2, endurance: 18,
-  xpSuccess: 40, xpFail: 15, rollEffect: [{ stat: 'technique', modifier: -1 }], routeType: 'Vertical', holdFeatures: ['Crimp'], moveFeatures: [], tag: 'Pinch/Crimp',
+  xpSuccess: 40, xpFail: 15, grit: 2, rollEffect: [{ stat: 'technique', modifier: -1 }], routeType: 'Vertical', holdFeatures: ['Crimp'], moveFeatures: [], tag: 'Pinch/Crimp',
 };
 const KNEEPADS = {
   name: 'Kneebar Pads', category: 'Specialized Gear', cost: 110, gritCost: 4, prerequisiteLevel: 1, description: 'Rest on the roof.',
@@ -100,16 +101,26 @@ test('the workshop builds a climber from rule elements, compiles it and submits 
   await expect(page.locator('.pm-rule')).toHaveCount(1);
   await expect(page.locator('[data-rule-text="0"]')).toContainText('On Overhang routes');
 
+  // Grit on the card: starting Grit and Grit each round show as a chip on the preview.
+  await page.fill('[data-path="gritStart"]', '2');
+  await page.fill('[data-path="gritPerRound"]', '1');
+  await expect(page.locator('#preview .aia-card__grit')).toContainText('+2');
+  await expect(page.locator('#preview .aia-card__grit')).toContainText('+1');
+  await expect(page.locator('#compileStatus')).toContainText('Ready to play');
+
   // The page's definition compiles in Node to the same climber.
   const def = await page.evaluate(() => window.AscentProject.editing.def);
   const compiled = compileCharacter(def);
   expect(compiled.ok).toBe(true);
+  expect(compiled.value.gritStart).toBe(2);
+  expect(compiled.value.gritPerRound).toBe(1);
   expect(compiled.value.specialAbility.description).toBe(describeRule(def.rules[0]));
 
   // Save, then submit for review: the server stores exactly the definition.
   await page.click('#saveBtn');
   await expect(page.locator('#workshopList li')).toHaveCount(1);
   await expect(page.locator('#workshopList')).toContainText('The Roof Rat');
+  await expect(page.locator('#workshopList')).toContainText('ready to play');
   await page.click('#submitBtn');
   await expect(page.locator('#submitModal')).toHaveClass(/show/);
   await page.fill('#submitAuthor', 'e2e');
@@ -126,6 +137,58 @@ test('the workshop builds a climber from rule elements, compiles it and submits 
   expect(stored.status).toBe('new');
   expect(stored.author).toBe('e2e');
   expect(stored.definition).toEqual(asJson(def));
+  expect(errors).toEqual([]);
+});
+
+test('cards can be deleted from the list or the editor through an in-page dialog', async ({ page }) => {
+  const errors = collectPageErrors(page);
+  // The browser's own confirm() must never be used: it can be blocked.
+  await page.addInitScript(() => { window.confirm = () => { throw new Error('native confirm used'); }; });
+  await seedWorkshop(page, { characters: [ROOF_RAT], routes: [CHALK_LINE] });
+  await page.goto('/project.html?projectMode=on');
+  await expect(page.locator('#workshopList li')).toHaveCount(2);
+
+  // From the list: "Keep it" keeps, "Delete" deletes.
+  await page.locator('#workshopList [data-delete]').first().click();
+  await expect(page.locator('#confirmModal')).toHaveClass(/show/);
+  await expect(page.locator('#confirmText')).toContainText('Delete "The Roof Rat"');
+  await page.click('#confirmNo');
+  await expect(page.locator('#confirmModal')).not.toHaveClass(/show/);
+  await expect(page.locator('#workshopList li')).toHaveCount(2);
+  await page.locator('#workshopList [data-delete]').first().click();
+  await page.click('#confirmYes');
+  await expect(page.locator('#workshopList li')).toHaveCount(1);
+  await expect(page.locator('#workshopList')).not.toContainText('The Roof Rat');
+
+  // From the editor: open the route, delete it; the editor closes.
+  await page.locator('#workshopList [data-edit]').click();
+  await expect(page.locator('#editor')).toBeVisible();
+  await expect(page.locator('[data-path="grit"]')).toHaveValue('2');
+  await page.click('#deleteBtn');
+  await page.click('#confirmYes');
+  await expect(page.locator('#editor')).toBeHidden();
+  await expect(page.locator('#workshopList li')).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('all-in-ascent.workshop')))).toEqual({ characters: [], routes: [], gear: [] });
+  expect(errors).toEqual([]);
+});
+
+test('a route card prints its own Grit, which the game deals onto it', async ({ page }) => {
+  const errors = collectPageErrors(page);
+  await page.goto('/project.html?projectMode=on&new=route');
+  // The starter route carries its grade's usual Grit; the builder may change it.
+  await expect(page.locator('[data-path="grit"]')).toHaveValue('2');
+  await expect(page.locator('#preview .aia-cost--grit b')).toHaveText('2');
+  await page.fill('[data-path="name"]', 'Grit Mine');
+  await page.fill('[data-path="grit"]', '5');
+  await expect(page.locator('#preview .aia-cost--grit b')).toHaveText('5');
+  await page.fill('[data-path="grit"]', '9');
+  await expect(page.locator('#compileStatus')).toContainText('Grit on the card must be a whole number between 0 and 6');
+  await page.fill('[data-path="grit"]', '5');
+  await page.click('#saveBtn');
+  const def = await page.evaluate(() => window.AscentProject.editing.def);
+  const { routes } = compileContentPack({ routes: [def] }).value;
+  expect(routes.bouldering[0].printedGrit).toBe(5);
+  expect(routeGritValue(GRIT_RULES, routes.bouldering[0])).toBe(5);
   expect(errors).toEqual([]);
 });
 
@@ -267,7 +330,7 @@ test('workshop cards that do not compile are left out of the game and the setup 
   await page.goto('/index.html?projectMode=on');
   await page.click('#continueBtn');
   await expect(page.getByTestId('project-mode-note')).toContainText('1 workshop card in this game');
-  await expect(page.getByTestId('project-mode-note')).toContainText('1 card left out');
+  await expect(page.getByTestId('project-mode-note')).toContainText('1 unfinished card left out');
   await expect(page.locator('#characterSelect .character-card--custom')).toHaveCount(1);
   expect(errors).toEqual([]);
 });

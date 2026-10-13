@@ -36,14 +36,14 @@
       name: 'New Climber', archetype: 'Project climber', description: '',
       portrait: 'technician', accent: 'cobalt',
       startingStats: { strength: 16, technique: 16, focus: 16, flexibility: 16 },
-      startingEndurance: 100,
+      startingEndurance: 100, gritStart: 0, gritPerRound: 0,
       growth: { strength: 2.5, technique: 2.5, focus: 2.5, flexibility: 2.5, endurance: 6 },
       specialAbility: { name: 'House Rules' },
       rules: [{ when: [{ type: 'routeType', value: 'Overhang' }], then: [{ type: 'statBonus', stat: 'strength', amount: 5 }] }],
     }),
     route: () => ({
       name: 'New Route', area: 'bouldering', grade: 'V2',
-      strength: 26, technique: 24, focus: 22, flexibility: 20, time: 2, endurance: 18, xpSuccess: 40, xpFail: 15,
+      strength: 26, technique: 24, focus: 22, flexibility: 20, time: 2, endurance: 18, xpSuccess: 40, xpFail: 15, grit: 2,
       rollEffect: [{ stat: 'technique', modifier: -1 }],
       routeType: 'Vertical', holdFeatures: ['Jugs'], moveFeatures: [], tag: null,
     }),
@@ -73,7 +73,7 @@
   function statusOf(kind, card) {
     const def = AscentWorkshop.definitionOf(card);
     const r = kind === 'character' ? E.compileCharacter(def) : kind === 'route' ? E.compileRoute(def) : E.compileGear(def);
-    return r.ok ? { ok: true, text: 'compiles' } : { ok: false, text: `${r.errors.length} error${r.errors.length === 1 ? '' : 's'}` };
+    return r.ok ? { ok: true, text: 'ready to play' } : { ok: false, text: `${r.errors.length} thing${r.errors.length === 1 ? '' : 's'} to fix` };
   }
 
   function renderWorkshop() {
@@ -94,7 +94,10 @@
       li.innerHTML = `
         <span class="aia-chip aia-chip--ink">${esc(KIND_LABELS[kind].split(' ')[0])}</span>
         <span><span class="pm-item__name">${esc(card.name || '(unnamed)')}</span><span class="pm-item__meta${st.ok ? '' : ' is-bad'}">${esc(st.text)}${card.submittedAt ? ' · submitted' : ''}</span></span>
-        <button class="btn btn--ghost" type="button" data-edit="${esc(card.workshopId)}" aria-label="Edit ${esc(card.name || 'card')}">Edit</button>`;
+        <span class="pm-item__tools">
+          <button class="btn btn--ghost" type="button" data-edit="${esc(card.workshopId)}" aria-label="Edit ${esc(card.name || 'card')}">Edit</button>
+          <button class="pm-mini" type="button" data-delete="${esc(card.workshopId)}" data-kind="${kind}" aria-label="Delete ${esc(card.name || 'card')}">✕</button>
+        </span>`;
       list.appendChild(li);
     }
     const n = rows.length;
@@ -134,6 +137,12 @@
           ${STATS.map(k => statField(STAT_LABELS[k], `startingStats.${k}`, def.startingStats && def.startingStats[k], L.stat.min, L.stat.max, 1, k)).join('')}
           ${statField('Endurance', 'startingEndurance', def.startingEndurance, L.endurance.min, L.endurance.max, 1, 'endurance')}
         </div></div>
+      <div class="pm-group"><h3>Grit <small>the game's currency: training and gear cost Grit</small></h3>
+        <div class="pm-stat-grid">
+          ${statField('Starting Grit', 'gritStart', def.gritStart ?? 0, L.gritStart.min, L.gritStart.max, 1, 'grit')}
+          ${statField('Grit each round', 'gritPerRound', def.gritPerRound ?? 0, L.gritPerRound.min, L.gritPerRound.max, 1, 'grit')}
+        </div>
+        <p class="pm-help" style="margin:var(--sp-2) 0 0">Every climber also takes the Grit on the route cards they send first. For Grit that depends on the situation, add a rule below.</p></div>
       <div class="pm-group"><h3>Growth per Level <small>${L.growth.min}–${L.growth.max} in steps of ${L.growth.step}; Endurance ${L.enduranceGrowth.min}–${L.enduranceGrowth.max}</small></h3>
         <div class="pm-stat-grid">
           ${STATS.map(k => statField(STAT_LABELS[k], `growth.${k}`, def.growth && def.growth[k], L.growth.min, L.growth.max, L.growth.step, k)).join('')}
@@ -166,7 +175,9 @@
           ${statField('Endurance', 'endurance', def.endurance, L.endurance.min, L.endurance.max, 1, 'endurance')}
           ${statField('XP on a send', 'xpSuccess', def.xpSuccess, L.xpSuccess.min, L.xpSuccess.max, 1, 'xp')}
           ${statField('XP on a fall', 'xpFail', def.xpFail, L.xpFail.min, L.xpFail.max, 1, 'xp')}
-        </div></div>
+          ${statField('Grit on the card', 'grit', Number.isInteger(def.grit) ? def.grit : E.defaultRouteGrit(def), L.grit.min, L.grit.max, 1, 'grit')}
+        </div>
+        <p class="pm-help" style="margin:var(--sp-2) 0 0">The first climber to send the route takes its Grit. Routes of this grade usually carry ${E.defaultRouteGrit(def)}.</p></div>
       <div class="pm-group"><h3>Dice <small>up to ${L.dice}; a buff die lowers its requirement, a nerf die raises it</small></h3>
         <div class="pm-dice">
           ${(def.rollEffect || []).map((d, i) => `<div class="pm-die">
@@ -263,7 +274,7 @@
           ${(rule.then || []).map((e, j) => elementChip(E.EFFECTS, e, `${path}.then.${j}`, 'pm-element--then', errorPaths)).join('')}
           ${atMaxThen ? '' : `<span class="pm-add"><select data-add-then="${i}" aria-label="Add an effect to rule ${i + 1}"><option value="">+ effect</option>${thenOpts.map(([k, s]) => `<option value="${k}">${esc(s.label)}</option>`).join('')}</select></span>`}
         </div></div>
-        <p class="pm-rule__text${ruleErrors.length ? ' is-bad' : ''}" data-rule-text="${i}">${esc(ruleErrors.length ? 'This rule has errors — see the compile status.' : text)}</p>
+        <p class="pm-rule__text${ruleErrors.length ? ' is-bad' : ''}" data-rule-text="${i}">${esc(ruleErrors.length ? 'Something in this rule needs fixing — see the checklist on the right.' : text)}</p>
       </div>`;
   }
 
@@ -306,17 +317,17 @@
     const preview = $('preview');
     preview.innerHTML = '';
     try {
-      if (kind === 'character') preview.appendChild(AIACards.climber(shown.key || 'custom-draft', shown));
-      else if (kind === 'route') preview.appendChild(AIACards.route(shown, { area: shown.area, grit: E.routeGritValue(E.GRIT_RULES, shown) }));
+      if (kind === 'character') preview.appendChild(AIACards.climber(shown.key || 'custom-draft', shown, { grit: { start: Number(def.gritStart) || 0, perRound: Number(def.gritPerRound) || 0 } }));
+      else if (kind === 'route') preview.appendChild(AIACards.route(shown, { area: shown.area, grit: compiled.ok ? E.routeGritValue(E.GRIT_RULES, shown) : (Number.isInteger(def.grit) ? def.grit : E.defaultRouteGrit(shown)) }));
       else preview.appendChild(AIACards.gear(shown, { currency: 'grit', price: shown.gritCost }));
     } catch (e) {
-      preview.innerHTML = `<p class="pm-note">Preview unavailable: ${esc(e.message)}</p>`;
+      preview.innerHTML = `<p class="pm-note">The preview will appear once the card is filled in.</p>`;
     }
     const status = $('compileStatus');
     status.className = `pm-status ${compiled.ok ? 'is-ok' : 'is-bad'}`;
     status.innerHTML = compiled.ok
-      ? `${icon('check')} <b>Compiles.</b> This card plays by its text in local games.`
-      : `${icon('cross')} <b>${compiled.errors.length} thing${compiled.errors.length === 1 ? '' : 's'} to fix</b> before it can be played or submitted:<ul>${compiled.errors.map(e => `<li>${esc(e.message)} <code>${esc(e.path.replace(/^(character|route|gear)\./, ''))}</code></li>`).join('')}</ul>`;
+      ? `${icon('check')} <b>Ready to play.</b> This card works in your local games exactly as its text says.`
+      : `${icon('cross')} <b>${compiled.errors.length} thing${compiled.errors.length === 1 ? '' : 's'} to fix</b> before it can be played or sent for review:<ul>${compiled.errors.map(e => `<li title="${esc(e.path.replace(/^(character|route|gear)\./, ''))}">${esc(e.message)}</li>`).join('')}</ul>`;
     $('submitBtn').disabled = !compiled.ok;
     $('deleteBtn').hidden = !editing.workshopId;
     const note = $('editorNote');
@@ -330,7 +341,7 @@
       const path = `rules.${i}`;
       const errs = compiled.ok ? [] : compiled.errors.filter(e => e.path.replace(/^(character|route|gear)\./, '').startsWith(path));
       el.classList.toggle('is-bad', errs.length > 0);
-      el.textContent = errs.length ? 'This rule has errors — see the compile status.' : E.describeRule(rule);
+      el.textContent = errs.length ? 'Something in this rule needs fixing — see the checklist on the right.' : E.describeRule(rule);
     }
     for (const chip of document.querySelectorAll('.pm-element[title]')) {
       const input = chip.querySelector('[data-path]');
@@ -449,11 +460,39 @@
     return saved;
   }
 
+  // An in-page "are you sure?" dialog (the design system's modal), because a
+  // browser's own confirm() box can be blocked or dismissed without a choice.
+  function askConfirm(text, yesLabel = 'Delete') {
+    return new Promise((resolve) => {
+      const modal = $('confirmModal');
+      $('confirmText').textContent = text;
+      $('confirmYes').textContent = yesLabel;
+      const done = (answer) => {
+        $('confirmYes').removeEventListener('click', yes);
+        $('confirmNo').removeEventListener('click', no);
+        modal.classList.remove('show');
+        resolve(answer);
+      };
+      const yes = () => done(true);
+      const no = () => done(false);
+      $('confirmYes').addEventListener('click', yes);
+      $('confirmNo').addEventListener('click', no);
+      modal.classList.add('show');
+      $('confirmNo').focus();
+    });
+  }
+
+  async function removeCard(kind, workshopId, name) {
+    if (!(await askConfirm(`Delete "${name || 'this card'}" from your workshop? This can't be undone.`))) return false;
+    AscentWorkshop.remove(kind, workshopId);
+    if (editing && editing.workshopId === workshopId) closeEditor();
+    else renderWorkshop();
+    return true;
+  }
+
   function remove() {
     if (!editing || !editing.workshopId) return;
-    if (!confirm(`Delete "${editing.def.name}" from your workshop?`)) return;
-    AscentWorkshop.remove(editing.kind, editing.workshopId);
-    closeEditor();
+    removeCard(editing.kind, editing.workshopId, editing.def.name);
   }
 
   function openSubmit() {
@@ -485,6 +524,20 @@
     }
   }
 
+  // A short notice under the workshop list.
+  function banner(text, bad = false) {
+    let el = $('workshopNote');
+    if (!el) {
+      el = document.createElement('p');
+      el.id = 'workshopNote';
+      el.className = 'pm-note';
+      el.setAttribute('role', 'status');
+      $('workshopList').after(el);
+    }
+    el.textContent = text;
+    el.classList.toggle('pm-warn', bad);
+  }
+
   function exportWorkshop() {
     const data = AscentWorkshop.load();
     const blob = new Blob([JSON.stringify({ schema: E.CONTENT_SCHEMA, ...data }, null, 2)], { type: 'application/json' });
@@ -514,9 +567,9 @@
           }
         }
         renderWorkshop();
-        alert(`Imported ${added} card${added === 1 ? '' : 's'}.`);
+        banner(added ? `Added ${added} card${added === 1 ? '' : 's'} to your workshop.` : 'No new cards in that file (cards with the same name as one you have are skipped).');
       } catch (e) {
-        alert(`Could not import: ${e.message}`);
+        banner('That file is not a saved copy of a workshop.', true);
       }
     };
     reader.readAsText(file);
@@ -531,8 +584,8 @@
     $('flagNote').classList.toggle('is-off', !on);
     $('flagNote').querySelector('b').textContent = on ? 'Project Mode is on for this browser.' : 'Project Mode is off for this browser.';
     $('flagHelp').textContent = on
-      ? 'Cards in your workshop that compile join every local game you start from the setup screen.'
-      : 'Switch it on to play your workshop cards in local games. You can still build and submit cards.';
+      ? 'Finished cards in your workshop join every local game you start from the setup screen.'
+      : 'Switch it on to play your workshop cards in local games. You can still build cards and send them for review.';
     $('playLink').href = on ? 'index.html' : 'index.html?projectMode=on';
   }
 
@@ -545,15 +598,21 @@
     renderWorkshop();
     $('flagToggle').addEventListener('change', (e) => { AscentFlags.set('projectMode', e.target.checked); renderFlag(); });
     for (const btn of document.querySelectorAll('[data-new]')) {
-      btn.addEventListener('click', () => {
-        if (dirty && !confirm('Discard unsaved changes to the card you are editing?')) return;
+      btn.addEventListener('click', async () => {
+        if (dirty && !(await askConfirm('Leave the card you are editing without saving it?', 'Leave without saving'))) return;
         openEditor(btn.dataset.new, STARTERS[btn.dataset.new]());
       });
     }
-    $('workshopList').addEventListener('click', (e) => {
+    $('workshopList').addEventListener('click', async (e) => {
+      const del = e.target.closest('[data-delete]');
+      if (del) {
+        const card = AscentWorkshop.get(del.dataset.kind, del.dataset.delete);
+        if (card) removeCard(del.dataset.kind, card.workshopId, card.name);
+        return;
+      }
       const btn = e.target.closest('[data-edit]');
       if (!btn) return;
-      if (dirty && !confirm('Discard unsaved changes to the card you are editing?')) return;
+      if (dirty && !(await askConfirm('Leave the card you are editing without saving it?', 'Leave without saving'))) return;
       const li = btn.closest('li');
       const card = AscentWorkshop.get(li.dataset.kind, li.dataset.id);
       if (card) openEditor(li.dataset.kind, AscentWorkshop.definitionOf(card), card.workshopId);
@@ -590,6 +649,7 @@
     compile: compileNow,
     open: openEditor,
     save,
+    removeCard,
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

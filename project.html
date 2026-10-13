@@ -32,14 +32,14 @@
     <span class="tape tape--coral">Climbers</span>
     <span class="tape tape--teal">Route cards</span>
     <span class="tape tape--violet">Gear cards</span>
-    <span class="tape tape--marigold">Rules that compile</span>
+    <span class="tape tape--marigold">Rules that just work</span>
   </div>
 </header>
 
 <main id="main" tabindex="-1" class="pm-main">
   <p class="pm-flag paper" id="flagNote">
     <label><input type="checkbox" id="flagToggle"> <b>Project Mode is on for this browser.</b></label>
-    <span id="flagHelp">Cards in your workshop that compile join every local game you start from the setup screen.</span>
+    <span id="flagHelp">Finished cards in your workshop join every local game you start from the setup screen.</span>
   </p>
 
   <div class="pm-layout">
@@ -55,8 +55,8 @@
       <ul class="pm-list" id="workshopList" aria-label="Workshop cards"></ul>
       <div class="pm-tools">
         <a class="btn btn--lime btn--sm" id="playLink" href="index.html?projectMode=on">Play with these cards ▸</a>
-        <button class="btn btn--ghost btn--sm" type="button" id="exportBtn">Export JSON</button>
-        <label class="btn btn--ghost btn--sm pm-import">Import JSON<input type="file" id="importInput" accept=".json,application/json" hidden></label>
+        <button class="btn btn--ghost btn--sm" type="button" id="exportBtn" title="Download your workshop as a file you can keep or share">Save a copy</button>
+        <label class="btn btn--ghost btn--sm pm-import" title="Add cards from a saved copy">Load a copy<input type="file" id="importInput" accept=".json,application/json" hidden></label>
       </div>
     </aside>
 
@@ -84,7 +84,7 @@
       <ol>
         <li>Start a card and set its numbers: a climber's stats and growth, a route's requirements and dice, a gear card's price.</li>
         <li>Give climbers and gear <b>rules</b>: pick conditions (<i>on Overhang routes</i>, <i>when the route needs under 30 Strength</i>, <i>at Level 3 or more</i>…) and effects (<i>+5 Strength</i>, <i>the climb costs −1 Time</i>, <i>roll an extra buff die</i>…). Add, remove and reorder them freely.</li>
-        <li>The card <b>compiles</b> against the rules engine as you type. A card that compiles plays in your local games exactly as its text says.</li>
+        <li>The game <b>checks your card</b> as you type and tells you what to fix. A finished card plays in your local games exactly as its text says.</li>
         <li>Happy with it? <b>Submit it for review</b> and the designer sees it in the review queue.</li>
       </ol>
     </section>
@@ -95,6 +95,17 @@
   <p class="site-footer__version">Rules engine <span id="engineVersion" data-testid="engine-version">v—</span></p>
   <p>Submitted cards are sent with the name and note you give and nothing else.</p>
 </footer>
+
+<div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" data-close-button="confirmNo">
+  <div class="modal-content">
+    <h2 class="modal-header" id="confirmTitle">Are you sure?</h2>
+    <p id="confirmText"></p>
+    <div class="action-buttons">
+      <button class="btn btn--ghost" type="button" id="confirmNo">Keep it</button>
+      <button class="btn btn--raspberry" type="button" id="confirmYes">Delete</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal" id="submitModal" role="dialog" aria-modal="true" aria-labelledby="submitTitle" data-close-button="submitCancel">
   <div class="modal-content">

@@ -472,6 +472,7 @@ function checkStatBlock(raw, path, at, min, max, label) {
 export const CHARACTER_LIMITS = Object.freeze({
   stat: { min: 5, max: 40 }, statTotal: { min: 40, max: 90 },
   endurance: { min: 50, max: 160 },
+  gritStart: { min: 0, max: 10 }, gritPerRound: { min: 0, max: 5 },
   growth: { min: 0, max: 6, step: 0.5 }, enduranceGrowth: { min: 0, max: 12, step: 0.5 },
 });
 
@@ -503,6 +504,15 @@ export function compileCharacter(raw, path = 'character') {
       at(`${path}.growth.${k}`, `${k === 'endurance' ? 'Endurance' : STAT_LABELS[k]} growth must be ${lim.min}–${lim.max} in steps of ${lim.step}`);
     } else growth[k] = v;
   }
+  // Grit (the Grit rules): what the climber starts with and gains each
+  // round, as plain numbers on the card. Conditional versions are rules.
+  const gritField = (field, lim, label) => {
+    const v = raw[field] === undefined || raw[field] === null ? 0 : raw[field];
+    if (!isInt(v) || v < lim.min || v > lim.max) { at(`${path}.${field}`, `${label} must be a whole number between ${lim.min} and ${lim.max}`); return 0; }
+    return v;
+  };
+  const gritStart = gritField('gritStart', L.gritStart, 'starting Grit');
+  const gritPerRound = gritField('gritPerRound', L.gritPerRound, 'Grit each round');
   const rules = compileRules(raw.rules, 'character', `${path}.rules`, at);
   const ability = raw.specialAbility || {};
   const abilityName = str(ability.name).slice(0, 40) || 'House rules';
@@ -511,7 +521,7 @@ export function compileCharacter(raw, path = 'character') {
   if (errors.length) return { ok: false, errors, value: null };
   const value = {
     key, name, archetype, description, portrait, accent, custom: true,
-    startingStats, startingEndurance, growth,
+    startingStats, startingEndurance, growth, gritStart, gritPerRound,
     specialAbility: {
       name: abilityName,
       description: rules.length ? describeRules(rules) : 'No special rules.',
@@ -527,8 +537,14 @@ export function compileCharacter(raw, path = 'character') {
 
 export const ROUTE_LIMITS = Object.freeze({
   requirement: { min: 0, max: 99 }, time: { min: 1, max: 8 }, endurance: { min: 0, max: 100 },
-  xpSuccess: { min: 5, max: 150 }, xpFail: { min: 0, max: 150 }, dice: 4,
+  xpSuccess: { min: 5, max: 150 }, xpFail: { min: 0, max: 150 }, dice: 4, grit: { min: 0, max: 6 },
 });
+
+// The Grit a route of this grade carries under the Grit rules (what a custom
+// route gets when its builder leaves the Grit field alone).
+export function defaultRouteGrit(route) {
+  return [2, 3, 4][gradeBandOf(route)];
+}
 
 export function compileRoute(raw, path = 'route') {
   const { errors, at } = makeErrors();
@@ -572,10 +588,19 @@ export function compileRoute(raw, path = 'route') {
   const moveFeatures = listOf('moveFeatures', ROUTE_VOCAB.moveFeatures);
   const tag = raw.tag === null || raw.tag === undefined || raw.tag === '' ? null : raw.tag;
   if (tag !== null && !ROUTE_VOCAB.tags.includes(tag)) at(`${path}.tag`, `tag must be one of ${ROUTE_VOCAB.tags.join(', ')} or none`);
+  // Grit printed on the card (Grit rules): the grade's usual amount unless the
+  // builder sets one. Kept as printedGrit — `grit` on a dealt card is what is
+  // left to take.
+  let printedGrit = null;
+  if (raw.grit !== undefined && raw.grit !== null && raw.grit !== '') {
+    if (!isInt(raw.grit) || raw.grit < L.grit.min || raw.grit > L.grit.max) at(`${path}.grit`, `Grit on the card must be a whole number between ${L.grit.min} and ${L.grit.max}`);
+    else printedGrit = raw.grit;
+  }
   if (errors.length) return { ok: false, errors, value: null };
   const value = {
     name, area, grade, ...reqs, time, endurance, xpSuccess, xpFail, rollEffect,
     gearModifiers: [], routeType, holdFeatures, moveFeatures, tag, custom: true,
+    printedGrit: printedGrit === null ? defaultRouteGrit({ grade }) : printedGrit,
   };
   return { ok: true, errors, value };
 }

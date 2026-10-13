@@ -1166,6 +1166,8 @@ export const gradeBand = gradeBandOf;
 
 // Grit a freshly dealt route card carries.
 export function routeGritValue(rules, route) {
+  // A custom route may print its own Grit (content.js compileRoute).
+  if (typeof route.printedGrit === 'number') return route.printedGrit;
   const table = (rules.grit && rules.grit.routeGrit) || DEFAULT_ROUTE_GRIT;
   return table[gradeBand(route)] ?? 0;
 }

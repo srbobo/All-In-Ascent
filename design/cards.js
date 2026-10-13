@@ -21,7 +21,9 @@
      costs    { time, endurance } as this climber pays them (route cards);
               an adjusted cost is marked and its base is read out
      grit     Grit on a route card (taken by the first climber to send it),
-              or a Milestone's Grit reward; omit when there is no Grit
+              or a Milestone's Grit reward; omit when there is no Grit.
+              On a climber card: { start, perRound } — the Grit the climber
+              starts with and gains each round (shown when either is set)
      price, currency  gear price as this climber pays it ('grit' or 'xp')
      gritCost Grit a training session costs (training cards)
 
@@ -262,6 +264,7 @@
             ${Art().climber(c.portrait || key)}
             ${reasonMarkup(id, o.action)}
             <span class="aia-card__endurance" title="Starting endurance">${icon('endurance')}<b>${c.startingEndurance ?? c.maxEndurance}</b><span class="sr-only"> starting endurance</span></span>
+            ${climberGritMarkup(o.grit)}
           </div>
           ${reqsMarkup(stats, null, { cls: 'aia-reqs--stats', verb: 'starting value' })}
           <div class="aia-rules aia-rules--ability">
@@ -277,6 +280,15 @@
         ${actionMarkup(id, o.action)}
       </article>`);
     return wireAction(node, o.action);
+  }
+  // Grit a climber card prints: "+2 Grit" to start, "+1/round" each round.
+  function climberGritMarkup(g) {
+    if (!g || (!g.start && !g.perRound)) return '';
+    const parts = [];
+    if (g.start) parts.push(`<b>+${g.start}</b><span>Grit</span>`);
+    if (g.perRound) parts.push(`<b>+${g.perRound}</b><span>/round</span>`);
+    const sr = [g.start ? `starts with ${g.start} Grit` : '', g.perRound ? `gains ${g.perRound} Grit each round` : ''].filter(Boolean).join(', ');
+    return `<span class="aia-card__grit" title="Grit (the game's currency)">${icon('grit')}${parts.join('')}<span class="sr-only"> ${sr}</span></span>`;
   }
   function setCodeForClimber(key) {
     const keys = typeof CHARACTERS !== 'undefined' ? Object.keys(CHARACTERS) : [];

@@ -373,7 +373,7 @@ function renderProjectModeNote() {
  const packProblem = projectContent.errors.find(e => e.kind === 'pack');
  note.innerHTML = `<span class="aia-chip aia-chip--ink">Project Mode</span> `
   + (n ? `${n} workshop card${n === 1 ? '' : 's'} in this game` : 'No workshop cards yet')
-  + (broken.length ? ` · <span class="pm-warn">${broken.length} card${broken.length === 1 ? '' : 's'} left out (won't compile)</span>` : '')
+  + (broken.length ? ` · <span class="pm-warn">${broken.length} unfinished card${broken.length === 1 ? '' : 's'} left out</span>` : '')
   + (packProblem ? ` · <span class="pm-warn">workshop left out: ${uiEsc(packProblem.errors[0].message)}</span>` : '')
   + ` · <a href="project.html">Open the workshop</a>`;
 }

@@ -109,7 +109,7 @@ export function createGame({ seed, characterKeys, rules = null, content = null }
   // custom climber's "starting Grit" rules).
   if (usesGrit(rules)) {
     players.forEach((p, i) => {
-      p.character.grit = startingGrit(rules, p.character.key, i) + effectSum(p.character, 'gritStart', { scope: 'setup' });
+      p.character.grit = startingGrit(rules, p.character.key, i) + (p.character.gritStart || 0) + effectSum(p.character, 'gritStart', { scope: 'setup' });
     });
   }
   // Rules-variant ability tuning (rules.characters[key].ability), copied onto
