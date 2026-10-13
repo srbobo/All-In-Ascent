@@ -14,7 +14,7 @@
 [build]
   ignore = '''
   case "${HEAD:-$BRANCH}" in
-    TechDebt|LintCleanup|R2-rollout-search) exit 0 ;;
+    TechDebt|LintCleanup|R2-rollout-search|fix/project-mode-polish) exit 0 ;;
     *) exit 1 ;;
   esac
   '''
