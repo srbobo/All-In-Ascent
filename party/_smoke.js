@@ -1,20 +1,16 @@
-// Headless smoke test for the PartyKit GameRoom — drives a bot-vs-bot game
-// through the same message handlers a real client would call. Not part of
-// the deploy bundle (excluded via `_*.js` in partykit.json).
+// Headless smoke test for the GameRoom — drives a bot-vs-bot game through the
+// same message handlers a real client would call, over party/_test-server.js.
+// Not part of the Worker bundle (party/server.js does not import it).
 
-import GameRoom from './game.js';
+import { GameRoom } from './game.js';
+import { TestServer } from './_test-server.js';
 
 // Count broadcasts rather than keeping them: each one carries the full game
 // state, so holding every one grows memory quadratically in a long game.
 const messages = { length: 0 };
-const fakeRoom = {
-  id: 'smoke',
-  env: {},
-  broadcast: (msg) => { JSON.parse(msg); messages.length++; },
-  storage: { put: async () => {} },
-};
-
-const room = new GameRoom(fakeRoom);
+const room = new (class extends GameRoom(TestServer) {
+  broadcast(msg) { JSON.parse(msg); messages.length++; }
+})({ name: 'smoke' });
 
 // Two fake connections — first one becomes host.
 const conns = [];
@@ -36,13 +32,13 @@ const friend = makeConn('friend');
 room.onConnect(friend, { request: { url: 'ws://x/party?username=bob&password=open' } });
 
 // Pick characters.
-await room.onMessage(JSON.stringify({ type: 'select_character', characterKey: 'technician' }), host);
-await room.onMessage(JSON.stringify({ type: 'select_character', characterKey: 'sprinter' }), friend);
+await room.onMessage(host, JSON.stringify({ type: 'select_character', characterKey: 'technician' }));
+await room.onMessage(friend, JSON.stringify({ type: 'select_character', characterKey: 'sprinter' }));
 
 // Host adds two bots and starts.
-await room.onMessage(JSON.stringify({ type: 'add_bot' }), host);
-await room.onMessage(JSON.stringify({ type: 'add_bot' }), host);
-await room.onMessage(JSON.stringify({ type: 'start_game' }), host);
+await room.onMessage(host, JSON.stringify({ type: 'add_bot' }));
+await room.onMessage(host, JSON.stringify({ type: 'add_bot' }));
+await room.onMessage(host, JSON.stringify({ type: 'start_game' }));
 
 // Wait for any pending bot-vs-bot turns. Two human seats means we'll stop
 // when seat 0 or seat 1 must act. We force the bot loop forward by
@@ -70,7 +66,7 @@ while (room.phase === 'in_progress' && safety++ < 2000) {
   const legal = getLegalActions(room.state);
   const { actionIndex } = await humanAgent.chooseAction({ state: room.state, legalActions: legal });
   const fakeConn = seat === 0 ? host : friend;
-  await room.onMessage(JSON.stringify({ type: 'action', actionIndex }), fakeConn);
+  await room.onMessage(fakeConn, JSON.stringify({ type: 'action', actionIndex }));
 }
 
 console.log('state is null?', room.state === null, 'phase:', room.phase, 'safety:', safety);

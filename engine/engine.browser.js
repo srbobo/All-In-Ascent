@@ -4445,7 +4445,7 @@ const { summarizeGame } = __stats;
 //
 // Built from summarizeGame (stats.js) plus a few per-card counts from the
 // engine's event log, so local play (the browser bundle), online play (the
-// PartyKit GameRoom) and the bot simulations record identical numbers for the
+// GameRoom, party/game.js) and the bot simulations record identical numbers for the
 // same game. A record never holds usernames or anything typed by a player:
 // seats are identified by character and by who controlled them (a human or a
 // bot level).

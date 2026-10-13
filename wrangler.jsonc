@@ -1,0 +1,46 @@
+// All In Ascent — Cloudflare Worker (PartyServer). Replaces partykit.json.
+//
+//   npm run online:dev      → npx wrangler dev   (http://127.0.0.1:1999)
+//   npm run online:deploy   → npx wrangler deploy
+//
+// Secrets (LOG_WEBHOOK_URL, TELEMETRY_READ_TOKEN, TELEMETRY_ADMIN_TOKEN,
+// SUBMISSIONS_READ_TOKEN, SUBMISSIONS_ADMIN_TOKEN) are set with
+// `npx wrangler secret put <NAME>`; for local dev put them in .dev.vars.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "all-in-ascent",
+  "main": "party/server.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // One Durable Object class per party. routePartykitRequest serves each at
+  // /parties/<kebab-cased binding name>/<room>, so Main is the `main` party
+  // PartySocket clients connect to by default.
+  "durable_objects": {
+    "bindings": [
+      { "name": "Main", "class_name": "Main" },
+      { "name": "Telemetry", "class_name": "Telemetry" },
+      { "name": "Submissions", "class_name": "Submissions" }
+    ]
+  },
+  // Wrangler does not infer these: add a new tag whenever a class is added,
+  // renamed or removed.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Main", "Telemetry", "Submissions"] }
+  ],
+
+  // The game's pages, served next to the parties (was partykit.json → serve).
+  // party/build-site.js copies just the playable site into .site/ before
+  // every dev run and deploy; the repo root holds far too much to upload.
+  "build": {
+    "command": "node party/build-site.js",
+    "watch_dir": ["design", "engine", "online", "docs", "RULEBOOK.html", "cards.html", "dashboard.html", "dashboard.js", "effects.js", "flags.js", "game.js", "index.html", "online-mode.js", "online.html", "project-store.js", "project.html", "project.js", "review.html", "review.js", "telemetry-client.js"]
+  },
+  "assets": {
+    "directory": ".site"
+  },
+
+  "dev": {
+    "port": 1999
+  }
+}

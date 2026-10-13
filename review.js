@@ -8,7 +8,7 @@
 // and kept in this browser.
 //
 // Where it reads from (as telemetry-client.js decides): ?telemetry=<host>,
-// the same origin on localhost, else the production PartyKit host.
+// the same origin on localhost, else the production host (backend.js).
 
 (function () {
   'use strict';

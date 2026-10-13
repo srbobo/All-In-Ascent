@@ -1,9 +1,10 @@
 // Tests for the Project Mode review queue (party/submissions.js). Runs the
-// PartyKit class in-process with in-memory storage. Not deployed.
+// room in-process over party/_test-server.js (in-memory storage). Not deployed.
 //
 //   node party/_submissions-test.js   (npm run test:party)
 
-import SubmissionsRoom, { SUBMISSIONS_ROOM } from './submissions.js';
+import { SubmissionsRoom, SUBMISSIONS_ROOM } from './submissions.js';
+import { TestServer } from './_test-server.js';
 import { createMemoryStorage } from './_memory-storage.js';
 import { SUBMISSION_SCHEMA } from '../engine/content.js';
 import { ENGINE_VERSION_STRING } from '../engine/version.js';
@@ -17,7 +18,7 @@ function check(label, cond, detail) {
 const URL_BASE = `http://x/parties/submissions/${SUBMISSIONS_ROOM}`;
 function makeRoom(env = {}, id = SUBMISSIONS_ROOM) {
   const storage = createMemoryStorage();
-  return { storage, room: new SubmissionsRoom({ id, env, storage }) };
+  return { storage, room: new (SubmissionsRoom(TestServer))({ name: id, env, storage }) };
 }
 const post = (room, body) => room.onRequest(new Request(URL_BASE, { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }));
 const get = (room, query = '') => room.onRequest(new Request(`${URL_BASE}${query}`));

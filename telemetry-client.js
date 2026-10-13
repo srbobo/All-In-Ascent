@@ -2,26 +2,25 @@
 //
 // Sends the anonymous match record of a finished LOCAL game
 // (AscentEngine.buildMatchRecord) to the telemetry party (party/telemetry.js)
-// for the designer's dashboard. Online games are recorded by the PartyKit
+// for the designer's dashboard. Online games are recorded by the
 // GameRoom itself, so online play never calls this.
 //
 // Where records go (same host logic as online.html):
 //   ?telemetry=off          → nothing is sent from this page
-//   ?telemetry=<host>       → that PartyKit host (e.g. 127.0.0.1:1999)
+//   ?telemetry=<host>       → that backend host (e.g. 127.0.0.1:1999)
 //   page on localhost       → the same origin (`npm run online:dev`, the e2e server)
-//   anywhere else / file:// → the production PartyKit host
+//   anywhere else / file:// → the production backend host (backend.js)
 //
 // Players can switch sharing off for their browser (the footer checkbox in
 // index.html); the choice is kept in localStorage.
 
 (function () {
-  const PRODUCTION_PARTYKIT_HOST = 'all-in-ascent.srbobo.partykit.dev';
   const STORAGE_KEY = 'all-in-ascent.telemetry';
   const PATH = '/parties/telemetry/global';
   // Project Mode submissions (party/submissions.js) live on the same host.
   const SUBMISSIONS_PATH = '/parties/submissions/global';
 
-  // The URL of `path` on the PartyKit host this page talks to (see above).
+  // The URL of `path` on the backend host this page talks to (see above).
   function endpointFor(path) {
     const override = new URLSearchParams(window.location.search).get('telemetry');
     if (override === 'off') return null;
@@ -32,7 +31,7 @@
     }
     const h = window.location.hostname;
     if (h === '127.0.0.1' || h === 'localhost' || h === '0.0.0.0') return window.location.origin + path;
-    return `https://${PRODUCTION_PARTYKIT_HOST}${path}`;
+    return `https://${window.AscentBackend.PRODUCTION_HOST}${path}`;
   }
 
   function endpoint() {
