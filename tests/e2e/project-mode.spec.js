@@ -191,7 +191,8 @@ test('a local game with workshop content plays the custom climber, route and gea
     overhang, { ...state.content.routes.bouldering[0], grit: 2 },
     ...state.availableRoutes.bouldering.filter(r => r.name !== overhang.name && r.name !== 'Chalk Line').slice(0, 3),
   ];
-  state.availableGear[0] = state.content.gear[0];
+  // The seeded deal may already have put the custom gear in the shop; never show it twice.
+  state.availableGear = [state.content.gear[0], ...state.availableGear.filter(g => g.name !== 'Kneebar Pads')].slice(0, 3);
   state.players[0].character.grit = 10;
   Object.assign(state.players[0].character.stats, { strength: 70, technique: 70, focus: 70, flexibility: 70 });
   await page.evaluate((s) => { setGameState(s); renderGameBoard(); }, state);
