@@ -250,19 +250,21 @@
       const filled = OnlineMode.seats.filter(s => s !== null).length;
       const allHaveChar = OnlineMode.seats.filter(s => s !== null).every(s => s.characterKey);
       const canStart = filled >= 2 && allHaveChar;
-      // CPU difficulty: Easy = heuristic (legacy), Medium/Hard = rollout
-      // search (simulates every legal action to pick its move — the strong
-      // CPU). The chosen level rides along on the add_bot message.
+      // CPU difficulty: the engine's CPU ladder (AscentEngine.CPU_LEVELS,
+      // engine/cpu.js), the same levels local play offers. The chosen level
+      // rides along on the add_bot message. Keeps the host's last choice
+      // across lobby re-renders.
       const diffSel = document.createElement('select');
       diffSel.className = 'ol-bot-difficulty';
       diffSel.title = 'CPU difficulty';
-      [['easy', 'Easy CPU'], ['medium', 'Medium CPU'], ['hard', 'Hard CPU']].forEach(([v, label]) => {
+      window.AscentEngine.CPU_LEVEL_KEYS.forEach((v) => {
         const opt = document.createElement('option');
         opt.value = v;
-        opt.textContent = label;
+        opt.textContent = `${window.AscentEngine.CPU_LEVELS[v].label} CPU`;
         diffSel.appendChild(opt);
       });
-      diffSel.value = 'hard';
+      diffSel.value = OnlineMode.botDifficulty || 'medium';
+      diffSel.onchange = () => { OnlineMode.botDifficulty = diffSel.value; };
       ctlHost.appendChild(diffSel);
       const addBot = document.createElement('button');
       addBot.type = 'button';

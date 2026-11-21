@@ -11,6 +11,11 @@
 //   DELETE /parties/telemetry/global?id=<id>         remove one record (admin)
 //   DELETE /parties/telemetry/global?all=1           remove every record (admin)
 //
+// Replay records (engine/replay-record.js: every move of a game, for the
+// learning bot) live beside the match records. Add `kind=replay` to any of
+// the requests above to store, count, page or delete replays instead; replay
+// pages hold at most 100 records (they are much bigger).
+//
 // Who records: the GameRoom posts online games itself when they end
 // (party/game.js); local hot-seat games are posted by the player's browser
 // (telemetry-client.js). Records are checked with validateMatchRecord and
@@ -22,12 +27,16 @@
 //   TELEMETRY_ADMIN_TOKEN — DELETE needs ?token=<value>; without it DELETE is off.
 
 import { validateMatchRecord } from '../engine/match-record.js';
+import { validateReplayRecord, REPLAY_MAX_BYTES } from '../engine/replay-record.js';
 import { CHARACTERS } from '../engine/data.js';
 
 export const TELEMETRY_ROOM = 'global';
-const KEY_PREFIX = 'match:';
-const MAX_BODY_BYTES = 64 * 1024;
-const MAX_PAGE = 1000;
+// What each kind of record is stored under, how big a body may be, how many
+// fit on one GET page, and how it is checked.
+const KINDS = {
+  match: { prefix: 'match:', maxBytes: 64 * 1024, maxPage: 1000, validate: validateMatchRecord },
+  replay: { prefix: 'replay:', maxBytes: REPLAY_MAX_BYTES, maxPage: 100, validate: validateReplayRecord },
+};
 const KNOWN_CHARACTERS = new Set(Object.keys(CHARACTERS));
 
 const CORS = {
@@ -51,13 +60,16 @@ export const TelemetryRoom = (Base) => class TelemetryRoom extends Base {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     // One store for the whole game; other room ids are not used.
     if (this.name !== TELEMETRY_ROOM) return json({ error: `use /parties/telemetry/${TELEMETRY_ROOM}` }, 404);
+    const kind = KINDS[url.searchParams.get('kind') || 'match'];
+    if (!kind) return json({ error: 'kind must be match or replay' }, 400);
+    const KEY_PREFIX = kind.prefix;
 
     if (req.method === 'POST') {
       const text = await req.text();
-      if (text.length > MAX_BODY_BYTES) return json({ error: 'record too large' }, 413);
+      if (text.length > kind.maxBytes) return json({ error: 'record too large' }, 413);
       let record;
       try { record = JSON.parse(text); } catch { return json({ error: 'body is not JSON' }, 400); }
-      const problem = validateMatchRecord(record, KNOWN_CHARACTERS);
+      const problem = kind.validate(record, KNOWN_CHARACTERS);
       if (problem) return json({ error: problem }, 400);
       await this.ctx.storage.put(KEY_PREFIX + record.id, { ...record, receivedAt: Date.now() });
       return json({ ok: true, id: record.id });
@@ -71,7 +83,7 @@ export const TelemetryRoom = (Base) => class TelemetryRoom extends Base {
         const all = await this.ctx.storage.list({ prefix: KEY_PREFIX });
         return json({ count: all.size });
       }
-      const limit = Math.min(MAX_PAGE, Math.max(1, Number(url.searchParams.get('limit')) || MAX_PAGE));
+      const limit = Math.min(kind.maxPage, Math.max(1, Number(url.searchParams.get('limit')) || kind.maxPage));
       const after = url.searchParams.get('after');
       // Ask for one extra to know whether another page follows.
       const page = await this.ctx.storage.list({

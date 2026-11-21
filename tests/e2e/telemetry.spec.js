@@ -7,6 +7,7 @@
 
 import { test, expect } from '@playwright/test';
 import { buildMatchRecord } from '../../engine/match-record.js';
+import { buildReplayRecord } from '../../engine/replay-record.js';
 import { aggregateMatches } from '../../engine/match-report.js';
 import { createGame } from '../../engine/state.js';
 import { getLegalActions, applyAction } from '../../engine/engine.js';
@@ -18,7 +19,9 @@ import {
 } from './support.js';
 
 const TELEMETRY = '/parties/telemetry/global';
-const isTelemetryPost = (r) => r.url().includes(TELEMETRY) && r.method() === 'POST';
+// A match record POST (replay records go to the same path with ?kind=replay).
+const isTelemetryPost = (r) => r.url().includes(TELEMETRY) && r.method() === 'POST' && !r.url().includes('kind=replay');
+const isReplayPost = (r) => r.url().includes(`${TELEMETRY}?kind=replay`) && r.method() === 'POST';
 
 // Load a CPU game one milestone from the end and send it through the UI.
 async function winLocalGame(page, seed, characters, characterKeys) {
@@ -39,6 +42,7 @@ test('a finished local game posts the engine\'s match record', async ({ page, re
   await expect(page.locator('footer.site-footer')).toContainText('recorded anonymously');
 
   const posted = page.waitForResponse(r => isTelemetryPost(r.request()));
+  const replayPosted = page.waitForResponse(r => isReplayPost(r.request()));
   const final = await winLocalGame(page, 4, ['The Technician', 'The Iron Lung', 'The Sprinter'], ['technician', 'ironLung', 'sprinter']);
   const response = await posted;
   expect(response.status()).toBe(200);
@@ -60,6 +64,16 @@ test('a finished local game posts the engine\'s match record', async ({ page, re
   expect(record.startedAt).toBeLessThanOrEqual(record.finishedAt);
   expect(record.players.every(p => p.controller === 'human')).toBe(true);
 
+  // Its replay record (every move, for the learning CPU) shares the id.
+  expect((await replayPosted).status()).toBe(200);
+  const replays = (await (await request.get(`${TELEMETRY}?kind=replay&records=1`)).json()).records;
+  const { receivedAt: replayReceived, ...replay } = replays.find(r => r.id === id);
+  expect(typeof replayReceived).toBe('number');
+  expect(replay).toEqual(asJson(buildReplayRecord(browserState, {
+    id, mode: 'local', startedAt: record.startedAt, finishedAt: record.finishedAt,
+    seats: final.players.map(() => ({ controller: 'human' })),
+  })));
+
   // Exactly one record per game: reopening the summary sends nothing more.
   let more = 0;
   page.on('request', r => { if (isTelemetryPost(r)) more++; });
@@ -74,7 +88,7 @@ test('a player who switches sharing off sends no record, and the choice sticks',
   const errors = collectPageErrors(page);
   collectDialogs(page);
   let posts = 0;
-  page.on('request', r => { if (isTelemetryPost(r)) posts++; });
+  page.on('request', r => { if (isTelemetryPost(r) || isReplayPost(r)) posts++; });
   await page.goto('/index.html');
   await page.locator('#telemetryOptIn').uncheck();
   await page.reload();

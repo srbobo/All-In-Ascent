@@ -115,6 +115,17 @@ main { padding: var(--sp-5) var(--gutter) var(--sp-7); }
 .player-count input:focus-visible + .hold { outline: 3px solid var(--focus-ring); outline-offset: 6px; }
 .player-count input:disabled + .hold { cursor: not-allowed; }
 .player-count:disabled label { cursor: not-allowed; }
+.player-count input:disabled + .hold { filter: saturate(0.2) brightness(1.1); opacity: 0.45; }
+
+/* CPU climbers (index.html #setupCpu): smaller holds than the human count. */
+.setup-cpu { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 2px dashed var(--rule, rgba(42, 29, 18, 0.18)); }
+.setup-sub { font-weight: 700; margin: 0; }
+.setup-sub span { font-weight: 400; color: var(--ink-soft); }
+.player-count--cpu .hold { --size: 3.25rem; font-size: var(--fs-lg); }
+.cpu-level { display: inline-flex; align-items: center; gap: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.cpu-level select { min-height: 44px; padding: 0 var(--sp-3); border: 2px solid var(--ink); border-radius: var(--r-md); background: var(--paper); color: var(--ink); font-family: var(--font-body, inherit); font-size: var(--fs-sm); letter-spacing: 0; text-transform: none; }
+.cpu-level select:disabled { opacity: 0.55; cursor: not-allowed; }
+#cpuRandomBtn { margin-bottom: var(--sp-4); }
 
 .pick-status {
   display: inline-flex; align-items: center; gap: var(--sp-2);
@@ -147,6 +158,7 @@ main { padding: var(--sp-5) var(--gutter) var(--sp-7); }
 .turn-indicator .ti-token { --size: 2.75rem; font-size: var(--fs-md); flex: none; }
 .turn-indicator .ti-text { min-width: 0; }
 .turn-indicator .ti-who { font-family: var(--font-display); font-weight: 800; font-size: var(--fs-lg); line-height: 1.1; }
+.turn-indicator .ti-cpu { font-family: var(--font-mono); font-weight: 400; font-size: var(--fs-2xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
 .turn-indicator .ti-time { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--ink-soft); font-weight: 600; }
 .turn-indicator .ti-warn { color: var(--raspberry-text); font-weight: 800; }
 .game-info { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
@@ -333,6 +345,7 @@ main { padding: var(--sp-5) var(--gutter) var(--sp-7); }
 .ps-portrait svg { width: 100%; height: 100%; }
 .ps-name { font-family: var(--font-display); font-weight: 800; font-size: var(--fs-md); line-height: 1.1; }
 .ps-name .ps-num { display: inline-grid; place-items: center; min-width: 1.9em; padding: 0 0.4em; margin-right: 0.35em; border-radius: var(--r-pill); background: var(--pc); color: var(--pc-on); font-size: 0.8em; }
+.ps-name .ps-cpu { display: inline-block; margin-left: 0.4em; padding: 0.1em 0.5em; border: 1.5px solid currentColor; border-radius: var(--r-pill); font-family: var(--font-mono); font-size: 0.55em; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; vertical-align: middle; }
 .ps-meta { display: flex; flex-wrap: wrap; gap: 0 var(--sp-2); font-size: var(--fs-xs); color: var(--ink-soft); }
 .ps-meta .aia-icon { color: var(--ink-muted); }
 .ps-level { --size: 2.6rem; font-size: var(--fs-sm); flex-direction: column; line-height: 0.95; }

@@ -55,6 +55,25 @@
         </fieldset>
         <!-- game.js reads the player count from here -->
         <input type="hidden" id="numPlayers" value="1">
+      </div>
+      <!-- CPU climbers join the humans (4 climbers at most). game.js fills the
+           difficulty list from the engine's CPU ladder (AscentEngine.CPU_LEVELS). -->
+      <div class="setup-cpu" id="setupCpu">
+        <p class="setup-sub" id="cpuCountLabel">CPU climbers <span>· play against the computer</span></p>
+        <div class="setup-row">
+          <fieldset class="player-count player-count--cpu" id="cpuCount" aria-labelledby="cpuCountLabel">
+            <legend class="sr-only">Number of CPU climbers</legend>
+            <label><input type="radio" name="cpuCount" value="0" aria-label="No CPU climbers" checked><span class="hold hold--label hold--lime" aria-hidden="true">0</span><span class="pc-label">None</span></label>
+            <label><input type="radio" name="cpuCount" value="1" aria-label="1 CPU climber"><span class="hold hold--label hold--teal" aria-hidden="true">1</span><span class="pc-label">CPU</span></label>
+            <label><input type="radio" name="cpuCount" value="2" aria-label="2 CPU climbers"><span class="hold hold--label hold--violet" aria-hidden="true">2</span><span class="pc-label">CPUs</span></label>
+            <label><input type="radio" name="cpuCount" value="3" aria-label="3 CPU climbers"><span class="hold hold--label hold--marigold" aria-hidden="true">3</span><span class="pc-label">CPUs</span></label>
+          </fieldset>
+          <label class="cpu-level">Difficulty
+            <select id="cpuLevel" data-testid="cpu-level"></select>
+          </label>
+        </div>
+      </div>
+      <div class="setup-row">
         <button class="btn btn--marigold" id="continueBtn" type="button" onclick="startCharacterSelect()">Choose climbers ▸</button>
       </div>
     </div>
@@ -65,6 +84,7 @@
       <p class="project-mode-note" id="projectModeNote" data-testid="project-mode-note" hidden></p>
       <p class="pick-status" id="pickStatus" aria-live="polite"></p>
       <ul class="pick-roster" id="pickRoster" aria-label="Chosen climbers"></ul>
+      <button class="btn btn--ghost btn--sm" id="cpuRandomBtn" type="button" onclick="pickRandomCpuClimbers()" hidden>Pick the CPU climbers at random</button>
       <div class="character-select card-grid--climbers" id="characterSelect"></div>
       <button class="btn btn--lime" id="startGameBtn" type="button" onclick="startGame()" disabled>Start climbing ▸</button>
     </div>
@@ -155,7 +175,7 @@
 
 <footer class="site-footer">
   <p class="site-footer__version">Rules engine <span id="engineVersion" data-testid="engine-version">v—</span></p>
-  <p class="site-footer__telemetry">Finished games are recorded anonymously to help balance the game: characters, cards and results, never names.
+  <p class="site-footer__telemetry">Finished games are recorded anonymously to help balance the game and train the CPU climbers: characters, cards, moves and results, never names.
     <label><input type="checkbox" id="telemetryOptIn" checked> Share my local games</label></p>
 </footer>
 

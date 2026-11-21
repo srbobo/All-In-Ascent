@@ -1,4 +1,7 @@
-{
+// Tuned planner weights per character — written by sim/tune-planner.js (do not edit by hand).
+// A plain module (not JSON) so the browser bundle (build-browser.js) can include it.
+
+export const PLANNER_WEIGHTS = {
   "technician": {
     "params": {
       "invCap": 30,
@@ -119,4 +122,4 @@
     },
     "kept": true
   }
-}
+};

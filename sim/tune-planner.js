@@ -7,18 +7,19 @@
 // solo rounds-to-win on the training seeds (unfinished games count as
 // max-rounds). Every candidate is scored on the SAME seeds, so comparisons
 // are paired. The winner is then checked on held-out test seeds against the
-// default weights, and written to sim/agents/planner-weights.json only if it
+// default weights, and written to engine/planner-weights.js only if it
 // is at least as fast there.
 //
 // Objective is solo speed: "how fast can this character ring the bell when
 // played well". It is the cleanest per-character signal and correlates with
 // racing strength; head-to-head checks belong in run-balance.js.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CHARACTERS } from '../engine/data.js';
 import { ENGINE_VERSION_STRING } from '../engine/version.js';
 import { DEFAULT_PARAMS } from './agents/planner-model.js';
+import { PLANNER_WEIGHTS } from '../engine/planner-weights.js';
 import { runGames, mean } from './balance-pool.js';
 
 const argv = process.argv.slice(2);
@@ -56,9 +57,13 @@ async function score(char, params, seeds) {
   return mean(rs.map(r => (r.done ? r.rounds : MAX_ROUNDS)));
 }
 
-const weightsPath = new URL('./agents/planner-weights.json', import.meta.url);
-let saved = {};
-try { saved = JSON.parse(readFileSync(weightsPath, 'utf8')); } catch { /* first run */ }
+// A JS module, not JSON, so the browser bundle (engine/build-browser.js) can
+// include it: the human-facing CPU (engine/cpu.js) plays with these weights.
+const weightsPath = new URL('../engine/planner-weights.js', import.meta.url);
+const saved = structuredClone(PLANNER_WEIGHTS);
+const weightsModule = (w) => '// Tuned planner weights per character — written by sim/tune-planner.js (do not edit by hand).\n' +
+  '// A plain module (not JSON) so the browser bundle (build-browser.js) can include it.\n\n' +
+  `export const PLANNER_WEIGHTS = ${JSON.stringify(w, null, 2)};\n`;
 
 for (const char of chars) {
   const t0 = Date.now();
@@ -98,6 +103,6 @@ for (const char of chars) {
     test: { seeds: flag('test-seeds', '1001-1300'), default: +testDefault.toFixed(3), tuned: +testTuned.toFixed(3) },
     kept: keep,
   };
-  writeFileSync(weightsPath, JSON.stringify(saved, null, 2) + '\n');
+  writeFileSync(weightsPath, weightsModule(saved));
 }
 console.log(`\nwrote ${fileURLToPath(weightsPath)}`);
