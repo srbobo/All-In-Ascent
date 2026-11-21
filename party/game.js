@@ -21,7 +21,8 @@
 //     within the room.
 //
 // Bots:
-//   - Host can add a heuristic bot in any open seat from the lobby.
+//   - Host can add a CPU (Easy / Medium / Hard, engine/cpu.js — the same
+//     ladder local play uses) in any open seat from the lobby.
 //   - Bots play immediately on their turn with an 800ms artificial delay so
 //     human players can follow what happened.
 //
@@ -36,19 +37,9 @@ import { getLegalActions, applyAction, isTerminal } from '../engine/engine.js';
 import { CHARACTERS } from '../engine/data.js';
 import { isWellFormedStatShift, canUseStatShift, GRIT_RULES } from '../engine/helpers.js';
 import { buildMatchRecord } from '../engine/match-record.js';
+import { buildReplayRecord } from '../engine/replay-record.js';
 import { TELEMETRY_ROOM } from './telemetry.js';
-import { createHeuristicAgent } from '../sim/agents/heuristic.js';
-import { createRolloutAgent } from '../sim/agents/rollout.js';
-
-// CPU difficulty ladder. 'easy' is the legacy heuristic; medium/hard use the
-// rollout search (full-width action evaluation via simulated playouts — the
-// R2 agent that plays at deterministic breakthrough level). rolloutsPerAction
-// is the strength dial: more playouts = less noise in the action values.
-const BOT_LEVELS = {
-  easy:   { label: 'Easy',   make: () => createHeuristicAgent() },
-  medium: { label: 'Medium', make: () => createRolloutAgent({ rolloutsPerAction: 3, maxPlayoutSteps: 300 }) },
-  hard:   { label: 'Hard',   make: () => createRolloutAgent({ rolloutsPerAction: 8, maxPlayoutSteps: 300 }) },
-};
+import { CPU_LEVELS, CPU_MODEL, cpuLevel, cpuSeed, createCpuAgent } from '../engine/cpu.js';
 
 const MAX_SEATS = 4;
 // Pause between bot moves so humans can read what happened. Headless runs set
@@ -74,7 +65,7 @@ export const GameRoom = (Base) => class GameRoom extends Base {
     this.events = [];                // full JSONL event log for this game
     this.startedAt = null;
     this.finishedAt = null;
-    this.botAgents = {};             // seat → heuristic agent instance
+    this.botAgents = {};             // seat → CPU agent (engine/cpu.js)
     this.botRunning = false;         // re-entrancy guard for bot loop
   }
 
@@ -222,15 +213,15 @@ export const GameRoom = (Base) => class GameRoom extends Base {
   addBot(difficulty) {
     const seatIndex = this.seats.findIndex(s => s === null);
     if (seatIndex < 0) return;
-    // Unknown/missing difficulty falls back to 'easy' (legacy heuristic bot),
-    // so old clients that send bare {type:'add_bot'} keep working.
-    const level = BOT_LEVELS[difficulty] ? difficulty : 'easy';
+    // Unknown/missing difficulty plays as Easy (engine cpuLevel), so old
+    // clients that send bare {type:'add_bot'} keep working.
+    const level = cpuLevel(difficulty);
     // Pick the first available character we haven't claimed yet.
     const taken = new Set(this.seats.filter(s => s).map(s => s.characterKey).filter(Boolean));
     const characterKey = Object.keys(CHARACTERS).find(k => !taken.has(k)) || null;
     this.seats[seatIndex] = {
       id: `bot:${seatIndex}`,
-      username: `Bot ${seatIndex + 1} (${BOT_LEVELS[level].label})`,
+      username: `Bot ${seatIndex + 1} (${CPU_LEVELS[level].label})`,
       isBot: true,
       botDifficulty: level,
       characterKey,
@@ -306,12 +297,12 @@ export const GameRoom = (Base) => class GameRoom extends Base {
       })),
     });
 
-    // Set up bot agents for bot seats, by difficulty level.
+    // Set up bot agents for bot seats, by difficulty level (engine/cpu.js),
+    // seeded from the game so their choices are reproducible.
     this.botAgents = {};
     for (let i = 0; i < orderedSeats.length; i++) {
       if (orderedSeats[i].isBot) {
-        const level = BOT_LEVELS[orderedSeats[i].botDifficulty] ? orderedSeats[i].botDifficulty : 'easy';
-        this.botAgents[i] = BOT_LEVELS[level].make();
+        this.botAgents[i] = createCpuAgent(orderedSeats[i].botDifficulty, { seed: cpuSeed(seed, i) });
       }
     }
 
@@ -429,28 +420,34 @@ export const GameRoom = (Base) => class GameRoom extends Base {
     return null;
   }
 
+  // The match record (dashboard) and the replay record (every move, for the
+  // learning bot) share one id, so they can be joined.
   async recordMatch() {
     const telemetry = await this.telemetry();
     if (!telemetry) return;
-    const record = buildMatchRecord(this.state, {
+    const meta = {
       id: `online-${crypto.randomUUID()}`,
       mode: 'online',
       startedAt: this.startedAt,
       finishedAt: this.finishedAt,
       seats: this.seats.filter(Boolean).map(s => (s.isBot
-        ? { controller: 'bot', botLevel: s.botDifficulty || 'easy' }
+        ? { controller: 'bot', botLevel: cpuLevel(s.botDifficulty), botModel: CPU_MODEL }
         : { controller: 'human' })),
-    });
-    try {
-      const res = await telemetry.fetch(new Request(`https://telemetry.internal/parties/telemetry/${TELEMETRY_ROOM}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(record),
-      }));
-      if (!res.ok) console.error('telemetry rejected the match record', res.status, await res.text());
-    } catch (err) {
-      console.error('telemetry failed', err);
-    }
+    };
+    const post = async (what, query, record) => {
+      try {
+        const res = await telemetry.fetch(new Request(`https://telemetry.internal/parties/telemetry/${TELEMETRY_ROOM}${query}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(record),
+        }));
+        if (!res.ok) console.error(`telemetry rejected the ${what}`, res.status, await res.text());
+      } catch (err) {
+        console.error(`telemetry failed (${what})`, err);
+      }
+    };
+    await post('match record', '', buildMatchRecord(this.state, meta));
+    await post('replay record', '?kind=replay', buildReplayRecord(this.state, meta));
   }
 
   async shipLogs() {

@@ -16,7 +16,8 @@
 //   mode       'local' | 'online' | 'sim'
 //   startedAt  wall-clock ms when the game started
 //   finishedAt wall-clock ms when the game ended
-//   seats      per seat, in player order: { controller: 'human' | 'bot', botLevel }
+//   seats      per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel }
+//              (botModel: the CPU version that played, engine/cpu.js CPU_MODEL)
 
 import { summarizeGame } from './stats.js';
 
@@ -99,6 +100,7 @@ export function buildMatchRecord(state, meta = {}) {
         characterKey: p.characterKey,
         controller,
         botLevel: controller === 'bot' ? (seat.botLevel || null) : null,
+        botModel: controller === 'bot' && typeof seat.botModel === 'string' ? seat.botModel : null,
         won: p.playerNum === sum.winner,
         placement: placement[p.playerNum],
         final: p.final,
@@ -142,6 +144,7 @@ export function validateMatchRecord(r, knownCharacters) {
     if (!p || typeof p !== 'object') return 'bad player';
     if (!knownCharacters.has(p.characterKey)) return 'unknown character';
     if (!['human', 'bot'].includes(p.controller)) return 'bad controller';
+    if (p.botModel != null && (typeof p.botModel !== 'string' || p.botModel.length > 40)) return 'bad botModel';
     if (!isInt(p.placement, 1, 4) || !p.final || !isInt(p.final.level, 1, 100)) return 'bad player result';
     if (!isInt(p.final.milestonesCompleted, 0, TIERS.length)) return 'bad milestones';
     if (!Array.isArray(p.gear) || !Array.isArray(p.routes) || !p.training || !p.timeByArea) return 'bad player detail';

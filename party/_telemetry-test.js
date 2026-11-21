@@ -12,6 +12,8 @@ import { createGame } from '../engine/state.js';
 import { getLegalActions, applyAction } from '../engine/engine.js';
 import { GRIT_RULES } from '../engine/helpers.js';
 import { buildMatchRecord } from '../engine/match-record.js';
+import { buildReplayRecord, replayRecordState, REPLAY_RECORD_SCHEMA } from '../engine/replay-record.js';
+import { CPU_MODEL } from '../engine/cpu.js';
 import { createPlannerAgent } from '../sim/agents/planner.js';
 
 const results = [];
@@ -25,12 +27,12 @@ function makeTelemetry(env = {}, id = TELEMETRY_ROOM) {
   const storage = createMemoryStorage();
   return { storage, room: new (TelemetryRoom(TestServer))({ name: id, env, storage }) };
 }
-const post = (room, body) => room.onRequest(new Request(URL_BASE, { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }));
+const post = (room, body, query = '') => room.onRequest(new Request(`${URL_BASE}${query}`, { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }));
 const get = (room, query = '') => room.onRequest(new Request(`${URL_BASE}${query}`));
 const del = (room, query) => room.onRequest(new Request(`${URL_BASE}${query}`, { method: 'DELETE' }));
 
-// A real finished game's record to post.
-async function finishedRecord(seed, id) {
+// A real finished game, and its match record to post.
+async function finishedGame(seed) {
   let { state } = createGame({ seed, characterKeys: ['technician', 'sprinter'], rules: GRIT_RULES });
   const agents = [createPlannerAgent({ seed }), createPlannerAgent({ seed: seed + 1 })];
   while (!state.gameEnded) {
@@ -38,13 +40,14 @@ async function finishedRecord(seed, id) {
     const { actionIndex } = await agents[state.currentPlayerIndex].chooseAction({ state, legalActions: legal });
     ({ state } = applyAction(state, legal[actionIndex]));
   }
-  return buildMatchRecord(state, { id, mode: 'local', startedAt: 1, finishedAt: 2 });
+  return state;
 }
 
 // ---------------------------------------------------------------------------
 // The store
 // ---------------------------------------------------------------------------
-const record = await finishedRecord(5, 'local-test-0001');
+const game5 = await finishedGame(5);
+const record = buildMatchRecord(game5, { id: 'local-test-0001', mode: 'local', startedAt: 1, finishedAt: 2 });
 {
   const { room, storage } = makeTelemetry();
   const res = await post(room, record);
@@ -84,6 +87,28 @@ const record = await finishedRecord(5, 'local-test-0001');
 
   const noAdmin = await del(room, '?all=1');
   check('DELETE is off without an admin token', noAdmin.status === 401 && storage.data.size === 5);
+}
+{
+  // Replay records: stored beside match records under kind=replay.
+  const { room, storage } = makeTelemetry({ TELEMETRY_ADMIN_TOKEN: 'adm1n' });
+  const replay = buildReplayRecord(game5, { id: 'local-test-0001', mode: 'local', startedAt: 1, finishedAt: 2 });
+  await post(room, record);
+  const res = await post(room, replay, '?kind=replay');
+  check('replay: POST ?kind=replay stores it under replay:', res.status === 200 && storage.data.has('replay:local-test-0001')
+    && storage.data.has('match:local-test-0001'));
+  check('replay: a match record is refused as a replay', (await post(room, record, '?kind=replay')).status === 400);
+  check('replay: a replay is refused as a match record', (await post(room, replay)).status === 400);
+  check('replay: an unknown kind is refused', (await post(room, replay, '?kind=nope')).status === 400);
+  const big = await post(room, { ...replay, id: 'local-test-big', pad: 'x'.repeat(200 * 1024) }, '?kind=replay');
+  check('replay: bodies up to the replay limit are accepted (bigger than a match record may be)', big.status === 200);
+  check('replay: count and match count are separate', (await (await get(room)).json()).count === 1
+    && (await (await get(room, '?kind=replay')).json()).count === 2);
+  const page = await (await get(room, '?kind=replay&records=1&limit=1')).json();
+  check('replay: GET pages replays', page.records.length === 1 && page.records[0].schema === REPLAY_RECORD_SCHEMA && page.next !== null);
+  const stored = (await (await get(room, '?kind=replay&records=1')).json()).records.find(r => r.id === 'local-test-0001');
+  check('replay: the stored replay rebuilds the game', !!stored && JSON.stringify(replayRecordState(stored)) === JSON.stringify(game5));
+  const wipe = await (await del(room, '?kind=replay&all=1&token=adm1n')).json();
+  check('replay: DELETE ?kind=replay removes only replays', wipe.removed === 2 && storage.data.size === 1 && storage.data.has('match:local-test-0001'));
 }
 {
   const { room } = makeTelemetry({}, 'not-global');
@@ -138,18 +163,29 @@ const record = await finishedRecord(5, 'local-test-0001');
     await game.onMessage(conn, JSON.stringify({ type: 'action', actionIndex }));
   }
   // endGame is not awaited by advance(); let it finish posting.
-  for (let i = 0; i < 50 && storage.data.size === 0; i++) await new Promise(r => setTimeout(r, 10));
+  for (let i = 0; i < 100 && storage.data.size < 2; i++) await new Promise(r => setTimeout(r, 10));
   check('online game completed', game.phase === 'completed');
-  const stored = [...storage.data.values()];
+  const stored = [...storage.data].filter(([k]) => k.startsWith('match:')).map(([, v]) => v);
+  const replays = [...storage.data].filter(([k]) => k.startsWith('replay:')).map(([, v]) => v);
   check('online game recorded exactly once', stored.length === 1);
-  check('online record posted to the telemetry room', telemetryPaths.join() === `/parties/telemetry/${TELEMETRY_ROOM}`, telemetryPaths.join());
+  check('online game replay recorded exactly once', replays.length === 1);
+  check('online records posted to the telemetry room', telemetryPaths.length === 2
+    && telemetryPaths.every(p => p === `/parties/telemetry/${TELEMETRY_ROOM}`), telemetryPaths.join());
   const rec = stored[0];
   check('online record: mode, id and timing', rec && rec.mode === 'online' && /^online-[\w-]+$/.test(rec.id)
     && rec.startedAt === game.startedAt && rec.finishedAt === game.finishedAt && rec.durationMs === game.finishedAt - game.startedAt);
   check('online record: human and bot seats', rec && rec.players[0].controller === 'human' && rec.players[0].characterKey === 'routeReader'
-    && rec.players[1].controller === 'bot' && rec.players[1].botLevel === 'easy');
+    && rec.players[1].controller === 'bot' && rec.players[1].botLevel === 'easy'
+    && rec.players[1].botModel === CPU_MODEL && rec.players[0].botModel === null);
   check('online record: matches the final state', rec && rec.winner === game.state.winner && rec.rounds === game.state.round);
   check('online record: no usernames', rec && !JSON.stringify(rec).includes('alice'));
+  const rep0 = replays[0];
+  check('online replay: shares the match record id', rep0 && rep0.id === rec.id && rep0.mode === 'online');
+  check('online replay: seats say who played', rep0 && rep0.seats[0].controller === 'human'
+    && rep0.seats[1].controller === 'bot' && rep0.seats[1].botLevel === 'easy' && rep0.seats[1].botModel === CPU_MODEL);
+  check('online replay: rebuilds the final state exactly', rep0
+    && JSON.stringify(replayRecordState(rep0)) === JSON.stringify(game.state));
+  check('online replay: no usernames', rep0 && !JSON.stringify(rep0).includes('alice'));
 }
 {
   // Without a telemetry room (GameRoom's default telemetry()) a game still ends cleanly.

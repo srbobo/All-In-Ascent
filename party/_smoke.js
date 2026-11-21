@@ -42,14 +42,14 @@ await room.onMessage(host, JSON.stringify({ type: 'start_game' }));
 
 // Wait for any pending bot-vs-bot turns. Two human seats means we'll stop
 // when seat 0 or seat 1 must act. We force the bot loop forward by
-// "playing" the heuristic action ourselves for the human seats too —
+// "playing" a planner action ourselves for the human seats too —
 // otherwise the test would hang waiting for a real WebSocket message.
 import { getLegalActions, isTerminal } from '../engine/engine.js';
 import { createPlannerAgent } from '../sim/agents/planner.js';
 
-// The human seats play like the planner bot, which always finishes a game
-// (the heuristic used by Easy bots can stall at max Level without the
-// expert Milestone), so the room reliably reaches 'completed'.
+// The human seats play like the planner bot (the bot behind every CPU
+// level, engine/cpu.js), which always finishes a game, so the room reliably
+// reaches 'completed'.
 const humanAgent = createPlannerAgent({ seed: 1 });
 let safety = 0;
 while (room.phase === 'in_progress' && safety++ < 2000) {

@@ -17,6 +17,10 @@ import * as stateModule from './state.js';
 import * as helpersModule from './helpers.js';
 import * as statsModule from './stats.js';
 import * as recordModule from './match-record.js';
+import * as replayModule from './replay-record.js';
+import * as cpuModule from './cpu.js';
+import * as observeModule from './observe.js';
+import { GRIT_RULES } from './helpers.js';
 import { createRng } from './rng.js';
 import { CHARACTERS, ROUTES, GEAR_SHOP } from './data.js';
 
@@ -43,7 +47,8 @@ const browser = ctx.window.AscentEngine;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 check('engine.browser.js exposes window.AscentEngine', !!browser);
-for (const [name, mod] of [['engine.js', engineModule], ['state.js', stateModule], ['helpers.js', helpersModule], ['stats.js', statsModule]]) {
+for (const [name, mod] of [['engine.js', engineModule], ['state.js', stateModule], ['helpers.js', helpersModule], ['stats.js', statsModule],
+  ['replay-record.js', replayModule], ['cpu.js', cpuModule], ['observe.js', observeModule]]) {
   const missing = Object.keys(mod).filter(k => !(k in browser));
   check(`bundle exposes every ${name} export`, missing.length === 0, `missing: ${missing.join(', ')}`);
 }
@@ -94,6 +99,45 @@ for (let g = 0; g < 24; g++) {
 }
 check('bundle summarizes and records every game identically to the engine', !summaryDiff, summaryDiff);
 check(`bundle plays identically to the engine (${games} games, ${steps} actions)`, !firstDiff && games === 24, firstDiff);
+
+// ---------------------------------------------------------------------------
+// CPU climbers: local play runs the bundle's CPU, online play the module's.
+// Same level + same seed + same state → same move, every move of the game,
+// and the same replay record at the end.
+// ---------------------------------------------------------------------------
+{
+  let cpuDiff = '';
+  let cpuMoves = 0;
+  const cpuGames = [
+    [61, ['technician', 'sprinter'], ['hard', 'easy']],
+    [62, ['routeReader', 'freeSolo', 'ironLung'], ['medium', 'hard', 'easy']],
+    [63, ['sprinter', 'technician', 'freeSolo', 'routeReader'], ['easy', 'medium', 'hard', 'hard']],
+  ];
+  for (const [seed, characterKeys, levels] of cpuGames) {
+    let a = stateModule.createGame({ seed, characterKeys, rules: GRIT_RULES }).state;
+    let b = browser.createGame({ seed, characterKeys, rules: browser.GRIT_RULES }).state;
+    const agentsA = levels.map((lv, i) => cpuModule.createCpuAgent(lv, { seed: cpuModule.cpuSeed(seed, i) }));
+    const agentsB = levels.map((lv, i) => browser.createCpuAgent(lv, { seed: browser.cpuSeed(seed, i) }));
+    for (let i = 0; i < 6000 && !a.gameEnded; i++) {
+      const legalA = engineModule.getLegalActions(a);
+      const legalB = browser.getLegalActions(b);
+      const ca = await agentsA[a.currentPlayerIndex].chooseAction({ state: a, legalActions: legalA });
+      const cb = await agentsB[b.currentPlayerIndex].chooseAction({ state: b, legalActions: legalB });
+      if (ca.actionIndex !== cb.actionIndex) { cpuDiff ||= `seed ${seed} step ${i}: ${ca.rationale} vs ${cb.rationale}`; break; }
+      a = engineModule.applyAction(a, legalA[ca.actionIndex]).state;
+      b = browser.applyAction(b, legalB[cb.actionIndex]).state;
+      cpuMoves++;
+    }
+    if (cpuDiff) break;
+    if (!a.gameEnded) { cpuDiff = `seed ${seed}: CPU game did not finish`; break; }
+    const seats = levels.map(lv => ({ controller: 'bot', botLevel: lv, botModel: cpuModule.CPU_MODEL }));
+    const meta = { id: `cpu-parity-${seed}`, mode: 'local', startedAt: 1, finishedAt: 2, seats };
+    if (!same(replayModule.buildReplayRecord(a, meta), browser.buildReplayRecord(b, meta))) { cpuDiff = `seed ${seed}: buildReplayRecord`; break; }
+  }
+  check(`bundle CPU plays identically to the engine CPU (${cpuMoves} moves, every level)`, !cpuDiff, cpuDiff);
+  check('bundle CPU model and ladder match the engine', browser.CPU_MODEL === cpuModule.CPU_MODEL
+    && same(browser.CPU_LEVELS, cpuModule.CPU_LEVELS));
+}
 
 // ---------------------------------------------------------------------------
 // Every gear effectKind resolves identically (direct helper sweep).

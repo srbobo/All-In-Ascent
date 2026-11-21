@@ -2,7 +2,8 @@
 //
 // Sends the anonymous match record of a finished LOCAL game
 // (AscentEngine.buildMatchRecord) to the telemetry party (party/telemetry.js)
-// for the designer's dashboard. Online games are recorded by the
+// for the designer's dashboard, and its replay record
+// (AscentEngine.buildReplayRecord: the moves, no names) for the learning CPU. Online games are recorded by the
 // GameRoom itself, so online play never calls this.
 //
 // Where records go (same host logic as online.html):
@@ -53,17 +54,30 @@
     return `${prefix}-${rand}`;
   }
 
-  // POST the record. text/plain keeps it a "simple" request (no CORS
-  // preflight). Resolves to true when the server stored it; never throws.
-  async function sendMatch(record) {
-    const url = endpoint();
+  // POST a record. text/plain keeps it a "simple" request (no CORS
+  // preflight). keepalive lets it finish if the page closes, but browsers
+  // cap keepalive bodies at 64 KB, so bigger ones (long replays) go without.
+  // Resolves to true when the server stored it; never throws.
+  async function post(url, record) {
     if (!url || !enabled()) return false;
+    const body = JSON.stringify(record);
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(record), keepalive: true });
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain' }, body, keepalive: body.length < 60000 });
       return res.ok;
     } catch {
       return false;
     }
+  }
+
+  function sendMatch(record) {
+    return post(endpoint(), record);
+  }
+
+  // The game's replay record (AscentEngine.buildReplayRecord): every move, so
+  // the learning CPU can replay and learn from it. Same opt-out as matches.
+  function sendReplay(record) {
+    const url = endpoint();
+    return post(url && `${url}?kind=replay`, record);
   }
 
   // Send a Project Mode card for the designer's review (not covered by the
@@ -91,5 +105,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindToggle);
   else bindToggle();
 
-  window.AscentTelemetry = { endpoint, endpointFor, enabled, setEnabled, newId, sendMatch, sendSubmission, SUBMISSIONS_PATH };
+  window.AscentTelemetry = { endpoint, endpointFor, enabled, setEnabled, newId, sendMatch, sendReplay, sendSubmission, SUBMISSIONS_PATH };
 })();

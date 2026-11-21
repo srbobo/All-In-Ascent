@@ -155,6 +155,8 @@ export default [
         ...browserGlobals,
         getGameState: 'readonly',
         setGameState: 'readonly',
+        getLocalSeats: 'readonly',
+        restAction: 'readonly',
         AscentProject: 'readonly',
       },
     },

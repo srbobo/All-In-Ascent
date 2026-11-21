@@ -286,8 +286,16 @@ let gameStartedAt = null;
 
 // UI-only state, kept out of the engine state.
 let gameLog = []; // newest first, max 20 entries
-let setupPlayerCount = 0; // chosen on the setup screen
+let setupPlayerCount = 0; // chosen on the setup screen (humans + CPU climbers)
 let setupCharacterKeys = []; // character picked by each player, in seat order
+// Who plays each seat, in seat order: { controller: 'human' } or
+// { controller: 'bot', botLevel } (humans first, then CPU climbers). Set on
+// the setup screen and kept for the game as localSeats.
+let setupSeats = [];
+let localSeats = [];
+// Seat index → CPU agent (AscentEngine.createCpuAgent, the same ladder online
+// play uses). Local play only; online the GameRoom plays its bots.
+let cpuAgents = {};
 
 // ===== BOARD QUERIES (engine rules, for the renderers) =====
 
@@ -412,6 +420,7 @@ function uiCurrent() {
 // (getLegalActions / illegalActionReason); this only words its answer.
 function uiBlocker(wanted) {
  if (isLegalNow(wanted)) return '';
+ if (cpuTurnNow()) return `${localSeatName(gameState.players[gameState.currentPlayerIndex].playerNum)} is on the wall`;
  const r = AscentEngine.illegalActionReason(gameState, wanted);
  if (!r) return 'Not available right now';
  const players = (nums) => nums.map(num => `P${num}`).join(', ');
@@ -480,6 +489,70 @@ function renderMilestonePanel() {
 
 // ===== GAME INITIALIZATION =====
 
+// ---- CPU climbers (setup) ----
+// The number of CPU climbers and their difficulty come from index.html
+// #setupCpu. The difficulty list is the engine's CPU ladder, so local play
+// offers exactly the levels online play does.
+const DEFAULT_CPU_LEVEL = 'medium';
+
+function cpuLevelLabel(level) {
+ const lv = window.AscentEngine && AscentEngine.CPU_LEVELS[level];
+ return lv ? lv.label : level;
+}
+
+function initCpuSetup() {
+ const select = document.getElementById('cpuLevel');
+ if (select && window.AscentEngine && !select.options.length) {
+  AscentEngine.CPU_LEVEL_KEYS.forEach(key => {
+   const opt = document.createElement('option');
+   opt.value = key;
+   opt.textContent = AscentEngine.CPU_LEVELS[key].label;
+   select.appendChild(opt);
+  });
+  select.value = DEFAULT_CPU_LEVEL;
+ }
+ const humans = document.getElementById('playerCount');
+ const cpus = document.getElementById('cpuCount');
+ if (humans) humans.addEventListener('change', syncCpuCount);
+ if (cpus) cpus.addEventListener('change', syncCpuCount);
+ syncCpuCount();
+}
+if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', initCpuSetup);
+
+function selectedHumanCount() {
+ return parseInt(document.getElementById('numPlayers')?.value, 10) || 1;
+}
+
+function selectedCpuCount() {
+ const checked = document.querySelector('#cpuCount input:checked');
+ return checked ? parseInt(checked.value, 10) || 0 : 0;
+}
+
+// At most 4 climbers: CPU counts that would overflow are disabled (and a
+// checked one drops to the largest that fits). The difficulty only matters
+// with at least one CPU.
+function syncCpuCount() {
+ const room = 4 - selectedHumanCount();
+ const inputs = [...document.querySelectorAll('#cpuCount input')];
+ inputs.forEach(input => { input.disabled = parseInt(input.value, 10) > room; });
+ if (selectedCpuCount() > room) {
+  const fit = inputs.filter(i => !i.disabled).pop();
+  if (fit) fit.checked = true;
+ }
+ const select = document.getElementById('cpuLevel');
+ if (select) select.disabled = selectedCpuCount() === 0;
+}
+
+function isCpuSetupSeat(i) {
+ return setupSeats[i]?.controller === 'bot';
+}
+
+// "Player 2" or "CPU 2 (Medium)", for the seat at index i.
+function seatLabelFor(seats, i) {
+ const seat = seats[i];
+ return seat?.controller === 'bot' ? `CPU ${i + 1} (${cpuLevelLabel(seat.botLevel)})` : `Player ${i + 1}`;
+}
+
 function startCharacterSelect() {
  const numPlayersInput = document.getElementById('numPlayers');
  if (!numPlayersInput) return;
@@ -490,7 +563,13 @@ function startCharacterSelect() {
  return;
  }
 
- setupPlayerCount = numPlayers;
+ const cpuCount = Math.max(0, Math.min(4 - numPlayers, selectedCpuCount()));
+ const cpuLevel = document.getElementById('cpuLevel')?.value || DEFAULT_CPU_LEVEL;
+ setupSeats = [
+  ...Array.from({ length: numPlayers }, () => ({ controller: 'human' })),
+  ...Array.from({ length: cpuCount }, () => ({ controller: 'bot', botLevel: AscentEngine.cpuLevel(cpuLevel) })),
+ ];
+ setupPlayerCount = setupSeats.length;
  setupCharacterKeys = [];
  loadProjectContent();
  renderProjectModeNote();
@@ -507,6 +586,10 @@ function startCharacterSelect() {
  const continueBtn = document.getElementById('continueBtn');
  if (continueBtn) continueBtn.disabled = true;
  numPlayersInput.disabled = true;
+ const cpuFieldset = document.getElementById('cpuCount');
+ if (cpuFieldset) cpuFieldset.disabled = true;
+ const cpuSelect = document.getElementById('cpuLevel');
+ if (cpuSelect) cpuSelect.disabled = true;
 
  charSelectionDiv.style.display = 'block';
  renderCharacterSelect();
@@ -530,22 +613,24 @@ function renderCharacterSelect() {
  const startBtn = document.getElementById('startGameBtn');
  if (startBtn) startBtn.disabled = !allChosen;
 
- const takenBy = new Map(setupCharacterKeys.map((key, i) => [key, i + 1]));
- const next = allChosen ? null : { playerNum: setupCharacterKeys.length + 1 };
+ const takenBy = new Map(setupCharacterKeys.map((key, i) => [key, i]));
+ const nextSeat = allChosen ? null : setupCharacterKeys.length;
+ const seatName = (i) => seatLabelFor(setupSeats, i);
 
  const roster = setupRoster();
  Object.keys(roster).forEach(charKey => {
   const char = roster[charKey];
   const by = takenBy.get(charKey);
+  const taken = by !== undefined;
   const card = AIACards.climber(charKey, char, {
-   status: by ? `Player ${by}` : null,
-   tone: by ? 'done' : null,
+   status: taken ? seatName(by) : null,
+   tone: taken ? 'done' : null,
    action: {
-    label: by ? `Player ${by}` : 'Choose',
-    disabled: !!by || !next,
-    reason: by ? `Chosen by Player ${by}` : (!next ? 'Every player has a climber' : ''),
+    label: taken ? seatName(by) : 'Choose',
+    disabled: taken || nextSeat === null,
+    reason: taken ? `Chosen by ${seatName(by)}` : (nextSeat === null ? 'Every player has a climber' : ''),
     reasonIcon: 'check',
-    ariaLabel: !by && next ? `Choose ${char.name} for Player ${next.playerNum}` : undefined,
+    ariaLabel: !taken && nextSeat !== null ? `Choose ${char.name} for ${seatName(nextSeat)}` : undefined,
     onClick: () => selectCharacter(charKey),
    },
   });
@@ -558,15 +643,32 @@ function renderCharacterSelect() {
  // Step status + roster of picks so far.
  const status = document.getElementById('pickStatus');
  if (status) {
-  status.textContent = next
-   ? `Player ${next.playerNum} of ${setupPlayerCount}, choose your climber.`
-   : 'Everyone is roped in. Start climbing when ready.';
+  status.textContent = nextSeat === null
+   ? 'Everyone is roped in. Start climbing when ready.'
+   : isCpuSetupSeat(nextSeat)
+    ? `Choose a climber for ${seatName(nextSeat)}, seat ${nextSeat + 1} of ${setupPlayerCount}.`
+    : `Player ${nextSeat + 1} of ${setupPlayerCount}, choose your climber.`;
  }
+ // Once only CPU seats are left, offer to fill them at random.
+ const randomBtn = document.getElementById('cpuRandomBtn');
+ if (randomBtn) randomBtn.hidden = !(nextSeat !== null && isCpuSetupSeat(nextSeat));
  const picks = document.getElementById('pickRoster');
  if (picks) {
   picks.innerHTML = setupCharacterKeys.map((key, i) =>
-   `<li><span class="aia-chip" style="background: var(--${uiPlayerColor(i + 1)}); color: var(--on-${uiPlayerColor(i + 1)});">P${i + 1}</span>${uiEsc(roster[key].name)}</li>`).join('');
+   `<li><span class="aia-chip" style="background: var(--${uiPlayerColor(i + 1)}); color: var(--on-${uiPlayerColor(i + 1)});">${isCpuSetupSeat(i) ? 'CPU' : 'P'}${i + 1}</span>${uiEsc(roster[key].name)}</li>`).join('');
  }
+}
+
+// Fill every remaining (CPU) seat with a random climber nobody has picked.
+function pickRandomCpuClimbers() {
+ const free = Object.keys(setupRoster()).filter(k => !setupCharacterKeys.includes(k));
+ while (setupCharacterKeys.length < setupPlayerCount && isCpuSetupSeat(setupCharacterKeys.length) && free.length) {
+  const [key] = free.splice(Math.floor(Math.random() * free.length), 1);
+  setupCharacterKeys.push(key);
+ }
+ renderCharacterSelect();
+ const startBtn = document.getElementById('startGameBtn');
+ if (startBtn && !startBtn.disabled) startBtn.focus();
 }
 
 function selectCharacter(charKey) {
@@ -610,6 +712,12 @@ function startGame() {
   ...(projectContent.pack ? { content: projectContent.pack } : {}),
  }).state;
  gameStartedAt = Date.now();
+ // CPU climbers: one engine CPU agent per CPU seat, seeded from the game.
+ localSeats = setupSeats.map(s => ({ ...s }));
+ cpuAgents = {};
+ localSeats.forEach((seat, i) => {
+  if (seat.controller === 'bot') cpuAgents[i] = AscentEngine.createCpuAgent(seat.botLevel, { seed: AscentEngine.cpuSeed(seed, i) });
+ });
 
  renderGameBoard();
  addLog(`Game started! Round 1 begins. (seed ${seed})`);
@@ -621,6 +729,7 @@ function startGame() {
  if (first) window.Effects.beginTurn(first.playerNum, first.character.name);
  window.Effects.roundTransition(1);
  }
+ maybeRunCpu();
 }
 
 function addLog(message) {
@@ -737,7 +846,7 @@ function updateTurnIndicator() {
  document.getElementById('turnIndicator').innerHTML = `
   <span class="hold hold--label hold--${uiPlayerColor(n)} ti-token" aria-hidden="true">P${n}</span>
   <div class="ti-text">
-   <div class="ti-who">Player ${n}'s turn · ${uiEsc(char.name)}</div>
+   <div class="ti-who">${uiEsc(localSeatName(n))}'s turn · ${uiEsc(char.name)}${cpuTurnNow() ? ' <span class="ti-cpu">· thinking…</span>' : ''}</div>
    <div class="ti-time"><span class="aia-pips${t <= 1 ? ' aia-pips--warn' : ''}" aria-hidden="true">${pips}</span><span>${timeText}</span></div>
   </div>`;
 }
@@ -806,7 +915,7 @@ function renderPlayers() {
    <div class="ps-head">
     <div class="ps-portrait">${window.AIAArt ? AIAArt.climber(char.portrait || char.key) : ''}</div>
     <div>
-     <h3 class="ps-name" id="ps-name-${n}"><span class="ps-num">P${n}</span>${uiEsc(char.name)}${isCurrent ? '<span class="sr-only"> (current turn)</span>' : ''}</h3>
+     <h3 class="ps-name" id="ps-name-${n}"><span class="ps-num">P${n}</span>${uiEsc(char.name)}${isCpuSeat(idx) ? `<span class="ps-cpu">CPU · ${uiEsc(cpuLevelLabel(localSeats[idx].botLevel))}</span>` : ''}${isCurrent ? '<span class="sr-only"> (current turn)</span>' : ''}</h3>
      <div class="ps-meta"><span>${uiEsc(char.archetype)}</span><span>${uiIcon('location')} ${uiEsc(formatLocationName(char.location))}</span></div>
     </div>
     <span class="hold hold--label hold--${color} ps-level"><span class="sr-only">Level </span>${char.level}<small aria-hidden="true">LVL</small></span>
@@ -1099,6 +1208,8 @@ function isOnline() {
 // locally (the same getLegalActions either way).
 function legalActionsNow() {
  if (isOnline()) return window.OnlineMode.legalActions || [];
+ // A CPU climber's turn: nothing on the board is the human's to click.
+ if (cpuTurnNow()) return [];
  return gameState.gameEnded ? [] : AscentEngine.getLegalActions(gameState);
 }
 
@@ -1124,35 +1235,110 @@ let pendingPresentation = null;
 // engine's legal actions; the engine applies it and we present the events.
 function dispatchAction(wanted, afterRender = null) {
  if (isOnline()) return window.OnlineMode.sendAction(wanted);
- if (pendingPresentation || gameState.gameEnded) return;
+ if (pendingPresentation || gameState.gameEnded || cpuTurnNow()) return;
  const match = AscentEngine.findLegalAction(AscentEngine.getLegalActions(gameState), wanted);
  if (!match) {
  alert(AscentEngine.explainIllegalAction(gameState, wanted) || 'That action is not available right now.');
  return;
  }
  const action = wanted.shift ? { ...match, shift: wanted.shift } : match;
+ applyLocalAction(action, afterRender);
+}
+
+// Apply one engine action locally (a human's click or a CPU's choice) and
+// present what it did. `cpu`: the move was a CPU climber's, so its result
+// dialogs close by themselves.
+function applyLocalAction(action, afterRender = null, { cpu = false } = {}) {
  const before = gameState;
  const { state, events } = AscentEngine.applyAction(before, action);
  gameState = state;
  if (state.gameEnded && !before.gameEnded) recordLocalGame(state);
- presentEvents(before, events, afterRender);
+ presentEvents(before, events, afterRender, { cpu });
+}
+
+// ===== CPU CLIMBERS (local play) =====
+//
+// A CPU seat plays through the engine's CPU (AscentEngine.createCpuAgent,
+// created in startGame): when its turn comes and the last move has been
+// presented, it picks one of getLegalActions after a short pause, and the
+// move is presented like a human's. Online, the GameRoom plays its bots.
+//
+// Pauses are presentation only. Tests set window.AIA_CPU_DELAY_MS (e.g. 0)
+// to use one delay for everything.
+const CPU_MOVE_DELAY_MS = 700;     // before each CPU move
+const CPU_RESULT_DELAY_MS = 1800;  // a CPU's climb result / level-up stays up this long
+let cpuTimer = null;
+
+function cpuDelay(ms) {
+ const override = Number(window.AIA_CPU_DELAY_MS);
+ return Number.isFinite(override) && window.AIA_CPU_DELAY_MS !== undefined ? override : ms;
+}
+
+function isCpuSeat(idx) {
+ return !isOnline() && localSeats[idx]?.controller === 'bot';
+}
+
+function cpuTurnNow() {
+ return !!gameState && !gameState.gameEnded && isCpuSeat(gameState.currentPlayerIndex);
+}
+
+// "Player 2" or "CPU 2 (Medium)".
+function localSeatName(playerNum) {
+ return seatLabelFor(localSeats, playerNum - 1);
+}
+
+// Display names for the post-game summary and the HUD, when CPUs played.
+function localSeatNames() {
+ if (!localSeats.some(s => s.controller === 'bot')) return null;
+ return Object.fromEntries(gameState.players.map(p => [p.playerNum, localSeatName(p.playerNum)]));
+}
+
+function maybeRunCpu() {
+ if (cpuTimer || pendingPresentation || !cpuTurnNow()) return;
+ cpuTimer = setTimeout(runCpuMove, cpuDelay(CPU_MOVE_DELAY_MS));
+}
+
+async function runCpuMove() {
+ cpuTimer = null;
+ if (pendingPresentation || !cpuTurnNow()) return;
+ const seat = gameState.currentPlayerIndex;
+ const before = gameState;
+ const legal = AscentEngine.getLegalActions(before);
+ const { actionIndex } = await cpuAgents[seat].chooseAction({ state: before, legalActions: legal });
+ // The state must not have moved on while the CPU was thinking.
+ if (gameState !== before || pendingPresentation) return;
+ const action = legal[actionIndex] || legal[legal.length - 1];
+ applyLocalAction(action, null, { cpu: true });
+}
+
+// Close a CPU move's dialog by itself after a pause, unless the player
+// already did (or the presentation moved on).
+function autoCloseForCpu(p, modalId, close) {
+ if (!p.cpu) return;
+ setTimeout(() => {
+  if (pendingPresentation === p && document.getElementById(modalId)?.classList.contains('show')) close();
+ }, cpuDelay(CPU_RESULT_DELAY_MS));
 }
 
 // Send the finished local game's anonymous match record (the engine builds
-// it) to the designer's telemetry dashboard. Online games are recorded by the
-// server instead. Every local seat is a human at this table.
+// it) to the designer's telemetry dashboard, and its replay record (every
+// move) for the learning CPU; both share one id. Online games are recorded by
+// the server instead.
 function recordLocalGame(state) {
  if (!window.AscentTelemetry) return;
  // Games with workshop content are experiments, not balance data.
  if (state.content) return;
- const record = AscentEngine.buildMatchRecord(state, {
+ const meta = {
  id: window.AscentTelemetry.newId('local'),
  mode: 'local',
  startedAt: gameStartedAt,
  finishedAt: Date.now(),
- seats: state.players.map(() => ({ controller: 'human' })),
- });
- window.AscentTelemetry.sendMatch(record);
+ seats: state.players.map((_, i) => (localSeats[i]?.controller === 'bot'
+  ? { controller: 'bot', botLevel: localSeats[i].botLevel, botModel: AscentEngine.CPU_MODEL }
+  : { controller: 'human' })),
+ };
+ window.AscentTelemetry.sendMatch(AscentEngine.buildMatchRecord(state, meta));
+ if (window.AscentTelemetry.sendReplay) window.AscentTelemetry.sendReplay(AscentEngine.buildReplayRecord(state, meta));
 }
 
 // ===== CHARACTER ABILITY: ROUTE READER STAT SHIFT =====
@@ -1283,19 +1469,23 @@ function purchaseGear(gear) {
 // after the climb-result modal and any level-up popups close.
 const TURN_EVENT_TYPES = ['turn_end', 'round_end', 'round_start', 'turn_start', 'game_end'];
 
-function presentEvents(before, events, afterRender) {
+function presentEvents(before, events, afterRender, { cpu = false } = {}) {
  events.forEach(e => logEvent(before, e));
  actionEffects(before, events);
- pendingPresentation = {
+ const p = pendingPresentation = {
  levelUps: events.filter(e => e.type === 'level_up'),
  turnEvents: events.filter(e => TURN_EVENT_TYPES.includes(e.type)),
  afterRender: afterRender ? () => afterRender(events) : null,
+ cpu,
  };
  if (events.some(e => e.type === 'climb_resolved')) {
  // Brief anticipation pause so the dice "settle" before the reveal; the
  // rest is presented when the result modal closes (closeClimbModal).
  const isMilestone = events.find(e => e.type === 'climb_resolved').payload.isMilestone;
- const show = () => showClimbResultFromEvents(before, events);
+ const show = () => {
+  showClimbResultFromEvents(before, events);
+  autoCloseForCpu(p, 'climbModal', closeClimbModal);
+ };
  if (window.Effects && typeof window.Effects.diceAnticipation === 'function') {
  window.Effects.diceAnticipation(isMilestone ? 540 : 420).then(show);
  } else {
@@ -1312,6 +1502,7 @@ function finishPresentation() {
  if (!p) return;
  if (p.levelUps.length) {
  showLevelUpPopup(p.levelUps.shift());
+ autoCloseForCpu(p, 'levelUpModal', closeLevelUpModal);
  return;
  }
  pendingPresentation = null;
@@ -1319,7 +1510,11 @@ function finishPresentation() {
  renderGameBoard();
  if (p.afterRender) requestAnimationFrame(p.afterRender);
  const end = p.turnEvents.find(e => e.type === 'game_end');
- if (end) setTimeout(() => showGameSummary(gameState, {}), 500);
+ if (end) {
+  const names = localSeatNames();
+  setTimeout(() => showGameSummary(gameState, names ? { names } : {}), 500);
+ }
+ maybeRunCpu();
 }
 
 function playerName(state, playerNum) {
@@ -2008,6 +2203,9 @@ window.closeGameSummary = closeGameSummary;
 window.restAction = restAction;
 window.attemptMilestoneRoute = attemptMilestoneRoute;
 window.toggleLogPanel = toggleLogPanel;
+window.pickRandomCpuClimbers = pickRandomCpuClimbers;
+// Who plays each local seat ({ controller, botLevel }), for tests and tools.
+window.getLocalSeats = function() { return localSeats.map(s => ({ ...s })); };
 
 // External setter for `gameState`. `let gameState = {...}` is module-scoped
 // (regular <script> tags don't put `let` bindings on window) so an outside

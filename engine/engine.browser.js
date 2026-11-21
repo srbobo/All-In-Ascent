@@ -1,4 +1,4 @@
-// AUTO-GENERATED FROM engine/{rng,telemetry,version,content,helpers,state,engine,stats,match-record}.js — DO NOT EDIT BY HAND.
+// AUTO-GENERATED FROM engine/{rng,telemetry,version,content,helpers,state,engine,stats,match-record,replay-record,observe,planner-model,planner-weights,planner,cpu}.js — DO NOT EDIT BY HAND.
 //
 // Regenerate with: node engine/build-browser.js
 // The rules engine as one classic script, so local play (game.js) runs the
@@ -4486,7 +4486,8 @@ const { summarizeGame } = __stats;
 //   mode       'local' | 'online' | 'sim'
 //   startedAt  wall-clock ms when the game started
 //   finishedAt wall-clock ms when the game ended
-//   seats      per seat, in player order: { controller: 'human' | 'bot', botLevel }
+//   seats      per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel }
+//              (botModel: the CPU version that played, engine/cpu.js CPU_MODEL)
 
 
 
@@ -4569,6 +4570,7 @@ function buildMatchRecord(state, meta = {}) {
         characterKey: p.characterKey,
         controller,
         botLevel: controller === 'bot' ? (seat.botLevel || null) : null,
+        botModel: controller === 'bot' && typeof seat.botModel === 'string' ? seat.botModel : null,
         won: p.playerNum === sum.winner,
         placement: placement[p.playerNum],
         final: p.final,
@@ -4612,6 +4614,7 @@ function validateMatchRecord(r, knownCharacters) {
     if (!p || typeof p !== 'object') return 'bad player';
     if (!knownCharacters.has(p.characterKey)) return 'unknown character';
     if (!['human', 'bot'].includes(p.controller)) return 'bad controller';
+    if (p.botModel != null && (typeof p.botModel !== 'string' || p.botModel.length > 40)) return 'bad botModel';
     if (!isInt(p.placement, 1, 4) || !p.final || !isInt(p.final.level, 1, 100)) return 'bad player result';
     if (!isInt(p.final.milestonesCompleted, 0, TIERS.length)) return 'bad milestones';
     if (!Array.isArray(p.gear) || !Array.isArray(p.routes) || !p.training || !p.timeByArea) return 'bad player detail';
@@ -4620,6 +4623,1444 @@ function validateMatchRecord(r, knownCharacters) {
 }
 
 return { MATCH_RECORD_SCHEMA, MATCH_MODES, buildMatchRecord, validateMatchRecord };
+})();
+
+// ---- engine/replay-record.js ----
+const __replay_record = (function () {
+'use strict';
+const { ENGINE_VERSION_STRING } = __version;
+const { createGame } = __state;
+const { applyAction, isTerminal } = __engine;
+const { MATCH_MODES } = __match_record;
+// Replay records — every move of a finished game, so it can be replayed
+// exactly and learned from (the learning-bot plan's data source).
+//
+//   buildReplayRecord(state, meta)            → plain JSON object (schema REPLAY_RECORD_SCHEMA)
+//   validateReplayRecord(record, knownChars)  → null when the record is acceptable, else a reason
+//   replayRecordState(record)                 → the final state, rebuilt with the engine
+//
+// The engine is deterministic: seed + characters + rules (+ Project Mode
+// content) + the list of chosen actions reproduces every state of the game,
+// human and CPU seats alike. The actions come from the engine's own
+// `action_chosen` events, so local play (the browser bundle), online play
+// (the GameRoom) and the bot simulations record identically.
+//
+// Like match records (match-record.js) a replay never holds usernames or
+// anything typed by a player: seats are a character and who controlled them.
+// `id` is the id of the game's match record, so the two can be joined.
+//
+// meta (all optional):
+//   id, mode, startedAt, finishedAt   as for buildMatchRecord
+//   seats   per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel }
+
+
+
+
+
+
+const REPLAY_RECORD_SCHEMA = 'aia-replay/1';
+// The telemetry server refuses bigger bodies; a long 4-player game is ~60 KB.
+const REPLAY_MAX_BYTES = 512 * 1024;
+
+const ACTION_TYPES = ['climb', 'milestone', 'train', 'rest', 'buyGear', 'endTurn'];
+
+function buildReplayRecord(state, meta = {}) {
+  const seats = meta.seats || [];
+  const term = isTerminal(state);
+  const startedAt = Number.isFinite(meta.startedAt) ? meta.startedAt : null;
+  const finishedAt = Number.isFinite(meta.finishedAt) ? meta.finishedAt : null;
+  return {
+    schema: REPLAY_RECORD_SCHEMA,
+    id: meta.id || null,
+    mode: MATCH_MODES.includes(meta.mode) ? meta.mode : 'local',
+    engineVersion: ENGINE_VERSION_STRING,
+    startedAt,
+    finishedAt,
+    seed: state.seed,
+    rules: state.rules || null,
+    content: state.content || null,
+    characterKeys: state.players.map(p => p.character.key),
+    seats: state.players.map((_, i) => {
+      const seat = seats[i] || {};
+      const bot = seat.controller === 'bot';
+      return {
+        controller: bot ? 'bot' : 'human',
+        botLevel: bot ? (seat.botLevel || null) : null,
+        botModel: bot && typeof seat.botModel === 'string' ? seat.botModel : null,
+      };
+    }),
+    ended: term.done,
+    winner: term.done ? (term.winner ?? null) : null,
+    rounds: state.round,
+    actions: (state.events || [])
+      .filter(e => e.type === 'action_chosen')
+      .map(e => e.payload.action),
+  };
+}
+
+// The telemetry server accepts records from any browser, so it checks the
+// shape before storing one. It does not replay the game (that is the
+// learner's job, offline, with the matching engine version).
+function validateReplayRecord(r, knownCharacters) {
+  const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'not an object';
+  if (r.schema !== REPLAY_RECORD_SCHEMA) return 'unknown schema';
+  if (typeof r.id !== 'string' || !/^[\w.:-]{6,100}$/.test(r.id)) return 'bad id';
+  if (!MATCH_MODES.includes(r.mode)) return 'bad mode';
+  if (typeof r.engineVersion !== 'string' || r.engineVersion.length > 20) return 'bad engineVersion';
+  if (!isInt(r.seed, 0, 2 ** 32)) return 'bad seed';
+  if (!Array.isArray(r.characterKeys) || !isInt(r.characterKeys.length, 1, 4)) return 'bad characters';
+  if (!r.characterKeys.every(k => knownCharacters.has(k))) return 'unknown character';
+  if (!Array.isArray(r.seats) || r.seats.length !== r.characterKeys.length) return 'bad seats';
+  for (const s of r.seats) {
+    if (!s || !['human', 'bot'].includes(s.controller)) return 'bad controller';
+    if (s.botModel != null && (typeof s.botModel !== 'string' || s.botModel.length > 40)) return 'bad botModel';
+  }
+  if (!Array.isArray(r.actions) || r.actions.length < 1 || r.actions.length > 20000) return 'bad actions';
+  if (!r.actions.every(a => a && ACTION_TYPES.includes(a.type))) return 'bad action';
+  return null;
+}
+
+// Rebuild the game from the record with this engine. Only meaningful when
+// record.engineVersion matches ENGINE_VERSION_STRING (rule changes alter
+// outcomes); throws if an action is not legal under this engine.
+function replayRecordState(record) {
+  let { state } = createGame({
+    seed: record.seed,
+    characterKeys: record.characterKeys,
+    rules: record.rules || null,
+    content: record.content || null,
+  });
+  for (const action of record.actions) ({ state } = applyAction(state, action));
+  return state;
+}
+
+return { REPLAY_RECORD_SCHEMA, REPLAY_MAX_BYTES, buildReplayRecord, validateReplayRecord, replayRecordState };
+})();
+
+// ---- engine/observe.js ----
+const __observe = (function () {
+'use strict';
+const { CHARACTERS, GEAR_SHOP, TRAINING_AREAS, XP_TABLE } = __data;
+const { getLegalActions, applyAction } = __engine;
+const { ENGINE_VERSION_STRING } = __version;
+const { ACCESS_CARDS } = __state;
+const { checkAreaAccess, climbSendProbability, computeClimbXp, computeRestRecovery, getEffectiveClimbEnduranceCost, getEffectiveClimbTimeCost, usesGrit, gearPrice, gearFunds, trainingGritCost, milestoneGritReward, trainingCap, getFailureEnduranceExtra, getSpendableXp, getSuccessEnduranceHeal, canUseStatShift, trainingSpec } = __helpers;
+// Structured observation API — the game as a CPU should see it.
+//
+//   observe(state, { seat, legalActions }) → plain JSON object
+//   observeText(obs)                       → compact text rendering of it
+//
+// Why this exists (docs/CPU_PLAYTEST_AUDIT.md §3.3, §5): every bot so far did
+// its own arithmetic about the game, and got it wrong in different ways — the
+// heuristic ignored Perfect Beta and Versatility, the LLM prompt showed gaps
+// against printed requirements and never a probability. This module computes
+// every number a decision needs WITH THE ENGINE'S OWN CODE, so a bot (search,
+// heuristic, or LLM) only has to choose:
+//
+//   - pSend for every legal climb and milestone, exact over all dice
+//     (helpers.climbSendProbability — the same dice procedure as applyAction,
+//     character abilities, Beta Boost, stat shifts and dice gear included);
+//   - for each milestone, how many training sessions (and in which stats)
+//     reach a 50% and a 90% send chance;
+//   - what each training session or gear purchase does to every milestone's
+//     pSend (computed by applying the action to a copy of the state);
+//   - resource facts that are easy to forget: spendable XP vs XP to the next
+//     Level, Endurance that does not refill between rounds, who holds which
+//     station, which wall the Setter resets next.
+//
+// `actions[k].i` is the index into the legal-action array the observation was
+// built from, so a bot answers with `legalActions[obs.actions[k].i]`.
+//
+// Read-only: never mutates `state`.
+
+
+
+
+
+
+
+const OBSERVATION_SCHEMA = 'aia-observation/1';
+
+const STATS = ['strength', 'technique', 'focus', 'flexibility'];
+const TIERS = ['beginner', 'intermediate', 'expert'];
+const SETTER_WALLS = ['leadClimbing', 'topRope', 'bouldering']; // routeClearingPosition 0/1/2
+const PLAN_CAP = 40; // training-plan search stops after this many sessions
+const round3 = (x) => Math.round(x * 1000) / 1000;
+
+// =============================================================================
+// observe
+// =============================================================================
+
+// Options:
+//   seat          whose view (default: the player to act)
+//   legalActions  the array to annotate (default: getLegalActions(state))
+//   plans         include each milestone's training plan (default true; the
+//                 costliest part — bots that model training themselves skip it)
+//   effects       include train/buy milestonePSendAfter (default true)
+function observe(state, {
+  seat = state.currentPlayerIndex, legalActions = null, plans = true, effects = true,
+} = {}) {
+  const player = state.players[seat];
+  if (!player) throw new Error(`observe: no player at seat ${seat}`);
+  const yourTurn = !state.gameEnded && seat === state.currentPlayerIndex;
+
+  const obs = {
+    schema: OBSERVATION_SCHEMA,
+    engineVersion: ENGINE_VERSION_STRING,
+    round: state.round,
+    seat,
+    playerNum: player.playerNum,
+    yourTurn,
+    gameOver: !!state.gameEnded,
+    // Most Time left acts next; a tie keeps the current climber acting,
+    // otherwise seat order. Listed so a bot can see who acts after it.
+    timeLeft: state.players.map(p => ({ playerNum: p.playerNum, time: p.character.timeRemaining })),
+    setterResetsNext: SETTER_WALLS[state.routeClearingPosition],
+    you: describePlayer(state, seat, { full: true }),
+    milestones: TIERS.map(tier => describeMilestone(state, seat, tier, plans)),
+    opponents: state.players
+      .map((_, i) => i)
+      .filter(i => i !== seat)
+      .map(i => describePlayer(state, i, { full: false })),
+    board: describeBoard(state),
+    actions: null,
+  };
+
+  if (yourTurn) {
+    const legal = legalActions || getLegalActions(state);
+    obs.actions = legal.map((a, i) => describeAction(state, seat, a, i, effects));
+  }
+  return obs;
+}
+
+// =============================================================================
+// Players
+// =============================================================================
+
+function describePlayer(state, seat, { full }) {
+  const p = state.players[seat];
+  const c = p.character;
+  const milestonesDone = TIERS.filter(t => c.milestonesCompleted[t]);
+  const out = {
+    seat,
+    playerNum: p.playerNum,
+    character: c.key,
+    level: c.level,
+    milestonesDone,
+    time: c.timeRemaining,
+    endurance: { current: c.currentEndurance, max: c.maxEndurance },
+    location: c.location,
+  };
+  if (!full) {
+    // Threat: this opponent's send chance on each milestone they still need.
+    out.milestonePSend = {};
+    for (const tier of TIERS) {
+      if (c.milestonesCompleted[tier]) continue;
+      const m = state.milestoneRoutes[tier];
+      out.milestonePSend[tier] = round3(climbSendProbability(c, m.route, m.area, {}, { isMilestone: true }).pSend);
+    }
+    out.equipment = [...c.equipment];
+    return out;
+  }
+
+  const next = XP_TABLE.find(r => r.level === c.level + 1);
+  const total = Object.fromEntries(STATS.map(k => [k, c.stats[k] + c.trainingBonuses[k] + c.gearBonuses[k]]));
+  const rest = computeRestRecovery(c);
+  if (usesGrit(state.rules)) {
+    // Grit economy: Grit buys training and gear; XP only raises your Level.
+    out.grit = c.grit || 0;
+    out.trainingCap = Number.isFinite(trainingCap(state.rules, c)) ? trainingCap(state.rules, c) : null;
+  }
+  out.xp = {
+    total: c.xp,
+    // Spending XP moves you back toward the start of your Level; it never
+    // costs a Level, but it delays the next one.
+    spendable: getSpendableXp(c),
+    toNextLevel: next ? Math.max(0, next.cumulative - c.xp) : null,
+  };
+  out.stats = { total, base: { ...c.stats }, training: { ...c.trainingBonuses }, gear: { ...c.gearBonuses } };
+  // Resting refills toward max + rest-bonus gear (it can go above max).
+  out.endurance.restCap = c.maxEndurance + rest.restBonusApplied;
+  out.equipment = [...c.equipment];
+  out.ability = describeAbility(c);
+  return out;
+}
+
+function describeAbility(c) {
+  const a = { name: (CHARACTERS[c.key] || c).specialAbility.name, rules: c.custom ? c.specialAbility.description : abilityRules(c.key) };
+  if (c.key === 'routeReader') {
+    a.betaBoostActive = !!c.betaBoostActive;
+    a.statShiftAvailable = canUseStatShift(c, false);
+  }
+  return a;
+}
+
+// One-line, engine-accurate summary of each ability (what pSend already
+// accounts for). Kept here rather than in game data so it states the rule the
+// engine implements, not the flavour text.
+function abilityRules(key) {
+  switch (key) {
+    case 'ironLung': return 'Fall: +50% XP and -5 extra Endurance (Mental Anchor removes the Endurance loss).';
+    case 'technician': return 'Every requirement -5; red Crux dice ignored; Milestone attempts +1 Time.';
+    case 'sprinter': return 'Every climb -2 Time (min 1); climbs earn 85% XP; +1 red Crux die on Focus every climb.';
+    case 'routeReader': return 'Send with 3 of 4 stats if the 4th misses by 3 or less; Rest grants +3 all stats on the next climb; once per round move up to 10 points between stats for one climb (Milestones included).';
+    case 'freeSolo': return 'No Lead access cards needed; all dice ignored, never falls; may only start a climb whose requirements base+training+permanent gear already meet; gains 2 Grit every round (Grit rules).';
+    default: return '';
+  }
+}
+
+// =============================================================================
+// Milestones
+// =============================================================================
+
+function describeMilestone(state, seat, tier, plans = true) {
+  const c = state.players[seat].character;
+  const m = state.milestoneRoutes[tier];
+  const r = m.route;
+  const access = checkAreaAccess(c, m.area);
+  const out = {
+    tier,
+    route: r.name,
+    grade: r.grade,
+    wall: m.area,
+    tag: r.tag || null,
+    requirements: pickStats(r),
+    dice: describeDice(r),
+    time: getEffectiveClimbTimeCost(c, r.time, r, true, m.area),
+    endurance: getEffectiveClimbEnduranceCost(c, r, r.endurance, m.area, true),
+    done: !!c.milestonesCompleted[tier],
+  };
+  if (out.done) return out;
+  out.access = access.hasAccess ? 'open' : { missing: access.missingItems };
+  const now = climbSendProbability(c, r, m.area, {}, { isMilestone: true });
+  // pSend if attempted with current stats (ignores Time/Endurance/station);
+  // Free Solo additionally may not start unless it is 1.
+  out.pSend = round3(now.pSend);
+  if (plans) out.trainingPlan = trainingPlan(c, r, m.area, state.rules);
+  return out;
+}
+
+// Greedy training plan: repeatedly add one session to whichever stat raises
+// this milestone's send chance most (ties broken by expected deciding
+// margin), and report the session counts at which pSend first reaches 0.5
+// and 0.9. Counts sessions only — not Time, Endurance or station contention.
+function trainingPlan(char, route, area, rules = null) {
+  const gain = trainingSpec(rules, TRAINING_AREAS[0], char).gain;
+  const cap = trainingCap(rules, char);
+  const sim = { ...char, trainingBonuses: { ...char.trainingBonuses } };
+  const alloc = Object.fromEntries(STATS.map(k => [k, 0]));
+  const plan = { perSession: gain, to50: null, to90: null };
+  let cur = climbSendProbability(sim, route, area, {}, { isMilestone: true });
+  for (let n = 0; n <= PLAN_CAP; n++) {
+    if (!plan.to50 && cur.pSend >= 0.5) plan.to50 = { sessions: n, train: nonZero(alloc) };
+    if (!plan.to90 && cur.pSend >= 0.9) { plan.to90 = { sessions: n, train: nonZero(alloc) }; break; }
+    if (n === PLAN_CAP) break;
+    let best = null;
+    for (const k of STATS) {
+      if (sim.trainingBonuses[k] + gain > cap) continue; // rules-variant cap at this Level
+      sim.trainingBonuses[k] += gain;
+      const r = climbSendProbability(sim, route, area, {}, { isMilestone: true });
+      sim.trainingBonuses[k] -= gain;
+      if (!best || r.pSend > best.r.pSend + 1e-12 ||
+          (Math.abs(r.pSend - best.r.pSend) <= 1e-12 && r.expectedMargin > best.r.expectedMargin)) {
+        best = { k, r };
+      }
+    }
+    if (!best) break; // every stat at its cap
+    sim.trainingBonuses[best.k] += gain;
+    alloc[best.k]++;
+    cur = best.r;
+  }
+  if (!plan.to90) plan.beyondCap = PLAN_CAP;
+  return plan;
+}
+
+function nonZero(alloc) {
+  return Object.fromEntries(Object.entries(alloc).filter(([, v]) => v > 0));
+}
+
+// =============================================================================
+// Board
+// =============================================================================
+
+function describeBoard(state) {
+  const holder = (pred) => {
+    const p = state.players.find(pl => pred(pl.character));
+    return p ? p.playerNum : null;
+  };
+  const topRope = [];
+  for (let b = 0; b < state.belayerCount; b++) {
+    topRope.push({
+      station: b,
+      routes: state.availableRoutes.topRope.filter(r => r.belayer === b).map(r => r.name),
+      heldBy: holder(c => c.location === 'topRope' && c.belayerStation === b),
+    });
+  }
+  return {
+    trainingStations: TRAINING_AREAS.map(t => ({
+      station: t.name, stat: t.stat, time: t.time, endurance: t.endurance,
+      heldBy: holder(c => c.location === t.name),
+    })),
+    topRopeStations: topRope,
+    leadHeldBy: holder(c => c.location === 'leadClimbing'),
+    walls: {
+      bouldering: state.availableRoutes.bouldering.map(r => r.name),
+      topRope: state.availableRoutes.topRope.map(r => r.name),
+      leadClimbing: state.availableRoutes.leadClimbing.map(r => r.name),
+    },
+    gearMarket: state.availableGear.map(g => g.name),
+    accessCards: [...ACCESS_CARDS],
+  };
+}
+
+// =============================================================================
+// Actions
+// =============================================================================
+
+function describeAction(state, seat, a, i, effects = true) {
+  const c = state.players[seat].character;
+  const attempted = state.attemptedRoutes[state.players[seat].playerNum] || {};
+  switch (a.type) {
+    case 'climb': {
+      const route = state.availableRoutes[a.area].find(r => r.name === a.routeName);
+      const out = {
+        i, type: 'climb', wall: a.area, route: route.name, grade: route.grade, tag: route.tag || null,
+        ...(a.area === 'topRope' ? { station: route.belayer } : {}),
+        ...climbNumbers(c, route, a.area, attempted, { isMilestone: false, shift: a.shift || null }),
+        ...(usesGrit(state.rules) ? { gritOnCard: route.grit || 0 } : {}),
+      };
+      if (a.shift) out.shift = { ...a.shift };
+      return out;
+    }
+    case 'milestone': {
+      const m = state.milestoneRoutes[a.difficulty];
+      const others = TIERS.filter(t => t !== a.difficulty);
+      return {
+        i, type: 'milestone', tier: a.difficulty, wall: m.area, route: m.route.name, grade: m.route.grade,
+        ...climbNumbers(c, m.route, m.area, attempted, { isMilestone: true, shift: a.shift || null }),
+        ...(a.shift ? { shift: { ...a.shift } } : {}),
+        sendWinsGame: others.every(t => c.milestonesCompleted[t]),
+        ...(usesGrit(state.rules) ? { gritReward: milestoneGritReward(state.rules, a.difficulty) } : {}),
+      };
+    }
+    case 'train': {
+      const t = TRAINING_AREAS.find(x => x.name === a.areaName);
+      const spec = trainingSpec(state.rules, t, c);
+      return {
+        i, type: 'train', station: t.name, stat: t.stat,
+        gain: spec.gain, time: spec.time, endurance: spec.endurance,
+        ...(usesGrit(state.rules) ? { gritCost: trainingGritCost(state.rules, c) } : {}),
+        ...(effects ? { milestonePSendAfter: milestoneEffect(state, seat, a) } : {}),
+      };
+    }
+    case 'rest': {
+      const rest = computeRestRecovery(c);
+      const out = { i, type: 'rest', time: 1, enduranceAfter: rest.newEndurance };
+      if (c.key === 'routeReader') out.grantsBetaBoost = true;
+      return out;
+    }
+    case 'buyGear': {
+      const g = GEAR_SHOP.find(x => x.name === a.gearName);
+      // Priced in XP, or in Grit under the Grit-economy rules.
+      const cost = gearPrice(state.rules, c, g);
+      const out = {
+        i, type: 'buyGear', card: g.name, cost, currency: usesGrit(state.rules) ? 'grit' : 'xp',
+        time: 1, effect: g.effectDisplay || g.description || '',
+        spendableAfter: gearFunds(state.rules, c) - cost,
+      };
+      const after = effects ? milestoneEffect(state, seat, a) : {};
+      if (Object.keys(after).length) out.milestonePSendAfter = after;
+      return out;
+    }
+    case 'endTurn':
+      return { i, type: 'endTurn', timeForfeited: c.timeRemaining };
+    default:
+      return { i, type: a.type };
+  }
+}
+
+function climbNumbers(c, route, area, attempted, { isMilestone, shift }) {
+  const { pSend } = climbSendProbability(c, route, area, attempted, { isMilestone, shift });
+  const climb = { route, area, isMilestone };
+  const xpSend = computeClimbXp(c, route, true, climb);
+  const xpFall = computeClimbXp(c, route, false, climb);
+  return {
+    time: getEffectiveClimbTimeCost(c, route.time, route, isMilestone, area),
+    endurance: getEffectiveClimbEnduranceCost(c, route, route.endurance, area, isMilestone),
+    pSend: round3(pSend),
+    xp: { send: xpSend, fall: xpFall, expected: round3(pSend * xpSend + (1 - pSend) * xpFall) },
+    fallExtraEndurance: getFailureEnduranceExtra(c, climb),
+    sendHeal: getSuccessEnduranceHeal(c, climb),
+  };
+}
+
+// pSend on each unfinished milestone after taking `action`, for the milestones
+// whose pSend it changes. Applies the action to a stripped copy of the state
+// with the real engine, so it reflects exactly what the purchase / session does.
+function milestoneEffect(state, seat, action) {
+  const before = state.players[seat].character;
+  const copy = { ...state, events: [] };
+  const { state: next } = applyAction(copy, action);
+  const after = next.players[seat].character;
+  const out = {};
+  for (const tier of TIERS) {
+    if (before.milestonesCompleted[tier]) continue;
+    const m = state.milestoneRoutes[tier];
+    const p0 = climbSendProbability(before, m.route, m.area, {}, { isMilestone: true }).pSend;
+    const p1 = climbSendProbability(after, m.route, m.area, {}, { isMilestone: true }).pSend;
+    if (Math.abs(p1 - p0) > 1e-9) out[tier] = { from: round3(p0), to: round3(p1) };
+  }
+  return out;
+}
+
+function pickStats(r) {
+  return { strength: r.strength, technique: r.technique, focus: r.focus, flexibility: r.flexibility };
+}
+
+function describeDice(r) {
+  return (r.rollEffect || []).map(e => ({ stat: e.stat, die: e.modifier === -1 ? 'beta' : 'crux' }));
+}
+
+// =============================================================================
+// observeText — compact rendering for an LLM prompt or a log line
+// =============================================================================
+
+const SHORT = { strength: 'Str', technique: 'Tec', focus: 'Foc', flexibility: 'Flx' };
+const fmtStats = (s) => STATS.map(k => `${SHORT[k]}${s[k]}`).join(' ');
+const pct = (p) => `${Math.round(p * 100)}%`;
+const fmtTrain = (t) => Object.entries(t).map(([k, v]) => `${SHORT[k]}×${v}`).join(' ') || 'none';
+
+function observeText(obs) {
+  const y = obs.you;
+  const L = [];
+  L.push(`Round ${obs.round} · You: P${y.playerNum} ${y.character} L${y.level} · ${obs.yourTurn ? 'your turn' : 'waiting'}`);
+  L.push(`Stats ${fmtStats(y.stats.total)} · End ${y.endurance.current}/${y.endurance.max} (no refill between rounds) · Time ${y.time}`);
+  L.push(y.grit !== undefined
+    ? `Grit ${y.grit} · XP ${y.xp.total} (${y.xp.toNextLevel ?? '—'} to next Level; XP is never spent)${y.trainingCap !== null ? ` · training cap +${y.trainingCap}/stat` : ''} · Gear: ${y.equipment.join(', ') || 'none'}`
+    : `XP ${y.xp.total} (spendable ${y.xp.spendable}, ${y.xp.toNextLevel ?? '—'} to next Level) · Gear: ${y.equipment.join(', ') || 'none'}`);
+  L.push(`Ability ${y.ability.name}: ${y.ability.rules}${y.ability.betaBoostActive ? ' [Beta Boost ACTIVE]' : ''}`);
+  L.push('Milestones:');
+  for (const m of obs.milestones) {
+    if (m.done) { L.push(`  ${m.tier}: ${m.route} — DONE`); continue; }
+    const acc = m.access === 'open' ? '' : ` · LOCKED, need ${m.access.missing.join(' + ')}`;
+    const plan = m.trainingPlan;
+    if (!plan) { L.push(`  ${m.tier}: ${m.route} ${m.grade} ${m.wall} · pSend ${pct(m.pSend)}${acc}`); continue; }
+    const p50 = plan.to50 ? `${plan.to50.sessions} (${fmtTrain(plan.to50.train)})` : `>${PLAN_CAP}`;
+    const p90 = plan.to90 ? `${plan.to90.sessions} (${fmtTrain(plan.to90.train)})` : `>${PLAN_CAP}`;
+    L.push(`  ${m.tier}: ${m.route} ${m.grade} ${m.wall} · pSend ${pct(m.pSend)}${acc} · sessions to 50%: ${p50}, to 90%: ${p90}`);
+  }
+  for (const o of obs.opponents) {
+    const threat = Object.entries(o.milestonePSend).map(([t, p]) => `${t[0]}${pct(p)}`).join(' ');
+    L.push(`Opp P${o.playerNum} ${o.character} L${o.level} · done ${o.milestonesDone.join(',') || '-'} · pSend ${threat || '-'} · time ${o.time}`);
+  }
+  L.push(`Setter resets ${obs.setterResetsNext} at round end.`);
+  if (obs.actions) {
+    L.push('Actions:');
+    for (const a of obs.actions) L.push(`  ${a.i}. ${actionLine(a)}`);
+  }
+  return L.join('\n');
+}
+
+function actionLine(a) {
+  switch (a.type) {
+    case 'climb': return `climb ${a.route} (${a.wall}) pSend ${pct(a.pSend)} · T${a.time} E${a.endurance} · XP ${a.xp.send}/${a.xp.fall}${a.gritOnCard ? ` · ${a.gritOnCard} Grit on card` : ''}${a.shift ? ` · shift ${a.shift.amount} ${SHORT[a.shift.from]}→${SHORT[a.shift.to]}` : ''}`;
+    case 'milestone': return `MILESTONE ${a.tier} ${a.route} pSend ${pct(a.pSend)} · T${a.time} E${a.endurance}${a.gritReward ? ` · +${a.gritReward} Grit` : ''}${a.sendWinsGame ? ' · SEND WINS' : ''}`;
+    case 'train': return `train ${SHORT[a.stat]} +${a.gain} · T${a.time} E${a.endurance}${a.gritCost !== undefined ? ` · ${a.gritCost} Grit` : ''}${effectLine(a.milestonePSendAfter)}`;
+    case 'rest': return `rest → End ${a.enduranceAfter}${a.grantsBetaBoost ? ' · Beta Boost' : ''}`;
+    case 'buyGear': return `buy ${a.card} (${a.cost} ${a.currency === 'grit' ? 'grit' : 'XP'} → ${a.spendableAfter} left): ${a.effect}${effectLine(a.milestonePSendAfter)}`;
+    case 'endTurn': return `call it a day (forfeit ${a.timeForfeited} Time)`;
+    default: return a.type;
+  }
+}
+
+function effectLine(after) {
+  if (!after || !Object.keys(after).length) return '';
+  return ' · ' + Object.entries(after).map(([t, v]) => `${t} ${pct(v.from)}→${pct(v.to)}`).join(' ');
+}
+
+return { OBSERVATION_SCHEMA, observe, observeText };
+})();
+
+// ---- engine/planner-model.js ----
+const __planner_model = (function () {
+'use strict';
+const { GEAR_SHOP, TRAINING_AREAS, XP_TABLE } = __data;
+const { applyLevelUpIfNeeded, buildEffectRollArray, calculateGearBonuses, checkAreaAccess, computeRestRecovery, getEffectiveClimbEnduranceCost, getEffectiveClimbTimeCost, getFailureEnduranceExtra, getSpendableXp, trainingCap, trainingSpec, usesGrit, gearPrice, abilityParam, passRule } = __helpers;
+// Planner model: how much Time does this climber still need to finish?
+//
+// The planner bot (planner.js) picks the action that minimises
+//     Time spent now  +  E[ timeToFinish(next state) ]
+// This module supplies timeToFinish — a fast, character-agnostic estimate of
+// the Time (in "10-Time rounds × 10" units) a climber still needs to send all
+// remaining milestones, from their stats, gear, Endurance and XP.
+//
+// The estimate plans, for the remaining milestones together:
+//   1. training — greedily add +gain sessions to whichever stat cuts the
+//      expected attempt cost most, until another session no longer pays for
+//      itself (and every milestone has at least `pMin` send chance);
+//   2. attempts — each milestone costs (Time + Endurance) / P(send) with the
+//      planned stats (failures repeat the attempt);
+//   3. Endurance — every point is worth 1/R Time (one Rest refills R);
+//      Endurance already in the tank is a credit;
+//   4. Lead access — missing access cards cost their XP shortfall at
+//      `xpRate` XP per Time, plus 1 Time per purchase;
+//   5. level progress — XP toward the next level is credited at the rate one
+//      level would cut the plan (the level's stat growth, valued by the plan).
+// Approach Shoes scale it all by 10/11 (more Time per round).
+//
+// Send chance for PLANNING uses a product form: dice on different stats are
+// independent, so P(send) = Π P(stat s passes) (or "≥3 of 4" for a Route
+// Reader). That is exact for every character ability and for Climbing Coach;
+// dice gear that couples stats (Sequence Memorization, Mountain Mentor, the
+// Decoder, Power Tap Belt) is approximated per stat. Real decisions about
+// whether to attempt a climb use observe()'s exact pSend, not this.
+
+
+
+
+const STATS = ['strength', 'technique', 'focus', 'flexibility'];
+const TIERS = ['beginner', 'intermediate', 'expert'];
+const ACCESS = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
+const K_MAX = 80;
+
+// Tunable weights. Defaults are hand-set; sim/tune-planner.js searches them
+// per character and writes engine/planner-weights.js.
+const DEFAULT_PARAMS = {
+  invCap: 30,          // a hopeless milestone counts as this many attempts
+  pMin: 0.35,          // keep training until every milestone reaches this pSend
+  trainWeight: 1,      // multiplier on a training session's Time cost
+  enduranceWeight: 1,  // multiplier on Endurance's Time value
+  xpRate: 8,           // XP a climber earns per Time spent climbing
+  xpWeight: 1,         // multiplier on the value of level progress
+  minXpTime: 3,        // Time to earn ANY XP (one climb), however little is needed
+  gearWeight: 1,       // multiplier on the value of saving XP for market gear
+  levelsAhead: 4,      // how many level-ups ahead the level credit looks
+  gritTime: 2,        // Grit economy: Time to earn one Grit by climbing
+  partnerFactor: 0.6,  // Grit cost per session with Training Partner (≈ one free a round)
+  capWeight: 1,        // multiplier on the Time to raise a training cap by levelling
+  neverIdle: true,     // never idle (empty Rest / Call It a Day) while anything else is legal:
+                       // cuts Grit-economy games ~45 → ~25 rounds, standard ones slightly too
+};
+
+// =============================================================================
+// Per-stat dice distributions (planning send chance)
+// =============================================================================
+
+const UNIFORM = [1 / 6, 1 / 6, 1 / 6, 1 / 6, 1 / 6, 1 / 6]; // P(face = 1..6)
+const COACHED = [0, 1 / 6, 1 / 6, 1 / 6, 1 / 6, 2 / 6];     // min(6, face + 1)
+const BEST_OF_TWO = [1, 3, 5, 7, 9, 11].map(n => n / 36);   // max of 2 dice
+const WORST_OF_TWO = [11, 9, 7, 5, 3, 1].map(n => n / 36);  // min of 2 dice
+const CONST_ONE = [1, 0, 0, 0, 0, 0];
+
+// PMF over D = Σ sign·face for one stat's dice, as { lo, pmf[] } (pmf[i] = P(D = lo + i)).
+function sumPmf(dice) {
+  let lo = 0;
+  let pmf = [1];
+  for (const { sign, faces } of dice) {
+    const nlo = lo + (sign > 0 ? 1 : -6);
+    const next = new Array(pmf.length + 5).fill(0);
+    for (let i = 0; i < pmf.length; i++) {
+      if (!pmf[i]) continue;
+      for (let f = 1; f <= 6; f++) {
+        const p = faces[f - 1];
+        if (!p) continue;
+        next[i + sign * f - (sign > 0 ? 1 : -6)] += pmf[i] * p;
+      }
+    }
+    lo = nlo;
+    pmf = next;
+  }
+  // Prefix sums → CDF.
+  const cdf = new Float64Array(pmf.length);
+  let acc = 0;
+  for (let i = 0; i < pmf.length; i++) { acc += pmf[i]; cdf[i] = acc; }
+  return { lo, cdf };
+}
+
+const ownsKind = (char, kind, route = null) => char.equipment.some(name => {
+  const g = GEAR_SHOP.find(x => x.name === name);
+  return g && g.effectKind === kind && (!g.tagFilter || (route && route.tag === g.tagFilter));
+});
+
+// Model of one milestone for one character: per-stat CDFs plus costs.
+function milestoneModel(char, tier, m) {
+  const route = m.route;
+  const effects = buildEffectRollArray(char, route);
+  const perStat = STATS.map(() => []);
+  for (const e of effects) {
+    let sign = e.modifier;
+    if (char.key === 'freeSolo') sign = 0;
+    if (char.key === 'technician' && sign === 1) sign = 0;
+    if (sign === 0) continue;
+    const faces = sign === -1 && ownsKind(char, 'milestoneBuffDiceBonus') ? COACHED : UNIFORM;
+    perStat[STATS.indexOf(e.stat)].push({ sign, faces });
+  }
+  // Coupling dice gear, approximated per stat (planning only).
+  const mostDice = (pred) => {
+    let best = -1;
+    let n = 0;
+    perStat.forEach((d, s) => { const k = d.filter(pred).length; if (k > n) { n = k; best = s; } });
+    return best;
+  };
+  const tweakOne = (pred, replace) => {
+    const s = mostDice(pred);
+    if (s < 0) return;
+    const i = perStat[s].findIndex(pred);
+    const r = replace(perStat[s][i]);
+    if (r) perStat[s][i] = r; else perStat[s].splice(i, 1);
+  };
+  const nerf = d => d.sign === 1 && d.faces !== CONST_ONE;
+  if (ownsKind(char, 'treatOneDieAsValue')) tweakOne(nerf, d => ({ ...d, faces: CONST_ONE }));
+  if (ownsKind(char, 'negateOneNerfDie')) tweakOne(d => d.sign === 1, () => null);
+  if (ownsKind(char, 'rerollOnTag', route) || ownsKind(char, 'extraDieDiscardOne', route)) {
+    tweakOne(() => true, d => ({ ...d, faces: d.sign === -1 ? BEST_OF_TWO : WORST_OF_TWO }));
+  }
+  const dists = perStat.map(sumPmf);
+
+  // Free Solo may only start a climb its base+training+permanent gear already
+  // clears, so per-route gear never counts for it.
+  const routeBonus = char.key === 'freeSolo'
+    ? { strength: 0, technique: 0, focus: 0, flexibility: 0 }
+    : calculateGearBonuses(char, route, m.area, {});
+  const isRR = char.key === 'routeReader';
+  // A Route Reader plans to Rest first, so its attempt carries the Beta Boost.
+  const boost = isRR ? (abilityParam(char, 'betaBoost') ?? 3) : 0;
+  const rule = passRule(isRR ? { ...char, betaBoostActive: true } : char, true);
+  const adj = char.key === 'technician' ? abilityParam(char, 'reqReduction') : 0;
+  return {
+    tier,
+    req: STATS.map(k => route[k]),
+    adj,
+    bonus: STATS.map(k => routeBonus[k] + boost),
+    dists,
+    needed: rule.needed,
+    nearMiss: rule.nearMiss,
+    time: getEffectiveClimbTimeCost(char, route.time, route, true) + (isRR ? 1 : 0),
+    endurance: getEffectiveClimbEnduranceCost(char, route, route.endurance),
+    failExtra: getFailureEnduranceExtra(char),
+    // Expected requirement per stat (dice at their mean) — the deficit
+    // surrogate that steers training while P(send) is still flat at 0.
+    expReq: STATS.map((k, s) => route[k] - adj + meanOf(dists[s])),
+  };
+}
+
+function meanOf({ lo, cdf }) {
+  let mean = 0;
+  let prev = 0;
+  for (let i = 0; i < cdf.length; i++) { mean += (lo + i) * (cdf[i] - prev); prev = cdf[i]; }
+  return mean;
+}
+
+// P(stat value x passes) for stat s of model m.
+function passProb(m, s, x) {
+  const { lo, cdf } = m.dists[s];
+  const i = x - m.req[s] + m.adj - lo; // need D ≤ x − req + adj
+  if (i < 0) return 0;
+  if (i >= cdf.length) return 1;
+  return cdf[i];
+}
+
+// Planning send chance for stat vector `x` (permanent totals, before the
+// milestone's per-route gear bonus).
+function planPSend(m, x) {
+  const q0 = passProb(m, 0, x[0] + m.bonus[0]);
+  const q1 = passProb(m, 1, x[1] + m.bonus[1]);
+  const q2 = passProb(m, 2, x[2] + m.bonus[2]);
+  const q3 = passProb(m, 3, x[3] + m.bonus[3]);
+  const all = q0 * q1 * q2 * q3;
+  if (m.needed === 4) return all;
+  // 3 of 4: one stat may fail — by at most nearMiss, when a variant sets one.
+  const near = (s, q) => (Number.isFinite(m.nearMiss) ? passProb(m, s, x[s] + m.bonus[s] + m.nearMiss) : 1) - q;
+  return all + near(0, q0) * q1 * q2 * q3 + q0 * near(1, q1) * q2 * q3 + q0 * q1 * near(2, q2) * q3 + q0 * q1 * q2 * near(3, q3);
+}
+
+function deficit(m, x) {
+  const d = STATS.map((_, s) => Math.max(0, m.expReq[s] - x[s] - m.bonus[s]));
+  // 3 of 4: the worst stat only has to come within nearMiss (Infinity = ignore it).
+  if (m.needed === 3) { d.sort((a, b) => b - a); d[0] = Math.max(0, d[0] - m.nearMiss); }
+  return d[0] + d[1] + d[2] + d[3];
+}
+
+// =============================================================================
+// The plan
+// =============================================================================
+
+// Time-equivalent cost of the remaining training + attempts from stats x0.
+// `train` = { specs[s]: {time, endurance, gain}, bonus0[s] (training so far),
+// cap (per-stat training cap at this Level), perRound (session limit or null) }.
+// Returns { time, endurance } (endurance = the plan's total Endurance use).
+function planCost(models, x0, train, R, params) {
+  const { specs, bonus0, cap, perRound } = train;
+  // Grit economy: sessions use Grit on hand first; each one after that
+  // also costs the climbing Time to earn its Grit.
+  const gritCost = train.gritCost || 0;
+  let gritHave = train.gritHave || 0;
+  let gritTime = 0;
+  let capTime = 0;
+  const gritExtra = () => (gritHave >= gritCost ? 0 : (gritCost - gritHave) * params.gritTime);
+  // Training cap: a session past the cap needs the level-ups that raise it,
+  // priced at train.beyondCapTime each. (Stopping the plan AT the cap made a
+  // higher cap look costlier than a lower one, so the bot avoided levelling.)
+  const beyond = (s) => (tb[s] + specs[s].gain > cap ? train.beyondCapTime : 0);
+  // With a per-round session limit, a session also costs its share of the
+  // rounds the limit forces you to wait through.
+  const effTime = specs.map(t => (perRound ? Math.max(t.time, 10 / perRound) : t.time));
+  const trainCost = specs.map((t, s) => params.trainWeight * effTime[s] + params.enduranceWeight * t.endurance / R);
+  const minP = 1 / params.invCap;
+  const attempts = (x) => {
+    let time = 0;
+    let end = 0;
+    for (const m of models) {
+      const inv = 1 / Math.max(planPSend(m, x), minP);
+      time += m.time * inv;
+      end += m.endurance * inv + m.failExtra * (inv - 1);
+    }
+    return { time, end, cost: time + params.enduranceWeight * end / R };
+  };
+  const x = x0.slice();
+  const tb = bonus0.slice();
+  let cur = attempts(x);
+  let trainTime = 0;
+  let trainEnd = 0;
+  for (let k = 0; k < K_MAX; k++) {
+    let best = -1;
+    let bestGain = 1e-9;
+    let bestNext = null;
+    let defBest = -1;
+    let defGain = 0;
+    const def0 = models.reduce((a, m) => a + deficit(m, x), 0);
+    for (let s = 0; s < 4; s++) {
+      if (beyond(s) === Infinity) continue; // cap can never be raised
+      x[s] += specs[s].gain;
+      const next = attempts(x);
+      const g = cur.cost - next.cost - trainCost[s] - gritExtra() - beyond(s);
+      if (g > bestGain) { bestGain = g; best = s; bestNext = next; }
+      const dg = def0 - models.reduce((a, m) => a + deficit(m, x), 0);
+      if (dg > defGain) { defGain = dg; defBest = s; }
+      x[s] -= specs[s].gain;
+    }
+    if (best < 0) {
+      // No session pays for itself by send chance alone. Keep training while
+      // some milestone is still below pMin and the deficit can shrink.
+      const behind = models.some(m => planPSend(m, x) < params.pMin);
+      if (!behind || defBest < 0) break;
+      best = defBest;
+      x[best] += specs[best].gain;
+      bestNext = attempts(x);
+      x[best] -= specs[best].gain;
+    }
+    capTime += beyond(best);
+    x[best] += specs[best].gain;
+    tb[best] += specs[best].gain;
+    gritTime += gritExtra();
+    gritHave = Math.max(0, gritHave - gritCost);
+    trainTime += effTime[best];
+    trainEnd += specs[best].endurance;
+    cur = bestNext;
+  }
+  return {
+    time: params.trainWeight * trainTime + gritTime + capTime + cur.time,
+    endurance: trainEnd + cur.end,
+  };
+}
+
+const TRAINING_AREAS_BY_STAT = STATS.map(k => TRAINING_AREAS.find(t => t.stat === k));
+
+// =============================================================================
+// timeToFinish
+// =============================================================================
+
+function permanentStats(char) {
+  return STATS.map(k => char.stats[k] + char.trainingBonuses[k] + char.gearBonuses[k]);
+}
+
+// `game` = { milestoneRoutes, rules, market } (a bare milestoneRoutes object
+// is accepted too). rules = state.rules (balance variants); market = names of
+// the gear cards currently for sale.
+function gameCtx(game) {
+  return game && game.milestoneRoutes ? game : { milestoneRoutes: game, rules: null, market: null };
+}
+
+// Core estimate without the level / gear credits. Cached per state shape.
+function coreEstimate(char, game, params, cache) {
+  const { milestoneRoutes, rules } = game;
+  const pending = TIERS.filter(t => !char.milestonesCompleted[t]);
+  if (!pending.length) return { plan: 0, access: 0, endurance: 0, earmarked: 0, gritReserved: 0, R: 1 };
+  const x = permanentStats(char);
+  const train = {
+    specs: TRAINING_AREAS_BY_STAT.map(t => trainingSpec(rules, t, char)),
+    bonus0: STATS.map(k => char.trainingBonuses[k]),
+    cap: trainingCap(rules, char),
+    perRound: rules && rules.trainPerRound ? rules.trainPerRound : null,
+    beyondCapTime: 0,
+  };
+  if (Number.isFinite(train.cap)) {
+    // Each level raises the cap by trainCapPerLevel in every stat; a session
+    // past the cap costs the Time to earn that share of a level's XP.
+    const perLevel = rules.trainCapPerLevel || 0;
+    const row = XP_TABLE.find(r => r.level === char.level);
+    const next = XP_TABLE.find(r => r.level === char.level + 1);
+    train.beyondCapTime = perLevel > 0 && row && next
+      ? params.capWeight * ((next.cumulative - row.cumulative) / params.xpRate) / Math.max(1, perLevel / train.specs[0].gain)
+      : Infinity;
+  }
+  // Lead access shortfall (Free Solo needs none). In the Grit economy the
+  // cards cost Grit, so Grit they need aren't available for training.
+  const Grit = usesGrit(rules);
+  const { access, earmarked, gritReserved } = needsLeadAccess(char, pending, milestoneRoutes)
+    ? (Grit ? accessEstimateGrit(char, rules, params) : accessEstimate(char, params))
+    : { access: 0, earmarked: 0, gritReserved: 0 };
+  if (Grit) {
+    const partner = char.equipment.some(n => GEAR_SHOP.find(g => g.name === n)?.effectKind === 'freeTrainingSession');
+    const freeTraining = !!(rules.characters && rules.characters[char.key] && rules.characters[char.key].freeTraining);
+    train.gritCost = freeTraining ? 0 : (rules.grit.trainCost ?? 1) * (partner ? params.partnerFactor : 1);
+    train.gritHave = Math.min(80, Math.max(0, (char.grit || 0) - gritReserved));
+  }
+  const rest = computeRestRecovery({ ...char, currentEndurance: 0 });
+  const R = Math.max(1, rest.newEndurance + rest.restBonusApplied / 2);
+  const key = `${char.key}|${x.join(',')}|${train.bonus0.join(',')}|${train.cap}|` +
+    `${JSON.stringify(train.specs)}|${train.perRound}|${train.gritCost}|${train.gritHave}|${train.beyondCapTime}|${R}|` +
+    `${char.equipment.join(',')}|${pending.join(',')}`;
+  let plan = cache && cache.get(key);
+  if (!plan) {
+    const models = pending.map(t => milestoneModel(char, t, milestoneRoutes[t]));
+    plan = planCost(models, x, train, R, params);
+    if (cache) {
+      if (cache.size > 20000) cache.clear();
+      cache.set(key, plan);
+    }
+  }
+  // Endurance already in the tank covers part of the plan's need.
+  const credit = Math.min(char.currentEndurance, plan.endurance);
+  const endurance = -params.enduranceWeight * credit / R;
+  return { plan: plan.time + params.enduranceWeight * plan.endurance / R, access, endurance, earmarked, gritReserved, R };
+}
+
+// Lead access in the Grit economy: cards cost Grit, earned at gritTime
+// each. No level-up cliff and nothing earmarked from XP (XP is never spent).
+function accessEstimateGrit(char, rules, params) {
+  const missing = ACCESS.filter(n => !char.equipment.includes(n)).map(n => GEAR_SHOP.find(g => g.name === n));
+  const need = missing.reduce((a, g) => a + gearPrice(rules, char, g), 0);
+  const short = Math.max(0, need - (char.grit || 0));
+  const earnTime = short > 0 ? Math.max(params.minXpTime, short * params.gritTime) : 0;
+  return { access: missing.length + earnTime, earmarked: 0, gritReserved: Math.min(need, char.grit || 0) };
+}
+
+function needsLeadAccess(char, pending, milestoneRoutes) {
+  return pending.some(t => milestoneRoutes[t].area === 'leadClimbing') &&
+    !checkAreaAccess(char, 'leadClimbing').hasAccess;
+}
+
+// Time still needed to own all three Lead access cards, and how much of the
+// current spendable XP will go into them ("earmarked").
+//
+// Cards are bought in order with spendable XP; every purchase moves the
+// climber back on the XP track, so it also makes room before the next level.
+// If the rest can be earned before that level-up, saved XP all goes into the
+// cards. If not, the level-up comes first and wipes what is left — that loss
+// is unavoidable, so it is priced in NOW, along with the XP to reach it. (Pricing it only once it happens
+// made every XP-earning move look worse than resting, and the bot stalled.)
+function accessEstimate(char, params) {
+  const missing = ACCESS.filter(n => !char.equipment.includes(n))
+    .map(n => GEAR_SHOP.find(g => g.name === n).cost);
+  const next = XP_TABLE.find(r => r.level === char.level + 1);
+  let spendable = getSpendableXp(char);
+  let room = next ? next.cumulative - char.xp : Infinity;
+  let spent = 0;
+  let i = 0;
+  while (i < missing.length && missing[i] <= spendable) {
+    spendable -= missing[i];
+    room += missing[i];
+    spent += missing[i];
+    i++;
+  }
+  const remaining = missing.slice(i).reduce((a, b) => a + b, 0);
+  let xpToEarn = 0;
+  let earmarked = spent;
+  if (remaining > 0) {
+    if (remaining - spendable < room) {
+      xpToEarn = remaining - spendable;
+      earmarked += spendable;
+    } else {
+      // Level up first (reaching it wipes what is saved), then earn the
+      // cards inside the new level. XP toward that level-up still counts —
+      // without it, early XP looked worthless and the bot stalled.
+      xpToEarn = (Number.isFinite(room) ? room : 0) + remaining;
+    }
+  }
+  // Earning any XP takes at least one climb, however little is missing.
+  const earnTime = xpToEarn > 0 ? Math.max(params.minXpTime, xpToEarn / params.xpRate) : 0;
+  return { access: missing.length + earnTime, earmarked };
+}
+
+// Estimated Time (×10/Time-per-round) to finish all remaining milestones.
+function timeToFinish(char, game, params = DEFAULT_PARAMS, cache = null) {
+  return explainTimeToFinish(char, game, params, cache).total;
+}
+
+// timeToFinish with its parts: { plan, access, endurance, levelCredit, gearCredit, total }.
+function explainTimeToFinish(char, gameIn, params = DEFAULT_PARAMS, cache = null) {
+  const game = gameCtx(gameIn);
+  const core = coreEstimate(char, game, params, cache);
+  const parts = { plan: core.plan, access: core.access, endurance: core.endurance, levelCredit: 0, gearCredit: 0, total: 0 };
+  if (core.plan === 0) return parts;
+  let total = core.plan + core.access + core.endurance;
+  // Level credit: the next level-up is worth what its stat growth cuts from
+  // the plan, minus the Time still needed to earn the XP for it (at xpRate).
+  // Only the net, and never below 0 — partly-earned XP is not banked growth.
+  // Earning any XP takes at least one climb (minXpTime), however little is left.
+  // (A linear "fraction of the level" credit made the bot refuse training that
+  // would make the coming level-up pointless, and rest forever instead.)
+  // XP set aside for Lead access cards doesn't count toward the level: it is
+  // going to be spent, so spending it must not look like lost progress.
+  // A level-up also raises a rules-variant training cap, which the plan for
+  // the levelled climber sees.
+  // Looking several levels ahead (levelsAhead) matters when one level-up
+  // alone changes little — e.g. under a rules-variant training cap, where
+  // only a few levels unlock enough training to send the expert.
+  if (params.xpWeight > 0 && char.level < 15) {
+    let best = 0;
+    const up = structuredClone(char);
+    for (let k = 1; k <= params.levelsAhead && up.level < 15; k++) {
+      const target = XP_TABLE.find(r => r.level === up.level + 1);
+      if (!target) break;
+      up.xp = target.cumulative;
+      applyLevelUpIfNeeded(up);
+      const upCore = coreEstimate(up, game, params, cache);
+      const saves = Math.max(0, core.plan - upCore.plan);
+      const toEarn = target.cumulative - (char.xp - core.earmarked);
+      const earnTime = Math.max(params.minXpTime, toEarn / params.xpRate);
+      best = Math.max(best, saves - earnTime);
+    }
+    parts.levelCredit = params.xpWeight * best;
+    total -= parts.levelCredit;
+  }
+  // Gear credit: the best card for sale is worth what owning it cuts from the
+  // plan, minus the Time to buy it (1, plus earning any XP shortfall). This is
+  // what makes XP worth saving for market gear; without it the bot only ever
+  // valued XP for levels and Lead access.
+  if (game.market && params.gearWeight > 0) {
+    const gritMode = usesGrit(game.rules);
+    const free = gritMode ? (char.grit || 0) - core.gritReserved : getSpendableXp(char) - core.earmarked;
+    const next = XP_TABLE.find(r => r.level === char.level + 1);
+    const room = next ? next.cumulative - char.xp : Infinity;
+    let best = 0;
+    for (const name of game.market) {
+      if (char.equipment.includes(name) || ACCESS.includes(name)) continue;
+      const g = GEAR_SHOP.find(x => x.name === name);
+      if (!g) continue;
+      const withG = { ...char, equipment: [...char.equipment, name] };
+      let value = core.plan - coreEstimate(withG, game, params, cache).plan;
+      if (name === 'Approach Shoes') value += (core.plan + core.access) / 11; // +1 Time per round
+      if (value <= 0) continue;
+      // XP still to earn before the purchase. If earning it would level the
+      // climber up first (wiping saved XP), the whole cost comes after that
+      // level-up — the same cliff accessEstimate prices for Lead access.
+      let buyTime;
+      if (gritMode) {
+        const short = Math.max(0, gearPrice(game.rules, char, g) - free);
+        buyTime = 1 + (short > 0 ? Math.max(params.minXpTime, short * params.gritTime) : 0);
+      } else {
+        const shortfall = Math.max(0, g.cost - free);
+        const toEarn = shortfall === 0 ? 0 : (shortfall < room ? shortfall : room + g.cost);
+        buyTime = 1 + (toEarn > 0 ? Math.max(params.minXpTime, toEarn / params.xpRate) : 0);
+      }
+      best = Math.max(best, value - buyTime);
+    }
+    parts.gearCredit = params.gearWeight * best;
+    total -= parts.gearCredit;
+  }
+  const perRound = 10 + (char.equipment.includes('Approach Shoes') ? 1 : 0);
+  parts.total = total * 10 / perRound;
+  return parts;
+}
+
+return { DEFAULT_PARAMS, milestoneModel, planPSend, permanentStats, timeToFinish, explainTimeToFinish };
+})();
+
+// ---- engine/planner-weights.js ----
+const __planner_weights = (function () {
+'use strict';
+// Tuned planner weights per character — written by sim/tune-planner.js (do not edit by hand).
+// A plain module (not JSON) so the browser bundle (build-browser.js) can include it.
+
+const PLANNER_WEIGHTS = {
+  "technician": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1,
+      "enduranceWeight": 0.7,
+      "xpRate": 8,
+      "xpWeight": 0,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 13.36,
+      "tuned": 13.18
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 13.13,
+      "tuned": 12.947
+    },
+    "kept": true
+  },
+  "sprinter": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1,
+      "enduranceWeight": 1,
+      "xpRate": 8,
+      "xpWeight": 1,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 16.66,
+      "tuned": 16.66
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 15.887,
+      "tuned": 15.887
+    },
+    "kept": true
+  },
+  "ironLung": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1.25,
+      "enduranceWeight": 1,
+      "xpRate": 11.2,
+      "xpWeight": 0,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 13.31,
+      "tuned": 12.94
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 13.057,
+      "tuned": 12.54
+    },
+    "kept": true
+  },
+  "freeSolo": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1,
+      "enduranceWeight": 1,
+      "xpRate": 8,
+      "xpWeight": 1,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 11.2,
+      "tuned": 11.2
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 10.827,
+      "tuned": 10.827
+    },
+    "kept": true
+  },
+  "routeReader": {
+    "params": {
+      "invCap": 30,
+      "pMin": 0.35,
+      "trainWeight": 1,
+      "enduranceWeight": 1,
+      "xpRate": 8,
+      "xpWeight": 1,
+      "minXpTime": 3
+    },
+    "engine": "0.8.0",
+    "objective": "mean solo rounds to win",
+    "train": {
+      "seeds": "1-100",
+      "default": 10.25,
+      "tuned": 10.25
+    },
+    "test": {
+      "seeds": "1001-1300",
+      "default": 10.007,
+      "tuned": 10.007
+    },
+    "kept": true
+  }
+};
+
+return { PLANNER_WEIGHTS };
+})();
+
+// ---- engine/planner.js ----
+const __planner = (function () {
+'use strict';
+const { applyAction, getLegalActions } = __engine;
+const { observe } = __observe;
+const { applyLevelUpIfNeeded, claimClimbGrit, usesGrit } = __helpers;
+const { createRng } = __rng;
+const { DEFAULT_PARAMS, timeToFinish } = __planner_model;
+const { PLANNER_WEIGHTS } = __planner_weights;
+// Planner agent — the fast playtest bot (docs/CPU_PLAYTEST_AUDIT.md §5, 3a).
+//
+// One-step expectimax over observe():
+//   for each legal action a (annotated by observe with exact pSend, costs, XP)
+//     cost(a) = Time a spends  +  Σ_outcomes P(outcome) · timeToFinish(next state)
+//   pick the cheapest.
+//
+// Climbs and milestone attempts branch into send / fall with observe's exact
+// pSend; training, resting and gear purchases are applied with the real
+// engine on a copy of the state. timeToFinish (planner-model.js) values the
+// resulting climber: training plan, attempt costs, Endurance, Lead access,
+// level progress. No playouts, no per-character rules — every character is
+// played by the same procedure, reading the engine's own numbers, which is
+// what balance measurement needs (audit F1).
+//
+// Options:
+//   params    weights for timeToFinish (default: DEFAULT_PARAMS, or the tuned
+//             per-character weights when `tuned: true`)
+//   tuned     use engine/planner-weights.js for the character played
+//   epsilon   chance of a uniformly random legal action (difficulty dial)
+//   seed      RNG seed for epsilon / tie-breaks (deterministic per seed)
+//
+// It lives in engine/ (not sim/) because it is also the human-facing CPU
+// (engine/cpu.js): the browser bundle (build-browser.js) includes it so local
+// play runs the same bot as online play. No Node-only imports here.
+
+
+
+
+
+
+
+
+function loadTunedWeights() {
+  return PLANNER_WEIGHTS;
+}
+
+// Idle guard. timeToFinish is an estimate, and a one-step lookahead over an
+// estimate can find spots where every useful action looks slightly worse than
+// idling — and then idles forever. By default (params.neverIdle) idling is
+// never chosen while anything else is legal; with neverIdle off, it is
+// forbidden once the estimate has not improved over STALL_ROUNDS rounds.
+// `stalls` counts rounds where that no-progress condition held.
+const STALL_ROUNDS = 2;
+
+function createPlannerAgent({ params = null, tuned = false, epsilon = 0, seed = 1 } = {}) {
+  const rng = createRng(seed);
+  const cache = new Map();
+  const history = []; // estimate at the first decision of each round
+  let lastRound = -1;
+  let forbidIdle = false;
+  return {
+    name: tuned ? 'planner-tuned' : 'planner',
+    stalls: 0,
+    async chooseAction({ state, legalActions }) {
+      if (state.round !== lastRound) {
+        lastRound = state.round;
+        const me = state.players[state.currentPlayerIndex].character;
+        const ctx = { milestoneRoutes: state.milestoneRoutes, rules: state.rules || null, market: state.availableGear.map(g => g.name) };
+        const p0 = resolveParams(me, params, tuned);
+        history.push(estimate(me, ctx, p0, cache));
+        const then = history[history.length - 1 - STALL_ROUNDS];
+        const stalled = then !== undefined && history[history.length - 1] > then - 0.01;
+        if (stalled) this.stalls++;
+        forbidIdle = p0.neverIdle || stalled;
+      }
+      return choosePlannerAction(state, legalActions || getLegalActions(state), {
+        params, tuned, epsilon, rng, cache, forbidIdle,
+      });
+    },
+  };
+}
+
+function resolveParams(me, params, tuned) {
+  return { ...DEFAULT_PARAMS, ...(tuned ? (loadTunedWeights()[me.key]?.params || {}) : {}), ...(params || {}) };
+}
+
+function estimate(char, game, p, cache) {
+  return timeToFinish(char, game, p, cache);
+}
+
+function choosePlannerAction(state, legalActions, {
+  params = null, tuned = false, epsilon = 0, rng = null, cache = null, forbidIdle = false,
+} = {}) {
+  const seat = state.currentPlayerIndex;
+  const me = state.players[seat].character;
+  const p = resolveParams(me, params, tuned);
+
+  if (epsilon > 0 && rng && rng.next() < epsilon) {
+    const i = Math.floor(rng.next() * legalActions.length);
+    return { actionIndex: i, rationale: `exploration: random action ${i}` };
+  }
+
+  const obs = observe(state, { seat, legalActions, plans: false, effects: false });
+  const perRound = 10 + (me.equipment.includes('Approach Shoes') ? 1 : 0);
+  const game = (st) => ({ milestoneRoutes: st.milestoneRoutes, rules: st.rules || null, market: st.availableGear.map(g => g.name) });
+  const here = game(state);
+  const ttf = (char, g = here) => timeToFinish(char, g, p, cache);
+
+  const hasNonIdle = obs.actions.some(a => a.type !== 'endTurn' && a.type !== 'rest');
+  const scored = []; // every option considered, for the decision-tension report
+  let best = null;
+  for (const a of obs.actions) {
+    const action = legalActions[a.i];
+    let spent;
+    let future;
+    switch (a.type) {
+      case 'climb':
+      case 'milestone': {
+        spent = a.time;
+        const send = climbOutcome(state, me, a, true);
+        const fall = climbOutcome(state, me, a, false);
+        future = (a.pSend > 0 ? a.pSend * ttf(send) : 0) + (a.pSend < 1 ? (1 - a.pSend) * ttf(fall) : 0);
+        break;
+      }
+      case 'endTurn':
+        spent = a.timeForfeited;
+        future = ttf(me);
+        break;
+      default: {
+        // train / rest / buyGear: deterministic — apply with the real engine.
+        spent = a.time;
+        const { state: next } = applyAction({ ...state, events: [] }, action);
+        future = ttf(next.players[seat].character, game(next));
+      }
+    }
+    const cost = spent * 10 / perRound + future;
+    // Idle: calling it a day, or a Rest that restores nothing and grants no
+    // Beta Boost. On a tie, prefer doing something over idling.
+    const idle = a.type === 'endTurn' ||
+      (a.type === 'rest' && a.enduranceAfter <= me.currentEndurance && !(a.grantsBetaBoost && !me.betaBoostActive));
+    if (forbidIdle && idle && hasNonIdle) continue;
+    scored.push({ cost, type: a.type });
+    if (!best || cost < best.cost - 1e-6 || (cost < best.cost + 1e-6 && best.idle && !idle)) {
+      best = { cost, a, idle };
+    }
+  }
+  // How close the call was: the gap to the runner-up, and which other kinds of
+  // action came within 1 Time of the best (analysis/strategy-diversity.mjs).
+  const others = scored.filter(o => o !== scored.find(x => x.cost === best.cost && x.type === best.a.type));
+  const gap = others.length ? Math.min(...others.map(o => o.cost)) - best.cost : Infinity;
+  const nearTypes = [...new Set(others.filter(o => o.cost - best.cost <= 1).map(o => o.type))].filter(t => t !== best.a.type);
+  return {
+    actionIndex: best.a.i,
+    rationale: `planner: ${describe(best.a)} → est. ${best.cost.toFixed(1)} Time to finish`,
+    decision: { gap, nearTypes, options: scored.length },
+  };
+}
+
+// The climber after a climb resolves one way or the other. Grit rewards are
+// applied with the engine's own claimClimbGrit, on a copy of the card.
+function climbOutcome(state, me, a, sent) {
+  const c = structuredClone(me);
+  c.xp += sent ? a.xp.send : a.xp.fall;
+  if (usesGrit(state.rules)) {
+    const card = a.type === 'milestone' ? {} : { ...state.availableRoutes[a.wall].find(r => r.name === a.route) };
+    claimClimbGrit(state.rules, c, card, { isMilestone: a.type === 'milestone', success: sent, tier: a.tier });
+  }
+  c.currentEndurance -= a.endurance;
+  if (sent) c.currentEndurance = Math.min(c.maxEndurance, c.currentEndurance + a.sendHeal);
+  else c.currentEndurance -= a.fallExtraEndurance;
+  if (c.currentEndurance < 0) c.currentEndurance = 0;
+  c.betaBoostActive = false;
+  if (a.shift) c.abilityUsed = true;
+  if (sent && a.type === 'milestone') c.milestonesCompleted[a.tier] = true;
+  while (applyLevelUpIfNeeded(c).leveledUp) { /* may cross several levels */ }
+  return c;
+}
+
+function describe(a) {
+  switch (a.type) {
+    case 'climb': return `climb ${a.route} (pSend ${a.pSend})`;
+    case 'milestone': return `milestone ${a.tier} (pSend ${a.pSend})`;
+    case 'train': return `train ${a.stat}`;
+    case 'buyGear': return `buy ${a.card}`;
+    default: return a.type;
+  }
+}
+
+return { loadTunedWeights, createPlannerAgent, choosePlannerAction };
+})();
+
+// ---- engine/cpu.js ----
+const __cpu = (function () {
+'use strict';
+const { deriveSeed } = __rng;
+const { createPlannerAgent } = __planner;
+// Human-facing CPU opponents — one difficulty ladder for local and online play.
+//
+//   createCpuAgent(level, { seed }) → agent with chooseAction({ state, legalActions })
+//   CPU_LEVELS                      → { easy, medium, hard }: label + settings
+//   CPU_MODEL                       → version tag of the bot behind every level
+//   cpuSeed(gameSeed, seatIndex)    → the per-seat seed both modes use
+//
+// Every level is the planner bot (planner.js): one-step expectimax over the
+// engine's exact send chances, the strongest and fastest bot we have
+// (docs/CPU_PLAYTEST_AUDIT.md §8). Difficulty is how often it plays a random
+// legal move instead (epsilon), and whether it uses the per-character tuned
+// weights. Local play (game.js, through the browser bundle) and online play
+// (party/game.js) both build their CPUs here, so a "Hard CPU" is the same
+// opponent everywhere.
+//
+// CPU_MODEL is recorded in match and replay records (botModel), so the
+// dashboard can tell a change in bot skill from a change in game balance.
+// Bump it whenever a level's behaviour changes.
+
+
+
+
+const CPU_MODEL = 'planner-1';
+
+const CPU_LEVELS = {
+  easy:   { label: 'Easy',   epsilon: 0.35, tuned: false },
+  medium: { label: 'Medium', epsilon: 0.1,  tuned: false },
+  hard:   { label: 'Hard',   epsilon: 0,    tuned: true },
+};
+
+const CPU_LEVEL_KEYS = Object.keys(CPU_LEVELS);
+
+// A known level key; anything else (missing, misspelt, from an old client)
+// is played as Easy.
+function cpuLevel(level) {
+  return Object.prototype.hasOwnProperty.call(CPU_LEVELS, level) ? level : 'easy';
+}
+
+// Per-seat seed: the CPU's random choices are reproducible from the game seed.
+function cpuSeed(gameSeed, seatIndex) {
+  return deriveSeed(gameSeed >>> 0, 1000 + seatIndex);
+}
+
+function createCpuAgent(level, { seed = 1 } = {}) {
+  const key = cpuLevel(level);
+  const { epsilon, tuned } = CPU_LEVELS[key];
+  const agent = createPlannerAgent({ epsilon, tuned, seed });
+  agent.name = `cpu-${key}`;
+  agent.level = key;
+  agent.model = CPU_MODEL;
+  return agent;
+}
+
+return { CPU_MODEL, CPU_LEVELS, CPU_LEVEL_KEYS, cpuLevel, cpuSeed, createCpuAgent };
 })();
 
 return {
@@ -4755,5 +6196,29 @@ return {
   MATCH_MODES: __match_record.MATCH_MODES,
   buildMatchRecord: __match_record.buildMatchRecord,
   validateMatchRecord: __match_record.validateMatchRecord,
+  REPLAY_RECORD_SCHEMA: __replay_record.REPLAY_RECORD_SCHEMA,
+  REPLAY_MAX_BYTES: __replay_record.REPLAY_MAX_BYTES,
+  buildReplayRecord: __replay_record.buildReplayRecord,
+  validateReplayRecord: __replay_record.validateReplayRecord,
+  replayRecordState: __replay_record.replayRecordState,
+  OBSERVATION_SCHEMA: __observe.OBSERVATION_SCHEMA,
+  observe: __observe.observe,
+  observeText: __observe.observeText,
+  DEFAULT_PARAMS: __planner_model.DEFAULT_PARAMS,
+  milestoneModel: __planner_model.milestoneModel,
+  planPSend: __planner_model.planPSend,
+  permanentStats: __planner_model.permanentStats,
+  timeToFinish: __planner_model.timeToFinish,
+  explainTimeToFinish: __planner_model.explainTimeToFinish,
+  PLANNER_WEIGHTS: __planner_weights.PLANNER_WEIGHTS,
+  loadTunedWeights: __planner.loadTunedWeights,
+  createPlannerAgent: __planner.createPlannerAgent,
+  choosePlannerAction: __planner.choosePlannerAction,
+  CPU_MODEL: __cpu.CPU_MODEL,
+  CPU_LEVELS: __cpu.CPU_LEVELS,
+  CPU_LEVEL_KEYS: __cpu.CPU_LEVEL_KEYS,
+  cpuLevel: __cpu.cpuLevel,
+  cpuSeed: __cpu.cpuSeed,
+  createCpuAgent: __cpu.createCpuAgent,
 };
 })();

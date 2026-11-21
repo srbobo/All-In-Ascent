@@ -28,7 +28,12 @@ const outPath = join(here, 'engine.browser.js');
 
 // Bundled modules in dependency order (each may import only from earlier ones
 // or from ./data.js).
-const MODULES = ['rng.js', 'telemetry.js', 'version.js', 'content.js', 'helpers.js', 'state.js', 'engine.js', 'stats.js', 'match-record.js'];
+const MODULES = [
+  'rng.js', 'telemetry.js', 'version.js', 'content.js', 'helpers.js', 'state.js', 'engine.js', 'stats.js',
+  'match-record.js', 'replay-record.js',
+  // The CPU opponents (cpu.js): local play runs the same bot as online play.
+  'observe.js', 'planner-model.js', 'planner-weights.js', 'planner.js', 'cpu.js',
+];
 
 // Data names game.js declares at top level in its GAME DATA section.
 const DATA_GLOBALS = ['CHARACTERS', 'XP_TABLE', 'TRAINING_AREAS', 'ROUTES', 'GEAR_SHOP'];

@@ -11,6 +11,8 @@ import {
   collectPageErrors, seedPageRandom, uiStep, asJson, cardAction, nearlyFinishedGame, expectSummaryShows,
 } from './support.js';
 import { buildMatchRecord } from '../../engine/match-record.js';
+import { buildReplayRecord } from '../../engine/replay-record.js';
+import { CPU_LEVELS, CPU_MODEL } from '../../engine/cpu.js';
 
 process.env.BOT_MOVE_DELAY_MS = '0';
 const { GameRoom } = await import('../../party/game.js');
@@ -46,10 +48,15 @@ test('online client plays a game against the GameRoom and bots', async ({ page }
   await page.goto('/index.html?online=1&host=localhost:1999&room=e2e-room&user=alice&password=pw');
   await expect(page.locator('#onlineLobby')).toContainText('Pick your character');
   await page.locator('.ol-char-card', { hasText: 'The Iron Lung' }).click();
-  // Easy CPUs (the heuristic bot) keep the run fast; Hard runs rollout search.
+  // The lobby offers the engine's CPU ladder — the same levels as local play.
+  const levels = await page.locator('.ol-bot-difficulty option').evaluateAll(os => os.map(o => [o.value, o.textContent]));
+  expect(levels).toEqual(Object.entries(CPU_LEVELS).map(([k, v]) => [k, `${v.label} CPU`]));
+  await expect(page.locator('.ol-bot-difficulty')).toHaveValue('medium');
+  // One Easy and one Hard CPU; the host's choice survives the lobby re-render.
   await page.selectOption('.ol-bot-difficulty', 'easy');
   await page.locator('button', { hasText: 'Add Bot' }).click();
-  await page.selectOption('.ol-bot-difficulty', 'easy');
+  await expect(page.locator('.ol-bot-difficulty')).toHaveValue('easy');
+  await page.selectOption('.ol-bot-difficulty', 'hard');
   await page.locator('button', { hasText: 'Add Bot' }).click();
   await page.locator('#ol-controls button', { hasText: 'Start Game' }).click();
   await expect(page.locator('#gameBoard')).toBeVisible();
@@ -68,6 +75,8 @@ test('online client plays a game against the GameRoom and bots', async ({ page }
     await page.waitForTimeout(10);
   }
   expect(humanActions, 'the human seat should play many actions').toBeGreaterThan(20);
+  // The bot seats are the engine's CPUs at the chosen levels.
+  expect(Object.values(room.botAgents).map(a => [a.level, a.model])).toEqual([['easy', CPU_MODEL], ['hard', CPU_MODEL]]);
 
   // The client renders exactly the server's engine state.
   await expect.poll(async () => JSON.stringify(await page.evaluate(() => getGameState())), { timeout: 5000 })
@@ -123,16 +132,21 @@ test('winning an online game opens the same post-game summary as local play', as
   await summary.getByRole('button', { name: 'View the board' }).click();
   await expect(page.locator('#turnIndicator')).toContainText('Game over · alice wins');
 
-  // The server recorded the game for the telemetry dashboard (the browser
-  // sends nothing online): alice's seat as a human, the Easy bots as bots.
-  await expect.poll(() => room.telemetryStorage.data.size).toBe(1);
-  const { receivedAt, ...record } = [...room.telemetryStorage.data.values()][0];
+  // The server recorded the game (the browser sends nothing online): a match
+  // record for the dashboard and a replay record for the learning CPU, with
+  // alice's seat as a human and the Easy bots as the engine's CPU.
+  await expect.poll(() => room.telemetryStorage.data.size).toBe(2);
+  const stored = (prefix) => [...room.telemetryStorage.data].find(([k]) => k.startsWith(prefix))[1];
+  const { receivedAt, ...record } = stored('match:');
   expect(typeof receivedAt).toBe('number');
-  expect(record).toEqual(asJson(buildMatchRecord(final, {
-    id: record.id, mode: 'online', startedAt: room.startedAt, finishedAt: room.finishedAt,
-    seats: [{ controller: 'human' }, { controller: 'bot', botLevel: 'easy' }, { controller: 'bot', botLevel: 'easy' }],
-  })));
+  const seats = [{ controller: 'human' }, { controller: 'bot', botLevel: 'easy', botModel: CPU_MODEL }, { controller: 'bot', botLevel: 'easy', botModel: CPU_MODEL }];
+  const meta = { id: record.id, mode: 'online', startedAt: room.startedAt, finishedAt: room.finishedAt, seats };
+  expect(record).toEqual(asJson(buildMatchRecord(final, meta)));
   expect(JSON.stringify(record)).not.toContain('alice');
+  const { receivedAt: replayReceived, ...replay } = stored('replay:');
+  expect(typeof replayReceived).toBe('number');
+  expect(replay).toEqual(asJson(buildReplayRecord(final, meta)));
+  expect(JSON.stringify(replay)).not.toContain('alice');
   expect(telemetryPosts).toBe(0);
   expect(errors).toEqual([]);
 });
