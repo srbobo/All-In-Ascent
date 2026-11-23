@@ -19,6 +19,8 @@
 //   tuned     use engine/planner-weights.js for the character played
 //   epsilon   chance of a uniformly random legal action (difficulty dial)
 //   seed      RNG seed for epsilon / tie-breaks (deterministic per seed)
+//   value     learned value-model weights (value-model.js): the finish-time
+//             estimate gets the model's correction. null = the plain planner.
 //
 // It lives in engine/ (not sim/) because it is also the human-facing CPU
 // (engine/cpu.js): the browser bundle (build-browser.js) includes it so local
@@ -30,6 +32,7 @@ import { applyLevelUpIfNeeded, claimClimbGrit, usesGrit } from './helpers.js';
 import { createRng } from './rng.js';
 import { DEFAULT_PARAMS, timeToFinish } from './planner-model.js';
 import { PLANNER_WEIGHTS } from './planner-weights.js';
+import { valueTimeToFinish } from './value-model.js';
 
 export function loadTunedWeights() {
   return PLANNER_WEIGHTS;
@@ -43,14 +46,14 @@ export function loadTunedWeights() {
 // `stalls` counts rounds where that no-progress condition held.
 const STALL_ROUNDS = 2;
 
-export function createPlannerAgent({ params = null, tuned = false, epsilon = 0, seed = 1 } = {}) {
+export function createPlannerAgent({ params = null, tuned = false, epsilon = 0, seed = 1, value = null } = {}) {
   const rng = createRng(seed);
   const cache = new Map();
   const history = []; // estimate at the first decision of each round
   let lastRound = -1;
   let forbidIdle = false;
   return {
-    name: tuned ? 'planner-tuned' : 'planner',
+    name: value ? 'planner-learned' : tuned ? 'planner-tuned' : 'planner',
     stalls: 0,
     async chooseAction({ state, legalActions }) {
       if (state.round !== lastRound) {
@@ -58,14 +61,14 @@ export function createPlannerAgent({ params = null, tuned = false, epsilon = 0, 
         const me = state.players[state.currentPlayerIndex].character;
         const ctx = { milestoneRoutes: state.milestoneRoutes, rules: state.rules || null, market: state.availableGear.map(g => g.name) };
         const p0 = resolveParams(me, params, tuned);
-        history.push(estimate(me, ctx, p0, cache));
+        history.push(estimate(me, ctx, p0, cache, value));
         const then = history[history.length - 1 - STALL_ROUNDS];
         const stalled = then !== undefined && history[history.length - 1] > then - 0.01;
         if (stalled) this.stalls++;
         forbidIdle = p0.neverIdle || stalled;
       }
       return choosePlannerAction(state, legalActions || getLegalActions(state), {
-        params, tuned, epsilon, rng, cache, forbidIdle,
+        params, tuned, epsilon, rng, cache, forbidIdle, value,
       });
     },
   };
@@ -75,12 +78,12 @@ function resolveParams(me, params, tuned) {
   return { ...DEFAULT_PARAMS, ...(tuned ? (loadTunedWeights()[me.key]?.params || {}) : {}), ...(params || {}) };
 }
 
-function estimate(char, game, p, cache) {
-  return timeToFinish(char, game, p, cache);
+function estimate(char, game, p, cache, value = null) {
+  return value ? valueTimeToFinish(char, game, p, cache, value) : timeToFinish(char, game, p, cache);
 }
 
 export function choosePlannerAction(state, legalActions, {
-  params = null, tuned = false, epsilon = 0, rng = null, cache = null, forbidIdle = false,
+  params = null, tuned = false, epsilon = 0, rng = null, cache = null, forbidIdle = false, value = null,
 } = {}) {
   const seat = state.currentPlayerIndex;
   const me = state.players[seat].character;
@@ -95,7 +98,7 @@ export function choosePlannerAction(state, legalActions, {
   const perRound = 10 + (me.equipment.includes('Approach Shoes') ? 1 : 0);
   const game = (st) => ({ milestoneRoutes: st.milestoneRoutes, rules: st.rules || null, market: st.availableGear.map(g => g.name) });
   const here = game(state);
-  const ttf = (char, g = here) => timeToFinish(char, g, p, cache);
+  const ttf = (char, g = here) => estimate(char, g, p, cache, value);
 
   const hasNonIdle = obs.actions.some(a => a.type !== 'endTurn' && a.type !== 'rest');
   const scored = []; // every option considered, for the decision-tension report

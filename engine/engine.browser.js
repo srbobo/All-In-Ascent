@@ -1,4 +1,4 @@
-// AUTO-GENERATED FROM engine/{rng,telemetry,version,content,helpers,state,engine,stats,match-record,replay-record,observe,planner-model,planner-weights,planner,cpu}.js — DO NOT EDIT BY HAND.
+// AUTO-GENERATED FROM engine/{rng,telemetry,version,content,helpers,state,engine,stats,match-record,replay-record,observe,planner-model,planner-weights,value-model,value-weights,planner,cpu}.js — DO NOT EDIT BY HAND.
 //
 // Regenerate with: node engine/build-browser.js
 // The rules engine as one classic script, so local play (game.js) runs the
@@ -5811,6 +5811,147 @@ const PLANNER_WEIGHTS = {
 return { PLANNER_WEIGHTS };
 })();
 
+// ---- engine/value-model.js ----
+const __value_model = (function () {
+'use strict';
+const { XP_TABLE } = __data;
+const { explainTimeToFinish, permanentStats } = __planner_model;
+// Learned value model — a correction to the planner's finish-time estimate.
+//
+//   valueFeatures(char, game, parts)          → number[] (VALUE_FEATURES order)
+//   valueResidual(weights, char, features)    → Time to add to the planner's estimate
+//   valueTimeToFinish(char, game, params, cache, weights) → corrected estimate
+//
+// The planner (planner.js) picks the action minimising Time now + E[time to
+// finish]. Its finish-time estimate (planner-model.js timeToFinish) is
+// hand-built. This module learns, from self-play outcomes, how far that
+// estimate is off for a given climber, and adds the correction:
+//
+//     V(char) = timeToFinish(char) + MLP(features) + adapter[char.key]
+//
+// - The estimate's own parts are inputs, so the network learns to re-weight
+//   them rather than to rebuild the game from scratch, and a zero network is
+//   exactly the planner.
+// - Features describe the climber by traits (starting stats, growth,
+//   endurance), not by name, so one network serves every character —
+//   including Project Mode climbers it never saw.
+// - adapters: a small per-character correction (bias + scale on the
+//   estimate), used only for characters it was trained on; any other
+//   character gets the shared network alone.
+//
+// Weights are plain JSON (engine/value-weights.js, written by
+// sim/learn/train.js) so the model runs the same in Node, the Worker and the
+// browser bundle. No Node-only imports here.
+
+
+
+
+const VALUE_MODEL_SCHEMA = 'aia-value-model/1';
+
+const TIERS = ['beginner', 'intermediate', 'expert'];
+const STAT_KEYS = ['strength', 'technique', 'focus', 'flexibility'];
+const ACCESS_CARDS_NEEDED = ['Belay Device', 'Locking Carabiner', 'Lead Rope'];
+
+const VALUE_FEATURES = [
+  // the planner's estimate and its parts
+  'ttf', 'plan', 'access', 'endurance', 'levelCredit', 'gearCredit',
+  // progress and resources
+  'pending', 'deficitSum', 'deficitMax', 'trainBonus', 'endNow', 'endMax',
+  'level', 'xpToLevel', 'grit', 'accessOwned', 'gearCount', 'betaBoost', 'abilityUsed',
+  // Time left in the current round (training only; see valueTimeToFinish)
+  'timeNow',
+  // traits — who the climber is, without naming them
+  'startStats', 'growth', 'startEndurance',
+];
+
+const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+
+// Features for one climber. `parts` is explainTimeToFinish's result for this
+// climber (computed once by the caller). `timeNow` overrides the climber's
+// Time left this round.
+function valueFeatures(char, game, parts, { timeNow = char.timeRemaining } = {}) {
+  const milestoneRoutes = game.milestoneRoutes || game;
+  const pending = TIERS.filter(t => !char.milestonesCompleted[t]);
+  const x = permanentStats(char);
+  const deficits = pending.map(t => {
+    const route = milestoneRoutes[t].route;
+    return sum(STAT_KEYS.map((k, s) => Math.max(0, route[k] - x[s])));
+  });
+  const next = XP_TABLE.find(r => r.level === char.level + 1);
+  const start = char.startingStats || char.stats;
+  return [
+    parts.total, parts.plan, parts.access, parts.endurance, parts.levelCredit, parts.gearCredit,
+    pending.length,
+    sum(deficits) / 10,
+    (deficits.length ? Math.max(...deficits) : 0) / 10,
+    sum(STAT_KEYS.map(k => char.trainingBonuses[k] || 0)) / 10,
+    char.currentEndurance / 10,
+    char.maxEndurance / 10,
+    char.level,
+    next ? (next.cumulative - char.xp) / 100 : 0,
+    char.grit || 0,
+    ACCESS_CARDS_NEEDED.filter(n => char.equipment.includes(n)).length,
+    char.equipment.length,
+    char.betaBoostActive ? 1 : 0,
+    char.abilityUsed ? 1 : 0,
+    timeNow,
+    sum(STAT_KEYS.map(k => start[k] || 0)) / 10,
+    char.growth ? sum(STAT_KEYS.map(k => char.growth[k] || 0)) : 0,
+    (char.startingEndurance || char.maxEndurance) / 10,
+  ];
+}
+
+// The network's correction (Time units, same as timeToFinish) for features
+// `f` of climber `char`. Weights: { mean, std, W1 (hidden × in), b1, W2, b2,
+// adapters: { [charKey]: { bias, scale } } }.
+//
+// `w.use` (optional): the indices of the features the network reads, in the
+// order of W1's columns, mean and std. Without it, every feature in order.
+function valueResidual(w, char, f) {
+  const h = w.b1.length;
+  const use = w.use || null;
+  const n = use ? use.length : f.length;
+  let out = w.b2;
+  for (let j = 0; j < h; j++) {
+    const row = w.W1[j];
+    let a = w.b1[j];
+    for (let k = 0; k < n; k++) {
+      const i = use ? use[k] : k;
+      a += row[k] * ((f[i] - w.mean[k]) / w.std[k]);
+    }
+    out += w.W2[j] * Math.tanh(a);
+  }
+  const ad = w.adapters && Object.prototype.hasOwnProperty.call(w.adapters, char.key) ? w.adapters[char.key] : null;
+  if (ad) out += ad.bias + ad.scale * f[0];
+  return out;
+}
+
+// Corrected finish-time estimate. Decisions compare climbers after different
+// actions, so the round's Time left is held at a fresh round (perRound) for
+// all of them — the action's own Time is already counted by the planner.
+function valueTimeToFinish(char, game, params, cache, weights) {
+  const parts = explainTimeToFinish(char, game, params, cache);
+  if (!weights || parts.total === 0) return parts.total;
+  const perRound = 10 + (char.equipment.includes('Approach Shoes') ? 1 : 0);
+  const f = valueFeatures(char, game, parts, { timeNow: perRound });
+  return Math.max(0, parts.total + valueResidual(weights, char, f));
+}
+
+return { VALUE_MODEL_SCHEMA, VALUE_FEATURES, valueFeatures, valueResidual, valueTimeToFinish };
+})();
+
+// ---- engine/value-weights.js ----
+const __value_weights = (function () {
+'use strict';
+// Learned value-model weights (engine/value-model.js) — written by
+// sim/learn/train.js (do not edit by hand). null: no trained model shipped.
+// A plain module (not JSON) so the browser bundle (build-browser.js) can include it.
+
+const VALUE_WEIGHTS = null;
+
+return { VALUE_WEIGHTS };
+})();
+
 // ---- engine/planner.js ----
 const __planner = (function () {
 'use strict';
@@ -5820,6 +5961,7 @@ const { applyLevelUpIfNeeded, claimClimbGrit, usesGrit } = __helpers;
 const { createRng } = __rng;
 const { DEFAULT_PARAMS, timeToFinish } = __planner_model;
 const { PLANNER_WEIGHTS } = __planner_weights;
+const { valueTimeToFinish } = __value_model;
 // Planner agent — the fast playtest bot (docs/CPU_PLAYTEST_AUDIT.md §5, 3a).
 //
 // One-step expectimax over observe():
@@ -5841,10 +5983,13 @@ const { PLANNER_WEIGHTS } = __planner_weights;
 //   tuned     use engine/planner-weights.js for the character played
 //   epsilon   chance of a uniformly random legal action (difficulty dial)
 //   seed      RNG seed for epsilon / tie-breaks (deterministic per seed)
+//   value     learned value-model weights (value-model.js): the finish-time
+//             estimate gets the model's correction. null = the plain planner.
 //
 // It lives in engine/ (not sim/) because it is also the human-facing CPU
 // (engine/cpu.js): the browser bundle (build-browser.js) includes it so local
 // play runs the same bot as online play. No Node-only imports here.
+
 
 
 
@@ -5865,14 +6010,14 @@ function loadTunedWeights() {
 // `stalls` counts rounds where that no-progress condition held.
 const STALL_ROUNDS = 2;
 
-function createPlannerAgent({ params = null, tuned = false, epsilon = 0, seed = 1 } = {}) {
+function createPlannerAgent({ params = null, tuned = false, epsilon = 0, seed = 1, value = null } = {}) {
   const rng = createRng(seed);
   const cache = new Map();
   const history = []; // estimate at the first decision of each round
   let lastRound = -1;
   let forbidIdle = false;
   return {
-    name: tuned ? 'planner-tuned' : 'planner',
+    name: value ? 'planner-learned' : tuned ? 'planner-tuned' : 'planner',
     stalls: 0,
     async chooseAction({ state, legalActions }) {
       if (state.round !== lastRound) {
@@ -5880,14 +6025,14 @@ function createPlannerAgent({ params = null, tuned = false, epsilon = 0, seed = 
         const me = state.players[state.currentPlayerIndex].character;
         const ctx = { milestoneRoutes: state.milestoneRoutes, rules: state.rules || null, market: state.availableGear.map(g => g.name) };
         const p0 = resolveParams(me, params, tuned);
-        history.push(estimate(me, ctx, p0, cache));
+        history.push(estimate(me, ctx, p0, cache, value));
         const then = history[history.length - 1 - STALL_ROUNDS];
         const stalled = then !== undefined && history[history.length - 1] > then - 0.01;
         if (stalled) this.stalls++;
         forbidIdle = p0.neverIdle || stalled;
       }
       return choosePlannerAction(state, legalActions || getLegalActions(state), {
-        params, tuned, epsilon, rng, cache, forbidIdle,
+        params, tuned, epsilon, rng, cache, forbidIdle, value,
       });
     },
   };
@@ -5897,12 +6042,12 @@ function resolveParams(me, params, tuned) {
   return { ...DEFAULT_PARAMS, ...(tuned ? (loadTunedWeights()[me.key]?.params || {}) : {}), ...(params || {}) };
 }
 
-function estimate(char, game, p, cache) {
-  return timeToFinish(char, game, p, cache);
+function estimate(char, game, p, cache, value = null) {
+  return value ? valueTimeToFinish(char, game, p, cache, value) : timeToFinish(char, game, p, cache);
 }
 
 function choosePlannerAction(state, legalActions, {
-  params = null, tuned = false, epsilon = 0, rng = null, cache = null, forbidIdle = false,
+  params = null, tuned = false, epsilon = 0, rng = null, cache = null, forbidIdle = false, value = null,
 } = {}) {
   const seat = state.currentPlayerIndex;
   const me = state.players[seat].character;
@@ -5917,7 +6062,7 @@ function choosePlannerAction(state, legalActions, {
   const perRound = 10 + (me.equipment.includes('Approach Shoes') ? 1 : 0);
   const game = (st) => ({ milestoneRoutes: st.milestoneRoutes, rules: st.rules || null, market: st.availableGear.map(g => g.name) });
   const here = game(state);
-  const ttf = (char, g = here) => timeToFinish(char, g, p, cache);
+  const ttf = (char, g = here) => estimate(char, g, p, cache, value);
 
   const hasNonIdle = obs.actions.some(a => a.type !== 'endTurn' && a.type !== 'rest');
   const scored = []; // every option considered, for the decision-tension report
@@ -6211,6 +6356,12 @@ return {
   timeToFinish: __planner_model.timeToFinish,
   explainTimeToFinish: __planner_model.explainTimeToFinish,
   PLANNER_WEIGHTS: __planner_weights.PLANNER_WEIGHTS,
+  VALUE_MODEL_SCHEMA: __value_model.VALUE_MODEL_SCHEMA,
+  VALUE_FEATURES: __value_model.VALUE_FEATURES,
+  valueFeatures: __value_model.valueFeatures,
+  valueResidual: __value_model.valueResidual,
+  valueTimeToFinish: __value_model.valueTimeToFinish,
+  VALUE_WEIGHTS: __value_weights.VALUE_WEIGHTS,
   loadTunedWeights: __planner.loadTunedWeights,
   createPlannerAgent: __planner.createPlannerAgent,
   choosePlannerAction: __planner.choosePlannerAction,

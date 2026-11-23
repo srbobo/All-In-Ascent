@@ -32,7 +32,7 @@ const MODULES = [
   'rng.js', 'telemetry.js', 'version.js', 'content.js', 'helpers.js', 'state.js', 'engine.js', 'stats.js',
   'match-record.js', 'replay-record.js',
   // The CPU opponents (cpu.js): local play runs the same bot as online play.
-  'observe.js', 'planner-model.js', 'planner-weights.js', 'planner.js', 'cpu.js',
+  'observe.js', 'planner-model.js', 'planner-weights.js', 'value-model.js', 'value-weights.js', 'planner.js', 'cpu.js',
 ];
 
 // Data names game.js declares at top level in its GAME DATA section.

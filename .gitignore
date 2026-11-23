@@ -35,3 +35,7 @@ training/adapters/
 training/data/
 training/pilot-split/
 training/.venv/
+
+# Learning-bot pipeline (sim/learn): generated self-play data and candidate models
+sim/learn/data/
+sim/learn/out/
