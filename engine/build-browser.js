@@ -33,6 +33,8 @@ const MODULES = [
   'match-record.js', 'replay-record.js',
   // The CPU opponents (cpu.js): local play runs the same bot as online play.
   'observe.js', 'planner-model.js', 'planner-weights.js', 'value-model.js', 'value-weights.js', 'planner.js', 'cpu.js',
+  // Player profiles and ratings (player-profile.js): the Adaptive CPU plays at the player's rating.
+  'player-profile.js',
 ];
 
 // Data names game.js declares at top level in its GAME DATA section.

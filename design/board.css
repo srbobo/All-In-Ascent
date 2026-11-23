@@ -127,6 +127,19 @@ main { padding: var(--sp-5) var(--gutter) var(--sp-7); }
 .cpu-level select:disabled { opacity: 0.55; cursor: not-allowed; }
 #cpuRandomBtn { margin-bottom: var(--sp-4); }
 
+/* The player's record against CPUs (index.html #profileCard). */
+.profile-card { margin-top: var(--sp-4); padding: var(--sp-3) var(--sp-4); border: 2px solid var(--ink); border-radius: var(--r-md); background: var(--paper); max-width: 60ch; }
+.profile-card p { margin: 0 0 var(--sp-1); }
+.profile-card .pc-title { font-weight: 700; }
+.profile-card .pc-title span { font-weight: 400; color: var(--ink-soft); }
+.profile-card .pc-rating { font-family: var(--font-mono); font-weight: 700; }
+.profile-card .pc-adaptive { color: var(--ink-soft); font-size: var(--fs-sm); }
+.profile-card .btn { margin-top: var(--sp-2); }
+.summary-rating { margin: var(--sp-3) 0 0; font-weight: 600; }
+.summary-rating__delta { font-family: var(--font-mono); margin-left: 0.25em; }
+.summary-rating__delta.up { color: var(--teal-text); }
+.summary-rating__delta.down { color: var(--raspberry-text); }
+
 .pick-status {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   margin: var(--sp-2) 0 var(--sp-4);

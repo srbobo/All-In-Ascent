@@ -34,7 +34,7 @@
   // every dev run and deploy; the repo root holds far too much to upload.
   "build": {
     "command": "node party/build-site.js",
-    "watch_dir": ["design", "engine", "online", "docs", "RULEBOOK.html", "cards.html", "dashboard.html", "dashboard.js", "effects.js", "flags.js", "game.js", "index.html", "online-mode.js", "online.html", "project-store.js", "project.html", "project.js", "review.html", "review.js", "telemetry-client.js"]
+    "watch_dir": ["design", "engine", "online", "docs", "RULEBOOK.html", "cards.html", "dashboard.html", "dashboard.js", "effects.js", "flags.js", "game.js", "index.html", "online-mode.js", "online.html", "player-profile-store.js", "project-store.js", "project.html", "project.js", "review.html", "review.js", "telemetry-client.js"]
   },
   "assets": {
     "directory": ".site"

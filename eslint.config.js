@@ -107,7 +107,7 @@ export default [
   },
   {
     // Browser classic scripts — global scope, no modules.
-    files: ['game.js', 'effects.js', 'online-mode.js', 'backend.js', 'telemetry-client.js', 'flags.js', 'project-store.js', 'project.js', 'review.js', 'design/**/*.js'],
+    files: ['game.js', 'effects.js', 'online-mode.js', 'backend.js', 'telemetry-client.js', 'flags.js', 'project-store.js', 'player-profile-store.js', 'project.js', 'review.js', 'design/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'script',

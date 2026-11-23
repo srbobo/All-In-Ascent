@@ -1,4 +1,4 @@
-// AUTO-GENERATED FROM engine/{rng,telemetry,version,content,helpers,state,engine,stats,match-record,replay-record,observe,planner-model,planner-weights,value-model,value-weights,planner,cpu}.js — DO NOT EDIT BY HAND.
+// AUTO-GENERATED FROM engine/{rng,telemetry,version,content,helpers,state,engine,stats,match-record,replay-record,observe,planner-model,planner-weights,value-model,value-weights,planner,cpu,player-profile}.js — DO NOT EDIT BY HAND.
 //
 // Regenerate with: node engine/build-browser.js
 // The rules engine as one classic script, so local play (game.js) runs the
@@ -4486,8 +4486,9 @@ const { summarizeGame } = __stats;
 //   mode       'local' | 'online' | 'sim'
 //   startedAt  wall-clock ms when the game started
 //   finishedAt wall-clock ms when the game ended
-//   seats      per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel }
-//              (botModel: the CPU version that played, engine/cpu.js CPU_MODEL)
+//   seats      per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel, botRating }
+//              (botModel: the CPU version that played, engine/cpu.js CPU_MODEL;
+//              botRating: the rating an Adaptive CPU played at)
 
 
 
@@ -4571,6 +4572,7 @@ function buildMatchRecord(state, meta = {}) {
         controller,
         botLevel: controller === 'bot' ? (seat.botLevel || null) : null,
         botModel: controller === 'bot' && typeof seat.botModel === 'string' ? seat.botModel : null,
+        botRating: controller === 'bot' && Number.isFinite(seat.botRating) ? seat.botRating : null,
         won: p.playerNum === sum.winner,
         placement: placement[p.playerNum],
         final: p.final,
@@ -4615,6 +4617,7 @@ function validateMatchRecord(r, knownCharacters) {
     if (!knownCharacters.has(p.characterKey)) return 'unknown character';
     if (!['human', 'bot'].includes(p.controller)) return 'bad controller';
     if (p.botModel != null && (typeof p.botModel !== 'string' || p.botModel.length > 40)) return 'bad botModel';
+    if (p.botRating != null && !(Number.isFinite(p.botRating) && p.botRating >= 0 && p.botRating <= 4000)) return 'bad botRating';
     if (!isInt(p.placement, 1, 4) || !p.final || !isInt(p.final.level, 1, 100)) return 'bad player result';
     if (!isInt(p.final.milestonesCompleted, 0, TIERS.length)) return 'bad milestones';
     if (!Array.isArray(p.gear) || !Array.isArray(p.routes) || !p.training || !p.timeByArea) return 'bad player detail';
@@ -4651,7 +4654,7 @@ const { MATCH_MODES } = __match_record;
 //
 // meta (all optional):
 //   id, mode, startedAt, finishedAt   as for buildMatchRecord
-//   seats   per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel }
+//   seats   per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel, botRating }
 
 
 
@@ -4687,6 +4690,7 @@ function buildReplayRecord(state, meta = {}) {
         controller: bot ? 'bot' : 'human',
         botLevel: bot ? (seat.botLevel || null) : null,
         botModel: bot && typeof seat.botModel === 'string' ? seat.botModel : null,
+        botRating: bot && Number.isFinite(seat.botRating) ? seat.botRating : null,
       };
     }),
     ended: term.done,
@@ -4715,6 +4719,7 @@ function validateReplayRecord(r, knownCharacters) {
   for (const s of r.seats) {
     if (!s || !['human', 'bot'].includes(s.controller)) return 'bad controller';
     if (s.botModel != null && (typeof s.botModel !== 'string' || s.botModel.length > 40)) return 'bad botModel';
+    if (s.botRating != null && !(Number.isFinite(s.botRating) && s.botRating >= 0 && s.botRating <= 4000)) return 'bad botRating';
   }
   if (!Array.isArray(r.actions) || r.actions.length < 1 || r.actions.length > 20000) return 'bad actions';
   if (!r.actions.every(a => a && ACTION_TYPES.includes(a.type))) return 'bad action';
@@ -6154,10 +6159,12 @@ const { deriveSeed } = __rng;
 const { createPlannerAgent } = __planner;
 // Human-facing CPU opponents — one difficulty ladder for local and online play.
 //
-//   createCpuAgent(level, { seed }) → agent with chooseAction({ state, legalActions })
-//   CPU_LEVELS                      → { easy, medium, hard }: label + settings
+//   createCpuAgent(level, { seed, rating }) → agent with chooseAction({ state, legalActions })
+//   CPU_LEVELS                      → { easy, medium, hard, adaptive }: label + settings
 //   CPU_MODEL                       → version tag of the bot behind every level
 //   cpuSeed(gameSeed, seatIndex)    → the per-seat seed both modes use
+//   cpuRating(level, rating)        → a CPU's strength on the player-rating scale
+//   epsilonForRating(rating)        → the Adaptive CPU's random-move rate
 //
 // Every level is the planner bot (planner.js): one-step expectimax over the
 // engine's exact send chances, the strongest and fastest bot we have
@@ -6166,6 +6173,10 @@ const { createPlannerAgent } = __planner;
 // weights. Local play (game.js, through the browser bundle) and online play
 // (party/game.js) both build their CPUs here, so a "Hard CPU" is the same
 // opponent everywhere.
+//
+// The Adaptive level (Phase 4) plays the player's own rating
+// (player-profile.js): the tuned planner with the random-move rate whose
+// measured strength matches it (CPU_STRENGTH), so games stay close.
 //
 // CPU_MODEL is recorded in match and replay records (botModel), so the
 // dashboard can tell a change in bot skill from a change in game balance.
@@ -6176,11 +6187,33 @@ const { createPlannerAgent } = __planner;
 
 const CPU_MODEL = 'planner-1';
 
+// Strength on the player-rating scale (Elo, Hard = 1600), measured head to
+// head: Hard beat Medium 117–83 and Easy 157–43 over 200 games each.
 const CPU_LEVELS = {
-  easy:   { label: 'Easy',   epsilon: 0.35, tuned: false },
-  medium: { label: 'Medium', epsilon: 0.1,  tuned: false },
-  hard:   { label: 'Hard',   epsilon: 0,    tuned: true },
+  easy:     { label: 'Easy',     epsilon: 0.35, tuned: false, rating: 1375 },
+  medium:   { label: 'Medium',   epsilon: 0.1,  tuned: false, rating: 1540 },
+  hard:     { label: 'Hard',     epsilon: 0,    tuned: true,  rating: 1600 },
+  adaptive: { label: 'Adaptive', epsilon: null, tuned: true,  rating: null },
 };
+
+// The tuned planner's strength at each random-move rate ε, by rating
+// (strongest first). Measured by sim/learn/calibrate-epsilon.js: ε-Hard vs
+// Hard over every ordered character pair, seats swapped, Grit rules.
+// Rating = 1600 + the Elo gap of its win rate against Hard (480 games per
+// point; ε = 1, which never won, is left out — its gap is not measurable).
+// Below 964 the Adaptive CPU plays at ε = 0.7, its weakest.
+const CPU_STRENGTH = [
+  { epsilon: 0,    rating: 1600 },
+  { epsilon: 0.05, rating: 1578 }, // 46.9% vs Hard
+  { epsilon: 0.1,  rating: 1546 }, // 42.3%
+  { epsilon: 0.2,  rating: 1497 }, // 35.6%
+  { epsilon: 0.35, rating: 1372 }, // 21.3%
+  { epsilon: 0.5,  rating: 1272 }, // 13.1%
+  { epsilon: 0.7,  rating: 964 },  //  2.5%
+];
+
+// A new player starts level with the Medium CPU.
+const START_RATING = 1540;
 
 const CPU_LEVEL_KEYS = Object.keys(CPU_LEVELS);
 
@@ -6195,17 +6228,215 @@ function cpuSeed(gameSeed, seatIndex) {
   return deriveSeed(gameSeed >>> 0, 1000 + seatIndex);
 }
 
-function createCpuAgent(level, { seed = 1 } = {}) {
+// The random-move rate at which the tuned planner plays at `rating`
+// (linear between measured points; clamped to the curve's ends).
+function epsilonForRating(rating) {
+  const r = Number.isFinite(rating) ? rating : START_RATING;
+  const curve = CPU_STRENGTH;
+  if (r >= curve[0].rating) return curve[0].epsilon;
+  const last = curve[curve.length - 1];
+  if (r <= last.rating) return last.epsilon;
+  for (let i = 1; i < curve.length; i++) {
+    const hi = curve[i - 1];
+    const lo = curve[i];
+    if (r >= lo.rating) return lo.epsilon + (hi.epsilon - lo.epsilon) * (r - lo.rating) / (hi.rating - lo.rating);
+  }
+  return last.epsilon;
+}
+
+// A CPU's strength on the player-rating scale: the level's measured rating,
+// or for Adaptive the rating it was set to play at (clamped to the curve).
+function cpuRating(level, rating = null) {
   const key = cpuLevel(level);
-  const { epsilon, tuned } = CPU_LEVELS[key];
-  const agent = createPlannerAgent({ epsilon, tuned, seed });
+  if (key !== 'adaptive') return CPU_LEVELS[key].rating;
+  const r = Number.isFinite(rating) ? rating : START_RATING;
+  return Math.min(CPU_STRENGTH[0].rating, Math.max(CPU_STRENGTH[CPU_STRENGTH.length - 1].rating, r));
+}
+
+// `rating`: for the Adaptive level, the rating to play at (the player's).
+function createCpuAgent(level, { seed = 1, rating = null } = {}) {
+  const key = cpuLevel(level);
+  const lv = CPU_LEVELS[key];
+  const epsilon = key === 'adaptive' ? epsilonForRating(rating) : lv.epsilon;
+  const agent = createPlannerAgent({ epsilon, tuned: lv.tuned, seed });
   agent.name = `cpu-${key}`;
   agent.level = key;
   agent.model = CPU_MODEL;
+  agent.epsilon = epsilon;
+  agent.rating = cpuRating(key, rating);
   return agent;
 }
 
-return { CPU_MODEL, CPU_LEVELS, CPU_LEVEL_KEYS, cpuLevel, cpuSeed, createCpuAgent };
+return { CPU_MODEL, CPU_LEVELS, CPU_STRENGTH, START_RATING, CPU_LEVEL_KEYS, cpuLevel, cpuSeed, epsilonForRating, cpuRating, createCpuAgent };
+})();
+
+// ---- engine/player-profile.js ----
+const __player_profile = (function () {
+'use strict';
+const { summarizeGame } = __stats;
+const { cpuRating, START_RATING } = __cpu;
+// Player profiles — what the CPU knows about the person it plays against.
+//
+//   emptyProfile()                               → a new profile
+//   sanitizeProfile(anything)                    → a valid profile (or a new one)
+//   updateProfile(profile, state, { seat, seats }) → { profile, change }
+//
+// A profile lives in the player's own browser (player-profile-store.js) in
+// local and online play alike; the engine only computes it. It holds:
+//
+// - rating — an Elo-style rating against CPU opponents on the same scale as
+//   the CPU strength curve (cpu.js CPU_STRENGTH: Hard = 1600). Each finished
+//   game moves it by K/n · Σ (score − expected) over the n CPU opponents,
+//   where score is 1 / ½ / 0 for finishing above / level with / below that
+//   CPU in the standings. Games against humans only do not move it (their
+//   strength is unknown). The Adaptive CPU plays at this rating.
+// - record — games, wins, losses vs CPUs, games and wins per character.
+// - style — running averages of how the player spends Time (share climbing,
+//   training, resting, shopping) and rounds to finish per character.
+// - history — the last HISTORY_MAX rating changes.
+//
+// Nothing in it identifies the player: no names, no timestamps.
+
+
+
+
+const PROFILE_SCHEMA = 'aia-player-profile/1';
+const HISTORY_MAX = 20;
+const RATING_MIN = 600;
+const RATING_MAX = 2400;
+
+const STYLE_KEYS = ['climb', 'train', 'rest', 'shop'];
+
+function emptyProfile() {
+  return {
+    schema: PROFILE_SCHEMA,
+    rating: START_RATING,
+    games: 0,
+    cpuGames: 0,
+    wins: 0,
+    losses: 0,
+    byCharacter: {},
+    style: { games: 0, climb: 0, train: 0, rest: 0, shop: 0 },
+    pace: {},
+    history: [],
+  };
+}
+
+const num = (v, lo, hi, dflt) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : dflt);
+const int = (v) => Math.round(num(v, 0, 1e6, 0));
+
+// Whatever came out of storage (corrupt JSON, an old schema, edited by hand)
+// becomes a valid profile: unknown fields dropped, numbers clamped.
+function sanitizeProfile(p) {
+  const out = emptyProfile();
+  if (!p || typeof p !== 'object' || p.schema !== PROFILE_SCHEMA) return out;
+  out.rating = Math.round(num(p.rating, RATING_MIN, RATING_MAX, START_RATING));
+  out.games = int(p.games);
+  out.cpuGames = Math.min(out.games, int(p.cpuGames));
+  out.wins = Math.min(out.cpuGames, int(p.wins));
+  out.losses = Math.min(out.cpuGames - out.wins, int(p.losses));
+  if (p.byCharacter && typeof p.byCharacter === 'object') {
+    for (const [k, v] of Object.entries(p.byCharacter).slice(0, 50)) {
+      if (!/^[\w-]{1,40}$/.test(k) || !v || typeof v !== 'object') continue;
+      const games = int(v.games);
+      out.byCharacter[k] = { games, wins: Math.min(games, int(v.wins)) };
+    }
+  }
+  if (p.style && typeof p.style === 'object') {
+    out.style.games = int(p.style.games);
+    for (const k of STYLE_KEYS) out.style[k] = num(p.style[k], 0, 1, 0);
+  }
+  if (p.pace && typeof p.pace === 'object') {
+    for (const [k, v] of Object.entries(p.pace).slice(0, 50)) {
+      if (!/^[\w-]{1,40}$/.test(k) || !v || typeof v !== 'object') continue;
+      out.pace[k] = { games: int(v.games), rounds: num(v.rounds, 0, 1000, 0) };
+    }
+  }
+  if (Array.isArray(p.history)) {
+    out.history = p.history.slice(-HISTORY_MAX).filter(h => h && typeof h === 'object').map(h => ({
+      rating: Math.round(num(h.rating, RATING_MIN, RATING_MAX, START_RATING)),
+      delta: Math.round(num(h.delta, -400, 400, 0)),
+      won: !!h.won,
+      character: typeof h.character === 'string' ? h.character.slice(0, 40) : null,
+      rounds: int(h.rounds),
+      cpus: Array.isArray(h.cpus) ? h.cpus.slice(0, 3).map(c => String(c).slice(0, 12)) : [],
+    }));
+  }
+  return out;
+}
+
+function expectedScore(rating, opponentRating) {
+  return 1 / (1 + 10 ** ((opponentRating - rating) / 400));
+}
+
+// K shrinks once the rating has some games behind it.
+function ratingK(cpuGames) {
+  return cpuGames < 10 ? 48 : 24;
+}
+
+// Fold one finished game into the profile of the player at seat index `seat`.
+// `seats` lists who played every seat: { controller: 'human' } or
+// { controller: 'bot', botLevel, rating? } (rating: the Adaptive CPU's).
+// Returns the new profile and the rating change ({ before, after, delta,
+// cpus } — delta 0 and cpus [] when no CPU played). An unfinished game
+// changes nothing.
+function updateProfile(profileIn, state, { seat, seats = [] }) {
+  const profile = sanitizeProfile(profileIn);
+  const before = profile.rating;
+  const unchanged = { profile, change: { before, after: before, delta: 0, cpus: [], counted: false } };
+  if (!state || !state.gameEnded || !state.players[seat]) return unchanged;
+
+  const sum = summarizeGame(state);
+  const me = state.players[seat];
+  const mine = sum.players.find(p => p.playerNum === me.playerNum);
+  const place = (playerNum) => sum.standings.indexOf(playerNum);
+  const won = sum.winner === me.playerNum;
+
+  // Rating: against every CPU seat.
+  const cpus = [];
+  let total = 0;
+  state.players.forEach((p, i) => {
+    const s = seats[i];
+    if (i === seat || !s || s.controller !== 'bot') return;
+    const r = cpuRating(s.botLevel, s.rating);
+    const score = place(me.playerNum) < place(p.playerNum) ? 1 : place(me.playerNum) === place(p.playerNum) ? 0.5 : 0;
+    total += score - expectedScore(before, r);
+    cpus.push(s.botLevel || 'easy');
+  });
+  let delta = 0;
+  if (cpus.length) {
+    delta = Math.round(ratingK(profile.cpuGames) * total / cpus.length);
+    profile.rating = Math.min(RATING_MAX, Math.max(RATING_MIN, before + delta));
+    delta = profile.rating - before;
+    profile.cpuGames++;
+    if (won) profile.wins++; else profile.losses++;
+  }
+
+  // Record and style.
+  profile.games++;
+  const key = me.character.key;
+  const ch = profile.byCharacter[key] || { games: 0, wins: 0 };
+  profile.byCharacter[key] = { games: ch.games + 1, wins: ch.wins + (won ? 1 : 0) };
+  const t = mine.timeByArea;
+  const climb = (t.bouldering || 0) + (t.topRope || 0) + (t.leadClimbing || 0) + (t.milestone || 0);
+  const parts = { climb, train: t.training || 0, rest: t.rest || 0, shop: t.gearShop || 0 };
+  const spent = parts.climb + parts.train + parts.rest + parts.shop;
+  if (spent > 0) {
+    const n = profile.style.games;
+    for (const k of STYLE_KEYS) profile.style[k] = (profile.style[k] * n + parts[k] / spent) / (n + 1);
+    profile.style.games = n + 1;
+  }
+  if (mine.final.milestonesCompleted === 3) {
+    const p = profile.pace[key] || { games: 0, rounds: 0 };
+    profile.pace[key] = { games: p.games + 1, rounds: (p.rounds * p.games + sum.rounds) / (p.games + 1) };
+  }
+  if (cpus.length) {
+    profile.history = [...profile.history, { rating: profile.rating, delta, won, character: key, rounds: sum.rounds, cpus }].slice(-HISTORY_MAX);
+  }
+  return { profile, change: { before, after: profile.rating, delta, cpus, counted: cpus.length > 0 } };
+}
+
+return { PROFILE_SCHEMA, HISTORY_MAX, RATING_MIN, RATING_MAX, emptyProfile, sanitizeProfile, expectedScore, ratingK, updateProfile };
 })();
 
 return {
@@ -6367,9 +6598,22 @@ return {
   choosePlannerAction: __planner.choosePlannerAction,
   CPU_MODEL: __cpu.CPU_MODEL,
   CPU_LEVELS: __cpu.CPU_LEVELS,
+  CPU_STRENGTH: __cpu.CPU_STRENGTH,
+  START_RATING: __cpu.START_RATING,
   CPU_LEVEL_KEYS: __cpu.CPU_LEVEL_KEYS,
   cpuLevel: __cpu.cpuLevel,
   cpuSeed: __cpu.cpuSeed,
+  epsilonForRating: __cpu.epsilonForRating,
+  cpuRating: __cpu.cpuRating,
   createCpuAgent: __cpu.createCpuAgent,
+  PROFILE_SCHEMA: __player_profile.PROFILE_SCHEMA,
+  HISTORY_MAX: __player_profile.HISTORY_MAX,
+  RATING_MIN: __player_profile.RATING_MIN,
+  RATING_MAX: __player_profile.RATING_MAX,
+  emptyProfile: __player_profile.emptyProfile,
+  sanitizeProfile: __player_profile.sanitizeProfile,
+  expectedScore: __player_profile.expectedScore,
+  ratingK: __player_profile.ratingK,
+  updateProfile: __player_profile.updateProfile,
 };
 })();

@@ -103,6 +103,9 @@
       case 'welcome':
         OnlineMode.me = { id: msg.yourId, username: msg.username, isHost: msg.isHost };
         OnlineMode.characters = msg.characters || [];
+        // Our rating (profile kept in this browser) so an Adaptive CPU can
+        // play at it. Only the number leaves the browser.
+        if (window.AscentProfile) send({ type: 'set_rating', rating: window.AscentProfile.load().rating });
         break;
 
       case 'lobby':
@@ -327,10 +330,21 @@
       const seatsByPlayer = OnlineMode.seats.filter(Boolean);
       serverState.players.forEach((p, i) => { if (seatsByPlayer[i]) names[p.playerNum] = seatsByPlayer[i].username; });
       const mine = seatsByPlayer.findIndex(s => !s.isBot && s.username === OnlineMode.me.username);
+      // Fold the game into our profile (engine updateProfile) when we were the
+      // only human at the table, as local play does.
+      let rating = null;
+      const humans = seatsByPlayer.filter(s => !s.isBot).length;
+      if (mine >= 0 && humans === 1 && window.AscentProfile) {
+        const seats = seatsByPlayer.map(s => (s.isBot
+          ? { controller: 'bot', botLevel: s.botLevel, rating: s.botRating }
+          : { controller: 'human' }));
+        rating = window.AscentProfile.record(serverState, mine, seats);
+      }
       window.showGameSummary(serverState, {
         names,
         you: mine >= 0 ? serverState.players[mine].playerNum : null,
         online: true,
+        ...(rating && rating.counted ? { rating } : {}),
       });
     }
   }

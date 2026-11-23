@@ -17,7 +17,7 @@
 //
 // meta (all optional):
 //   id, mode, startedAt, finishedAt   as for buildMatchRecord
-//   seats   per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel }
+//   seats   per seat, in player order: { controller: 'human' | 'bot', botLevel, botModel, botRating }
 
 import { ENGINE_VERSION_STRING } from './version.js';
 import { createGame } from './state.js';
@@ -53,6 +53,7 @@ export function buildReplayRecord(state, meta = {}) {
         controller: bot ? 'bot' : 'human',
         botLevel: bot ? (seat.botLevel || null) : null,
         botModel: bot && typeof seat.botModel === 'string' ? seat.botModel : null,
+        botRating: bot && Number.isFinite(seat.botRating) ? seat.botRating : null,
       };
     }),
     ended: term.done,
@@ -81,6 +82,7 @@ export function validateReplayRecord(r, knownCharacters) {
   for (const s of r.seats) {
     if (!s || !['human', 'bot'].includes(s.controller)) return 'bad controller';
     if (s.botModel != null && (typeof s.botModel !== 'string' || s.botModel.length > 40)) return 'bad botModel';
+    if (s.botRating != null && !(Number.isFinite(s.botRating) && s.botRating >= 0 && s.botRating <= 4000)) return 'bad botRating';
   }
   if (!Array.isArray(r.actions) || r.actions.length < 1 || r.actions.length > 20000) return 'bad actions';
   if (!r.actions.every(a => a && ACTION_TYPES.includes(a.type))) return 'bad action';
