@@ -20,6 +20,7 @@ import * as recordModule from './match-record.js';
 import * as replayModule from './replay-record.js';
 import * as cpuModule from './cpu.js';
 import * as observeModule from './observe.js';
+import * as profileModule from './player-profile.js';
 import { GRIT_RULES } from './helpers.js';
 import { createRng } from './rng.js';
 import { CHARACTERS, ROUTES, GEAR_SHOP } from './data.js';
@@ -48,7 +49,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 check('engine.browser.js exposes window.AscentEngine', !!browser);
 for (const [name, mod] of [['engine.js', engineModule], ['state.js', stateModule], ['helpers.js', helpersModule], ['stats.js', statsModule],
-  ['replay-record.js', replayModule], ['cpu.js', cpuModule], ['observe.js', observeModule]]) {
+  ['replay-record.js', replayModule], ['cpu.js', cpuModule], ['observe.js', observeModule], ['player-profile.js', profileModule]]) {
   const missing = Object.keys(mod).filter(k => !(k in browser));
   check(`bundle exposes every ${name} export`, missing.length === 0, `missing: ${missing.join(', ')}`);
 }
@@ -133,6 +134,11 @@ check(`bundle plays identically to the engine (${games} games, ${steps} actions)
     const seats = levels.map(lv => ({ controller: 'bot', botLevel: lv, botModel: cpuModule.CPU_MODEL }));
     const meta = { id: `cpu-parity-${seed}`, mode: 'local', startedAt: 1, finishedAt: 2, seats };
     if (!same(replayModule.buildReplayRecord(a, meta), browser.buildReplayRecord(b, meta))) { cpuDiff = `seed ${seed}: buildReplayRecord`; break; }
+    // The player's profile update (local play does it in the browser).
+    const pseats = levels.map((lv, i) => (i === 0 ? { controller: 'human' } : { controller: 'bot', botLevel: lv, rating: 1450 }));
+    if (!same(profileModule.updateProfile(null, a, { seat: 0, seats: pseats }), browser.updateProfile(null, b, { seat: 0, seats: pseats }))) {
+      cpuDiff = `seed ${seed}: updateProfile`; break;
+    }
   }
   check(`bundle CPU plays identically to the engine CPU (${cpuMoves} moves, every level)`, !cpuDiff, cpuDiff);
   check('bundle CPU model and ladder match the engine', browser.CPU_MODEL === cpuModule.CPU_MODEL

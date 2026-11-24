@@ -5,11 +5,13 @@
 // through the Node engine and records a replay for the learning CPU.
 
 import { test, expect } from '@playwright/test';
-import { CPU_LEVELS, CPU_MODEL } from '../../engine/cpu.js';
+import { CPU_LEVELS, CPU_MODEL, START_RATING } from '../../engine/cpu.js';
+import { emptyProfile, updateProfile } from '../../engine/player-profile.js';
 import { buildMatchRecord } from '../../engine/match-record.js';
 import { buildReplayRecord, replayRecordState } from '../../engine/replay-record.js';
 import {
   seedPageRandom, collectPageErrors, collectDialogs, fastEffects, cardAction, uiStep, replayInEngine, asJson,
+  nearlyFinishedGame,
 } from './support.js';
 
 const TELEMETRY = '/parties/telemetry/global';
@@ -159,6 +161,67 @@ test('a local game against CPU climbers plays to the end, replays through the en
     id, mode: 'local', startedAt: replay.startedAt, finishedAt: replay.finishedAt, seats,
   })));
   expect(asJson(replayRecordState(replay))).toEqual(browserState);
+  expect(dialogs).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------
+// The player's record and the Adaptive CPU (engine/player-profile.js)
+// ---------------------------------------------------------------------------
+
+test('a win against an Adaptive CPU moves the rating, which this browser keeps and can reset', async ({ page }) => {
+  const errors = collectPageErrors(page);
+  const dialogs = collectDialogs(page);
+  await setCpuDelay(page, 600000); // the CPU never moves by itself in this test
+  await page.goto('/index.html');
+
+  // A new player: Medium's rating, no games, Adaptive plays like Medium.
+  const card = page.getByTestId('profile-card');
+  await expect(card.getByTestId('profile-rating')).toHaveText(`Rating ${START_RATING}`);
+  await expect(card).toContainText('No games against CPUs yet');
+  await expect(card.getByTestId('profile-adaptive')).toContainText('about Medium');
+  await expect(card.locator('#profileResetBtn')).toHaveCount(0);
+
+  // One human (Technician) against one Adaptive CPU (Sprinter), picked by hand.
+  await page.locator('#cpuCount input[value="1"]').check({ force: true });
+  await page.selectOption('#cpuLevel', 'adaptive');
+  await page.click('#continueBtn');
+  await cardAction(page, '#characterSelect', 'The Technician').click();
+  await cardAction(page, '#characterSelect', 'The Sprinter').click();
+  await page.click('#startGameBtn');
+  await fastEffects(page);
+  expect(await page.evaluate(() => getLocalSeats())).toEqual([
+    { controller: 'human' }, { controller: 'bot', botLevel: 'adaptive', rating: START_RATING },
+  ]);
+
+  // Jump to one send from the human winning, and send it through the UI.
+  const { before, last, final } = await nearlyFinishedGame({ seed: 5, characterKeys: ['technician', 'sprinter'], winner: 1 });
+  await page.evaluate((s) => { setGameState(s); renderGameBoard(); }, asJson(before));
+  await cardAction(page, '#milestonePanel', before.milestoneRoutes[last.difficulty].route.name).click();
+  await page.locator('#climbModal .action-buttons button').click();
+
+  // The summary shows the engine's rating change.
+  const seats = [{ controller: 'human' }, { controller: 'bot', botLevel: 'adaptive', rating: START_RATING }];
+  const { change, profile } = updateProfile(emptyProfile(), final, { seat: 0, seats });
+  expect(change.delta).toBeGreaterThan(0);
+  const line = page.getByTestId('rating-change');
+  await expect(line).toContainText(`Your rating ${START_RATING} → ${change.after}`);
+  await expect(line).toContainText(`+${change.delta}`);
+  await expect(line).toContainText('vs Adaptive CPU');
+
+  // Kept in this browser: after a reload the card shows the new record.
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('all-in-ascent.profile')));
+  expect(stored).toEqual(asJson(profile));
+  await page.reload();
+  await expect(card.getByTestId('profile-rating')).toHaveText(`Rating ${change.after}`);
+  await expect(card).toContainText('1 game vs CPUs · 1 won, 0 lost');
+
+  // Reset takes two clicks.
+  await card.locator('#profileResetBtn').click();
+  await expect(card.locator('#profileResetBtn')).toHaveText('Click again to reset your record');
+  await card.locator('#profileResetBtn').click();
+  await expect(card.getByTestId('profile-rating')).toHaveText(`Rating ${START_RATING}`);
+  expect(await page.evaluate(() => localStorage.getItem('all-in-ascent.profile'))).toBeNull();
   expect(dialogs).toEqual([]);
   expect(errors).toEqual([]);
 });

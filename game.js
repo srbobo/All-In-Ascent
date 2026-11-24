@@ -516,6 +516,66 @@ function initCpuSetup() {
  if (humans) humans.addEventListener('change', syncCpuCount);
  if (cpus) cpus.addEventListener('change', syncCpuCount);
  syncCpuCount();
+ renderProfileCard();
+}
+
+// ---- The player's record (player-profile-store.js, engine player-profile.js) ----
+// One profile per browser. It counts games with exactly one human at the
+// table and at least one CPU (whose strength is known); the Adaptive CPU
+// plays at its rating.
+
+function playerProfile() {
+ return window.AscentProfile && window.AscentEngine ? window.AscentProfile.load() : null;
+}
+
+// Which fixed level the Adaptive CPU is closest to at `rating`.
+function adaptiveLike(rating) {
+ const levels = AscentEngine.CPU_LEVEL_KEYS.filter(k => k !== 'adaptive');
+ const easy = AscentEngine.CPU_LEVELS.easy.rating;
+ if (rating < easy - 60) return 'gentler than Easy';
+ const nearest = levels.reduce((a, k) => (Math.abs(AscentEngine.CPU_LEVELS[k].rating - rating) < Math.abs(AscentEngine.CPU_LEVELS[a].rating - rating) ? k : a));
+ if (Math.abs(AscentEngine.CPU_LEVELS[nearest].rating - rating) <= 30 || rating > AscentEngine.CPU_LEVELS.hard.rating) return `about ${cpuLevelLabel(nearest)}`;
+ // Between two levels (they are listed easiest first).
+ const above = levels.find(k => AscentEngine.CPU_LEVELS[k].rating > rating);
+ const below = [...levels].reverse().find(k => AscentEngine.CPU_LEVELS[k].rating <= rating);
+ return above && below ? `between ${cpuLevelLabel(below)} and ${cpuLevelLabel(above)}` : `about ${cpuLevelLabel(nearest)}`;
+}
+
+let profileResetArmed = false;
+
+function renderProfileCard() {
+ const card = document.getElementById('profileCard');
+ const profile = playerProfile();
+ if (!card || !profile) return;
+ const record = profile.cpuGames
+  ? `${profile.cpuGames} game${profile.cpuGames === 1 ? '' : 's'} vs CPUs · ${profile.wins} won, ${profile.losses} lost`
+  : 'No games against CPUs yet';
+ card.innerHTML = `
+  <p class="pc-title">Your climbing record <span>· kept in this browser only</span></p>
+  <p class="pc-stats"><span class="pc-rating" data-testid="profile-rating">Rating ${profile.rating}</span> · ${uiEsc(record)}</p>
+  <p class="pc-adaptive" data-testid="profile-adaptive">The Adaptive CPU plays at your rating: ${uiEsc(adaptiveLike(profile.rating))} right now. It counts games with one human player.</p>
+  ${profile.games ? `<button class="btn btn--ghost btn--sm" type="button" id="profileResetBtn">${profileResetArmed ? 'Click again to reset your record' : 'Reset record'}</button>` : ''}`;
+ const reset = document.getElementById('profileResetBtn');
+ if (reset) {
+  reset.onclick = () => {
+   if (!profileResetArmed) { profileResetArmed = true; renderProfileCard(); return; }
+   profileResetArmed = false;
+   window.AscentProfile.reset();
+   renderProfileCard();
+  };
+ }
+}
+
+// After a finished local game: fold it into the profile when exactly one
+// human played. Returns the engine's rating change (or null).
+function recordLocalProfile(state) {
+ if (!window.AscentProfile) return null;
+ const humanSeats = localSeats.length
+  ? localSeats.map((s, i) => (s.controller === 'human' ? i : -1)).filter(i => i >= 0)
+  : state.players.map((_, i) => i);
+ if (humanSeats.length !== 1) return null;
+ const seats = state.players.map((_, i) => localSeats[i] || { controller: 'human' });
+ return window.AscentProfile.record(state, humanSeats[0], seats);
 }
 if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', initCpuSetup);
 
@@ -713,10 +773,14 @@ function startGame() {
  }).state;
  gameStartedAt = Date.now();
  // CPU climbers: one engine CPU agent per CPU seat, seeded from the game.
- localSeats = setupSeats.map(s => ({ ...s }));
+ // An Adaptive CPU plays at the player's rating (their profile in this browser).
+ const profile = playerProfile();
+ localSeats = setupSeats.map(s => (s.controller === 'bot' && s.botLevel === 'adaptive'
+  ? { ...s, rating: AscentEngine.cpuRating('adaptive', profile ? profile.rating : null) }
+  : { ...s }));
  cpuAgents = {};
  localSeats.forEach((seat, i) => {
-  if (seat.controller === 'bot') cpuAgents[i] = AscentEngine.createCpuAgent(seat.botLevel, { seed: AscentEngine.cpuSeed(seed, i) });
+  if (seat.controller === 'bot') cpuAgents[i] = AscentEngine.createCpuAgent(seat.botLevel, { seed: AscentEngine.cpuSeed(seed, i), rating: seat.rating });
  });
 
  renderGameBoard();
@@ -1252,7 +1316,10 @@ function applyLocalAction(action, afterRender = null, { cpu = false } = {}) {
  const before = gameState;
  const { state, events } = AscentEngine.applyAction(before, action);
  gameState = state;
- if (state.gameEnded && !before.gameEnded) recordLocalGame(state);
+ if (state.gameEnded && !before.gameEnded) {
+  recordLocalGame(state);
+  localRatingChange = recordLocalProfile(state);
+ }
  presentEvents(before, events, afterRender, { cpu });
 }
 
@@ -1265,6 +1332,9 @@ function applyLocalAction(action, afterRender = null, { cpu = false } = {}) {
 //
 // Pauses are presentation only. Tests set window.AIA_CPU_DELAY_MS (e.g. 0)
 // to use one delay for everything.
+// The finished local game's rating change (engine updateProfile), shown in
+// the post-game summary.
+let localRatingChange = null;
 const CPU_MOVE_DELAY_MS = 700;     // before each CPU move
 const CPU_RESULT_DELAY_MS = 1800;  // a CPU's climb result / level-up stays up this long
 let cpuTimer = null;
@@ -1334,7 +1404,7 @@ function recordLocalGame(state) {
  startedAt: gameStartedAt,
  finishedAt: Date.now(),
  seats: state.players.map((_, i) => (localSeats[i]?.controller === 'bot'
-  ? { controller: 'bot', botLevel: localSeats[i].botLevel, botModel: AscentEngine.CPU_MODEL }
+  ? { controller: 'bot', botLevel: localSeats[i].botLevel, botModel: AscentEngine.CPU_MODEL, ...(localSeats[i].rating != null ? { botRating: localSeats[i].rating } : {}) }
   : { controller: 'human' })),
  };
  window.AscentTelemetry.sendMatch(AscentEngine.buildMatchRecord(state, meta));
@@ -1512,7 +1582,10 @@ function finishPresentation() {
  const end = p.turnEvents.find(e => e.type === 'game_end');
  if (end) {
   const names = localSeatNames();
-  setTimeout(() => showGameSummary(gameState, names ? { names } : {}), 500);
+  const opts = {};
+  if (names) opts.names = names;
+  if (localRatingChange && localRatingChange.counted) opts.rating = localRatingChange;
+  setTimeout(() => showGameSummary(gameState, opts), 500);
  }
  maybeRunCpu();
 }
@@ -1828,6 +1901,8 @@ let summaryOptions = {};
 // `opts.names`: { playerNum: display name } (online usernames; local play
 // shows "Player N"). `opts.you`: the viewer's playerNum, if any.
 // `opts.online`: the "play again" button leads back to online.html.
+// `opts.rating`: the viewer's rating change from this game (engine
+// updateProfile's change), shown under the banner.
 function showGameSummary(state = gameState, opts = summaryOptions) {
  summaryOptions = opts || {};
  // The HUD's "Game over · X wins" line uses the same names.
@@ -1845,6 +1920,11 @@ function showGameSummary(state = gameState, opts = summaryOptions) {
    <p class="who">${uiEsc(who(winner.playerNum))} · ${uiEsc(winner.characterName)}</p>
    <p>Sent all three milestone projects in round ${sum.rounds}.</p>
   </div>` : '';
+ const r = summaryOptions.rating;
+ const ratingLine = r && r.counted ? `
+  <p class="summary-rating" data-testid="rating-change">Your rating ${r.before} → <strong>${r.after}</strong>
+   <span class="summary-rating__delta ${r.delta >= 0 ? 'up' : 'down'}">${r.delta >= 0 ? '+' : '−'}${Math.abs(r.delta)}</span>
+   · vs ${uiEsc(r.cpus.map(c => `${cpuLevelLabel(c)} CPU`).join(', '))}</p>` : '';
 
  const standings = sum.standings.map((n, i) => {
   const p = byNum[n];
@@ -1860,7 +1940,7 @@ function showGameSummary(state = gameState, opts = summaryOptions) {
  <div class="victory summary" data-testid="game-summary">
   <p class="eyebrow">Game over · ${sum.rounds} round${sum.rounds === 1 ? '' : 's'}</p>
   <h2 id="victoryTitle">${winner ? 'Top out!' : 'Game over'}</h2>
-  ${banner}
+  ${banner}${ratingLine}
   <section class="summary-section" aria-labelledby="sumStandings">
    <h3 id="sumStandings">Final standings</h3>
    <ol class="final-standings">${standings}</ol>

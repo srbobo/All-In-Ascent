@@ -44,7 +44,7 @@ async function playCpus(seed, characterKeys, levels, maxSteps = 6000) {
 // ---------------------------------------------------------------------------
 // The ladder
 // ---------------------------------------------------------------------------
-check('three levels, easiest first', CPU_LEVEL_KEYS.join() === 'easy,medium,hard');
+check('three fixed levels, easiest first, then Adaptive', CPU_LEVEL_KEYS.join() === 'easy,medium,hard,adaptive');
 check('every level has a label', CPU_LEVEL_KEYS.every(k => typeof CPU_LEVELS[k].label === 'string' && CPU_LEVELS[k].label));
 check('random moves fall as the level rises', CPU_LEVELS.easy.epsilon > CPU_LEVELS.medium.epsilon && CPU_LEVELS.medium.epsilon > CPU_LEVELS.hard.epsilon
   && CPU_LEVELS.hard.epsilon === 0);
@@ -125,7 +125,7 @@ check('per-seat seeds differ by seat and by game', cpuSeed(7, 0) !== cpuSeed(7, 
   check('replay: characters in seat order', rep.characterKeys.join() === keys.join());
   check('replay: seats say who played (and nothing else)', rep.seats[0].controller === 'human' && rep.seats[0].botLevel === null
     && rep.seats[0].botModel === null && rep.seats[1].controller === 'bot' && rep.seats[1].botLevel === 'medium'
-    && rep.seats[1].botModel === CPU_MODEL && rep.seats.every(s => Object.keys(s).sort().join() === 'botLevel,botModel,controller'));
+    && rep.seats[1].botModel === CPU_MODEL && rep.seats.every(s => Object.keys(s).sort().join() === 'botLevel,botModel,botRating,controller'));
   const actionEvents = state.events.filter(e => e.type === 'action_chosen');
   check('replay: one action per action_chosen event', rep.actions.length === actionEvents.length && rep.actions.length > 100);
   check('replay: rebuilds the final state exactly', JSON.stringify(replayRecordState(rep)) === before);

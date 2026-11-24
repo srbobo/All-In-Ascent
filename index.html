@@ -72,6 +72,9 @@
             <select id="cpuLevel" data-testid="cpu-level"></select>
           </label>
         </div>
+        <!-- The player's record against CPUs (player-profile-store.js; kept in
+             this browser only). game.js renders it. -->
+        <div class="profile-card" id="profileCard" data-testid="profile-card"></div>
       </div>
       <div class="setup-row">
         <button class="btn btn--marigold" id="continueBtn" type="button" onclick="startCharacterSelect()">Choose climbers ▸</button>
@@ -225,6 +228,7 @@
 <script src="backend.js"></script>
 <script src="telemetry-client.js"></script>
 <script src="project-store.js"></script>
+<script src="player-profile-store.js"></script>
 <script src="online-mode.js"></script>
 <script src="effects.js"></script>
 <script src="game.js"></script>

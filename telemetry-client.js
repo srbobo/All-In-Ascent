@@ -56,16 +56,25 @@
 
   // POST a record. text/plain keeps it a "simple" request (no CORS
   // preflight). keepalive lets it finish if the page closes, but browsers
-  // cap keepalive bodies at 64 KB, so bigger ones (long replays) go without.
+  // cap the keepalive bodies IN FLIGHT AT ONCE at 64 KB in total (a match
+  // record and a long replay are sent together), and a request over the cap
+  // fails outright. So keepalive is used only while the in-flight total stays
+  // under the cap; anything else is sent as a normal request.
   // Resolves to true when the server stored it; never throws.
+  const KEEPALIVE_BUDGET = 60000;
+  let keepaliveInFlight = 0;
   async function post(url, record) {
     if (!url || !enabled()) return false;
     const body = JSON.stringify(record);
+    const keepalive = keepaliveInFlight + body.length < KEEPALIVE_BUDGET;
+    if (keepalive) keepaliveInFlight += body.length;
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain' }, body, keepalive: body.length < 60000 });
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain' }, body, keepalive });
       return res.ok;
     } catch {
       return false;
+    } finally {
+      if (keepalive) keepaliveInFlight -= body.length;
     }
   }
 

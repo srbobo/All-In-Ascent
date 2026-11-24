@@ -13,7 +13,8 @@ import { getLegalActions, applyAction } from '../engine/engine.js';
 import { GRIT_RULES } from '../engine/helpers.js';
 import { buildMatchRecord } from '../engine/match-record.js';
 import { buildReplayRecord, replayRecordState, REPLAY_RECORD_SCHEMA } from '../engine/replay-record.js';
-import { CPU_MODEL } from '../engine/cpu.js';
+import { CPU_MODEL, epsilonForRating } from '../engine/cpu.js';
+import { RATING_MAX } from '../engine/player-profile.js';
 import { createPlannerAgent } from '../sim/agents/planner.js';
 
 const results = [];
@@ -186,6 +187,35 @@ const record = buildMatchRecord(game5, { id: 'local-test-0001', mode: 'local', s
   check('online replay: rebuilds the final state exactly', rep0
     && JSON.stringify(replayRecordState(rep0)) === JSON.stringify(game.state));
   check('online replay: no usernames', rep0 && !JSON.stringify(rep0).includes('alice'));
+}
+{
+  // Adaptive CPUs: players send their rating; the bot plays at the table's mean.
+  const game = new (GameRoom(TestServer))({ name: 'adaptive-room' });
+  const sent = { host: [], guest: [] };
+  const host = { id: 'host', send(m) { sent.host.push(JSON.parse(m)); }, close() {} };
+  const guest = { id: 'guest', send(m) { sent.guest.push(JSON.parse(m)); }, close() {} };
+  game.onConnect(host, { request: { url: 'ws://x/party?username=alice&password=pw' } });
+  game.onConnect(guest, { request: { url: 'ws://x/party?username=bob&password=pw' } });
+  await game.onMessage(host, JSON.stringify({ type: 'set_rating', rating: 1300 }));
+  await game.onMessage(guest, JSON.stringify({ type: 'set_rating', rating: 99999 }));
+  check('set_rating: stored per human seat, clamped to the rating range', game.seats[0].rating === 1300 && game.seats[1].rating === RATING_MAX);
+  await game.onMessage(guest, JSON.stringify({ type: 'set_rating', rating: 'lots' }));
+  check('set_rating: a non-number is ignored', game.seats[1].rating === RATING_MAX);
+  await game.onMessage(guest, JSON.stringify({ type: 'set_rating', rating: 1700 }));
+  await game.onMessage(host, JSON.stringify({ type: 'select_character', characterKey: 'technician' }));
+  await game.onMessage(guest, JSON.stringify({ type: 'select_character', characterKey: 'sprinter' }));
+  await game.onMessage(host, JSON.stringify({ type: 'add_bot', difficulty: 'adaptive' }));
+  check('adaptive bot seat is labelled', game.seats[2].isBot && /Adaptive/.test(game.seats[2].username));
+  game.maybePlayBot = async () => {}; // keep the room still for inspection
+  await game.onMessage(host, JSON.stringify({ type: 'start_game' }));
+  const agent = game.botAgents[2];
+  check('adaptive bot plays at the mean human rating (1300, 1700 → 1500)', agent && agent.level === 'adaptive' && agent.rating === 1500
+    && Math.abs(agent.epsilon - epsilonForRating(1500)) < 1e-12 && game.seats[2].botRating === 1500);
+  await game.onMessage(host, JSON.stringify({ type: 'set_rating', rating: 900 }));
+  check('set_rating: ignored once the game has started', game.seats[0].rating === 1300);
+  const msg = game.stateMessage();
+  check('state message: bot seats carry level and rating; humans do not', msg.seats[2].botLevel === 'adaptive' && msg.seats[2].botRating === 1500
+    && !('botLevel' in msg.seats[0]) && !('rating' in msg.seats[0]));
 }
 {
   // Without a telemetry room (GameRoom's default telemetry()) a game still ends cleanly.

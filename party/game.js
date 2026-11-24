@@ -39,7 +39,8 @@ import { isWellFormedStatShift, canUseStatShift, GRIT_RULES } from '../engine/he
 import { buildMatchRecord } from '../engine/match-record.js';
 import { buildReplayRecord } from '../engine/replay-record.js';
 import { TELEMETRY_ROOM } from './telemetry.js';
-import { CPU_LEVELS, CPU_MODEL, cpuLevel, cpuSeed, createCpuAgent } from '../engine/cpu.js';
+import { CPU_LEVELS, CPU_MODEL, START_RATING, cpuLevel, cpuRating, cpuSeed, createCpuAgent } from '../engine/cpu.js';
+import { RATING_MIN, RATING_MAX } from '../engine/player-profile.js';
 
 const MAX_SEATS = 4;
 // Pause between bot moves so humans can read what happened. Headless runs set
@@ -182,6 +183,16 @@ export const GameRoom = (Base) => class GameRoom extends Base {
         this.broadcastLobby();
         break;
 
+      // A player's rating from their own profile (kept in their browser,
+      // player-profile-store.js). Only the number is sent; Adaptive CPUs
+      // play at the mean rating of the humans at the table.
+      case 'set_rating':
+        if (!seat || seat.isBot || this.phase !== 'lobby') return;
+        if (typeof msg.rating === 'number' && Number.isFinite(msg.rating)) {
+          seat.rating = Math.round(Math.min(RATING_MAX, Math.max(RATING_MIN, msg.rating)));
+        }
+        break;
+
       case 'remove_bot':
         if (!isHost || this.phase !== 'lobby') return;
         if (typeof msg.seatIndex === 'number' && this.seats[msg.seatIndex]?.isBot) {
@@ -298,11 +309,17 @@ export const GameRoom = (Base) => class GameRoom extends Base {
     });
 
     // Set up bot agents for bot seats, by difficulty level (engine/cpu.js),
-    // seeded from the game so their choices are reproducible.
+    // seeded from the game so their choices are reproducible. Adaptive bots
+    // play at the mean rating the humans sent (set_rating), or a new
+    // player's rating if nobody did.
+    const ratings = orderedSeats.filter(s => !s.isBot && Number.isFinite(s.rating)).map(s => s.rating);
+    const tableRating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : START_RATING;
     this.botAgents = {};
     for (let i = 0; i < orderedSeats.length; i++) {
-      if (orderedSeats[i].isBot) {
-        this.botAgents[i] = createCpuAgent(orderedSeats[i].botDifficulty, { seed: cpuSeed(seed, i) });
+      const s = orderedSeats[i];
+      if (s.isBot) {
+        s.botRating = cpuLevel(s.botDifficulty) === 'adaptive' ? Math.round(cpuRating('adaptive', tableRating)) : null;
+        this.botAgents[i] = createCpuAgent(s.botDifficulty, { seed: cpuSeed(seed, i), rating: s.botRating });
       }
     }
 
@@ -431,7 +448,7 @@ export const GameRoom = (Base) => class GameRoom extends Base {
       startedAt: this.startedAt,
       finishedAt: this.finishedAt,
       seats: this.seats.filter(Boolean).map(s => (s.isBot
-        ? { controller: 'bot', botLevel: cpuLevel(s.botDifficulty), botModel: CPU_MODEL }
+        ? { controller: 'bot', botLevel: cpuLevel(s.botDifficulty), botModel: CPU_MODEL, ...(s.botRating != null ? { botRating: s.botRating } : {}) }
         : { controller: 'human' })),
     };
     const post = async (what, query, record) => {
@@ -529,11 +546,14 @@ export const GameRoom = (Base) => class GameRoom extends Base {
       phase: this.phase,
       state: this.state,
       legalActions,
+      // Bots' level and Adaptive rating let each client update its own
+      // profile (player-profile.js) when the game ends.
       seats: this.seats.map(s => s && ({
         username: s.username,
         isBot: s.isBot,
         characterKey: s.characterKey,
         connected: s.connected,
+        ...(s.isBot ? { botLevel: cpuLevel(s.botDifficulty), botRating: s.botRating ?? null } : {}),
       })),
     };
   }
